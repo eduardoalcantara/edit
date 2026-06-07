@@ -62,6 +62,16 @@ impl Tabulation {
         }
     }
 
+    /// Rótulo legível na barra de status (ex.: `Tab 4`; literal = `Tab`).
+    pub fn footer_label(self) -> &'static str {
+        match self {
+            Tabulation::Spaces2 => "Tab 2",
+            Tabulation::Spaces4 => "Tab 4",
+            Tabulation::Spaces8 => "Tab 8",
+            Tabulation::TabLiteral => "Tab",
+        }
+    }
+
     pub fn insert_text(self) -> &'static str {
         match self {
             Tabulation::Spaces2 => "  ",

@@ -7,4 +7,5 @@ rust-version = "1.85"
 [dependencies]
 ratatui = "0.30"
 crossterm = "0.29"
-tui-textarea = { package = "tui-textarea-2", version = "0.11", default-features = false, features = ["crossterm"] }
+ropey = "1"
+arboard = "3"
