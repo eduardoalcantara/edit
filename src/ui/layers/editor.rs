@@ -72,6 +72,7 @@ impl UiLayer for EditorLayer {
             app.view.border,
             terminal_below,
             show_cursor,
+            app.view.show_tabs,
         );
     }
 

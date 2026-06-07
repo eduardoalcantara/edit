@@ -80,6 +80,25 @@ impl Tabulation {
             Tabulation::TabLiteral => "\t",
         }
     }
+
+    /// Rótulo no modal de conversão de tabulação.
+    pub fn convert_option_label(self) -> &'static str {
+        match self {
+            Tabulation::Spaces2 => "2 espaços",
+            Tabulation::Spaces4 => "4 espaços",
+            Tabulation::Spaces8 => "8 espaços",
+            Tabulation::TabLiteral => "Tab literal",
+        }
+    }
+
+    /// Parada usada em Tab → Espaços / Espaços → Tab (2, 4 ou 8; literal = 8).
+    pub fn convert_stop_width(self) -> usize {
+        match self {
+            Tabulation::Spaces2 => 2,
+            Tabulation::Spaces4 => 4,
+            Tabulation::Spaces8 | Tabulation::TabLiteral => 8,
+        }
+    }
 }
 
 pub fn read_with_encoding(path: &std::path::Path, enc: FileEncoding) -> std::io::Result<Vec<String>> {

@@ -5,11 +5,13 @@ mod history;
 mod render;
 mod search;
 mod selection;
+mod tabs;
 mod viewport;
 
 pub use commands::EditorCommand;
 pub use cursor::{Cursor, SelectionMode};
 pub use engine::{EditorEngine, EMPTY_DOCUMENT_TEXT};
+pub use tabs::{convert_spaces_to_tabs, convert_tabulation_between, convert_tabs_to_spaces};
 
 use ratatui::layout::Rect;
 use ratatui::Frame;
@@ -120,6 +122,7 @@ impl Editor {
         border: EditorBorder,
         terminal_below: bool,
         show_cursor: bool,
+        show_tabs: bool,
     ) {
         self.inner_area = render::draw(
             &mut self.engine,
@@ -131,16 +134,22 @@ impl Editor {
             border,
             terminal_below,
             show_cursor,
+            show_tabs,
         );
     }
 
     pub fn viewport_to_doc(&self, vp_line: usize, vp_col: usize) -> (usize, usize) {
-        crate::input::mouse::viewport_to_doc(
+        let (line, vis_col) = crate::input::mouse::viewport_to_doc(
             vp_line,
             vp_col,
             self.engine.viewport.top_line,
             self.engine.viewport.left_col,
-        )
+        );
+        let line = line.min(self.engine.text.len_lines().saturating_sub(1));
+        let line_str = self.engine.text.line(line).to_string();
+        let tab_width = tabs::tab_stop_width(self.engine.tabulation);
+        let char_col = tabs::char_col_from_visual(&line_str, vis_col, tab_width);
+        (line, char_col)
     }
 
     pub fn is_linear_dragging(&self) -> bool {
@@ -224,6 +233,14 @@ impl Editor {
         self.engine.byte_size()
     }
 
+    pub fn visible_char_count(&self) -> usize {
+        self.engine.footer_visible_chars()
+    }
+
+    pub fn total_char_count(&self) -> usize {
+        self.engine.footer_total_chars()
+    }
+
     pub fn undo(&mut self) {
         self.engine.undo();
     }
@@ -279,5 +296,11 @@ impl Editor {
 
     pub fn replace_one(&mut self, replacement: &str) -> bool {
         self.engine.replace_one(replacement)
+    }
+
+    pub fn replace_content(&mut self, content: &str) {
+        let (line, col) = self.engine.cursor_raw();
+        self.engine.load_text(content);
+        self.engine.set_caret_line_col(line, col, true);
     }
 }

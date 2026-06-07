@@ -7,6 +7,7 @@ use ratatui::Frame;
 use crate::edit_mode::EditMode;
 use crate::editor::cursor::{char_idx_to_line_col, SelectionMode};
 use crate::editor::engine::EditorEngine;
+use crate::editor::tabs::{expand_tabs, tab_stop_width, visual_col_in_line};
 use crate::theme::ThemePalette;
 use crate::view_state::{EditorBorder, EditorMargin};
 use crate::widgets::panel;
@@ -40,18 +41,23 @@ pub fn draw(
     border: EditorBorder,
     terminal_below: bool,
     show_cursor: bool,
+    show_tabs: bool,
 ) -> Rect {
-    let frame_title = format!("[ {title} ]");
     let border_style = Style::default()
         .fg(palette.border)
         .bg(palette.editor_bg);
+    let title_style = Style::default()
+        .fg(palette.editor_fg)
+        .bg(palette.editor_bg)
+        .add_modifier(Modifier::BOLD);
 
     let inner = panel::render_editor_frame(
         frame,
         area,
-        &frame_title,
+        title,
         palette.editor_text_style(),
         border_style,
+        title_style,
         border == EditorBorder::Visible,
         terminal_below,
     );
@@ -69,6 +75,7 @@ pub fn draw(
     let line_count = engine.text.len_lines().max(1);
 
     let text_style = palette.editor_text_style();
+    let tab_width = tab_stop_width(engine.tabulation);
     for row in 0..visible_h {
         let doc_line = top + row;
         let line_area = Rect {
@@ -81,27 +88,48 @@ pub fn draw(
             frame.render_widget(Paragraph::new(" ").style(text_style), line_area);
             continue;
         }
-        let line_text = engine.text.line(doc_line);
-        let line_str = line_text.to_string();
-        let display = if left < line_str.chars().count() {
-            line_str.chars().skip(left).take(visible_w).collect::<String>()
+        let mut line_str = engine.text.line(doc_line).to_string();
+        line_str.truncate(line_str.trim_end_matches('\n').len());
+        let expanded = expand_tabs(&line_str, tab_width, show_tabs);
+        let display = if left < expanded.chars().count() {
+            expanded.chars().skip(left).take(visible_w).collect::<String>()
         } else {
             String::new()
         };
 
-        let spans = styled_line(engine, doc_line, left, &display, palette);
+        let spans = styled_line(
+            engine,
+            doc_line,
+            &line_str,
+            left,
+            &display,
+            tab_width,
+            palette,
+        );
         frame.render_widget(Paragraph::new(Line::from(spans)), line_area);
     }
 
-    draw_cursors(frame, engine, content, top, left, palette, show_cursor);
+    draw_cursors(
+        frame,
+        engine,
+        content,
+        top,
+        left,
+        tab_width,
+        palette,
+        show_cursor,
+    );
+    engine.refresh_footer_size_stats(top, left, visible_w, visible_h);
     content
 }
 
 fn styled_line(
     engine: &EditorEngine,
     doc_line: usize,
-    left_col: usize,
+    line_str: &str,
+    left_vis: usize,
     display: &str,
+    tab_width: usize,
     palette: ThemePalette,
 ) -> Vec<Span<'static>> {
     let normal = palette.editor_text_style();
@@ -121,7 +149,14 @@ fn styled_line(
                 let line_len = engine.text.line(doc_line).len_chars();
                 let sel_start = if doc_line == r0 { c0 } else { 0 };
                 let sel_end = if doc_line == r1 { c1 } else { line_len };
-                spans = highlight_range(display, left_col, sel_start, sel_end, normal, selected);
+                spans = highlight_range(
+                    display,
+                    left_vis,
+                    visual_col_in_line(line_str, sel_start, tab_width),
+                    visual_col_in_line(line_str, sel_end, tab_width),
+                    normal,
+                    selected,
+                );
             }
         }
     }
@@ -130,7 +165,14 @@ fn styled_line(
         if let Some(block) = engine.block_selection {
             let (r0, c0, r1, c1) = block.normalized();
             if doc_line >= r0 && doc_line <= r1 {
-                spans = highlight_range(display, left_col, c0, c1, normal, selected);
+                spans = highlight_range(
+                    display,
+                    left_vis,
+                    visual_col_in_line(line_str, c0, tab_width),
+                    visual_col_in_line(line_str, c1, tab_width),
+                    normal,
+                    selected,
+                );
             }
         }
     }
@@ -158,15 +200,15 @@ fn styled_line(
 
 fn highlight_range(
     display: &str,
-    left_col: usize,
-    sel_start: usize,
-    sel_end: usize,
+    left_vis: usize,
+    sel_start_vis: usize,
+    sel_end_vis: usize,
     normal: Style,
     selected: Style,
 ) -> Vec<Span<'static>> {
     let chars: Vec<char> = display.chars().collect();
-    let vis_start = sel_start.saturating_sub(left_col);
-    let vis_end = sel_end.saturating_sub(left_col).min(chars.len());
+    let vis_start = sel_start_vis.saturating_sub(left_vis);
+    let vis_end = sel_end_vis.saturating_sub(left_vis).min(chars.len());
     if vis_start >= chars.len() || vis_end <= vis_start {
         return vec![Span::styled(display.to_string(), normal)];
     }
@@ -185,7 +227,8 @@ fn draw_cursors(
     engine: &EditorEngine,
     content: Rect,
     top_line: usize,
-    left_col: usize,
+    left_vis: usize,
+    tab_width: usize,
     palette: ThemePalette,
     show_cursor: bool,
 ) {
@@ -204,7 +247,9 @@ fn draw_cursors(
         if line < top_line || line >= top_line + content.height as usize {
             continue;
         }
-        let vis_col = col.saturating_sub(left_col);
+        let mut line_str = engine.text.line(line).to_string();
+        line_str.truncate(line_str.trim_end_matches('\n').len());
+        let vis_col = visual_col_in_line(&line_str, col, tab_width).saturating_sub(left_vis);
         if vis_col >= content.width as usize {
             continue;
         }

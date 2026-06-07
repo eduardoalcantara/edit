@@ -9,10 +9,11 @@ use crate::clipboard::Clipboard;
 use crate::document::Document;
 use crate::editor::Editor;
 use crate::encoding::{FileEncoding, Tabulation};
+use crate::editor::convert_tabulation_between;
 use crate::events;
 use crate::file_io;
 use crate::menus::{ActionId, MenuBar, MenuState};
-use crate::modal::{ConfirmKind, ConfirmLayout, Modal, PathInputKind};
+use crate::modal::{ConfirmKind, DialogButtonAction, Modal, PathInputKind};
 use crate::recent::RecentFiles;
 use crate::theme::ThemeId;
 use crate::ui;
@@ -174,7 +175,7 @@ impl App {
 
     pub fn request_quit(&mut self) {
         if self.is_dirty() {
-            self.modal = Modal::quit_unsaved(&self.document_title());
+            self.modal = Modal::quit_unsaved(&self.document.title());
             return;
         }
         self.should_quit = true;
@@ -226,48 +227,72 @@ impl App {
     }
 
     pub fn confirm_modal(&mut self) {
-        let (kind, selected, layout) = match std::mem::replace(&mut self.modal, Modal::None) {
-            Modal::Confirm {
-                kind,
-                selected,
-                layout,
-                ..
-            } => (kind, selected, layout),
+        let (kind, action) = match std::mem::replace(&mut self.modal, Modal::None) {
+            Modal::Confirm { dialog, kind, .. } => {
+                let action = dialog
+                    .selected_action()
+                    .unwrap_or(DialogButtonAction::Cancel);
+                (kind, action)
+            }
             other => {
                 self.modal = other;
                 return;
             }
         };
 
-        match kind {
-            ConfirmKind::QuitUnsaved => match selected {
-                0 => {
-                    self.pending_quit = true;
-                    if self.document.path().is_some() {
-                        self.request_save();
-                        if !self.is_dirty() {
-                            self.pending_quit = false;
-                            self.should_quit = true;
-                        }
-                    } else {
-                        self.modal =
-                            Modal::path_input("Salvar como", "Caminho:", PathInputKind::SaveAs);
+        match (kind, action) {
+            (ConfirmKind::QuitUnsaved, DialogButtonAction::Primary) => {
+                self.pending_quit = true;
+                if self.document.path().is_some() {
+                    self.request_save();
+                    if !self.is_dirty() {
+                        self.pending_quit = false;
+                        self.should_quit = true;
                     }
+                } else {
+                    self.modal =
+                        Modal::path_input("Salvar como", "Caminho:", PathInputKind::SaveAs);
                 }
-                1 => self.should_quit = true,
-                _ => self.set_status("Ação cancelada"),
-            },
-            _ if layout == ConfirmLayout::OkCancel && selected == 1 => {
-                self.set_status("Ação cancelada");
             }
-            ConfirmKind::DiscardForNew | ConfirmKind::CloseDocument => self.new_document(),
-            ConfirmKind::DiscardForOpen => {
+            (ConfirmKind::QuitUnsaved, DialogButtonAction::Secondary) => self.should_quit = true,
+            (_, DialogButtonAction::Cancel) => self.set_status("Ação cancelada"),
+            (ConfirmKind::DiscardForNew, DialogButtonAction::Primary)
+            | (ConfirmKind::CloseDocument, DialogButtonAction::Primary) => self.new_document(),
+            (ConfirmKind::DiscardForOpen, DialogButtonAction::Primary) => {
                 self.modal = Modal::path_input("Abrir arquivo", "Caminho:", PathInputKind::Open);
             }
-            ConfirmKind::OverwriteSave { path } => self.save_to_path(path, true),
-            ConfirmKind::ReinterpretEncoding { encoding } => self.reinterpret_encoding(encoding),
-            ConfirmKind::ConvertEncoding { encoding } => self.convert_encoding(encoding),
+            (ConfirmKind::OverwriteSave { path }, DialogButtonAction::Primary) => {
+                self.save_to_path(path, true)
+            }
+            (ConfirmKind::ChangeEncoding { encoding }, DialogButtonAction::Primary) => {
+                self.apply_encoding_change(encoding)
+            }
+            (ConfirmKind::ConvertEncoding { encoding }, DialogButtonAction::Primary) => {
+                self.convert_encoding(encoding)
+            }
+            _ => self.set_status("Ação cancelada"),
         }
+    }
+
+    pub fn submit_convert_tabulation(&mut self) {
+        let Modal::ConvertTabulation(modal) = std::mem::replace(&mut self.modal, Modal::None) else {
+            return;
+        };
+        let from = modal.from_tab();
+        let to = modal.to_tab();
+        let before = self.editor.content_string();
+        let after = convert_tabulation_between(&before, from, to);
+        if after != before {
+            self.editor.replace_content(&after);
+            self.set_status(format!(
+                "Convertido: {} → {}",
+                from.convert_option_label(),
+                to.convert_option_label()
+            ));
+        } else {
+            self.set_status("Nada a converter");
+        }
+        self.set_tab(to);
     }
 
     pub fn cancel_modal(&mut self) {
@@ -371,6 +396,15 @@ impl App {
         let palette = self.theme.palette();
         self.editor.toggle_mode(&palette);
         self.set_status(format!("Modo: {}", self.editor.mode().label()));
+    }
+
+    fn apply_encoding_change(&mut self, encoding: FileEncoding) {
+        if self.document.path().is_some() {
+            self.reinterpret_encoding(encoding);
+        } else {
+            self.document.encoding = encoding;
+            self.set_status(format!("Codificação: {}", encoding.label()));
+        }
     }
 
     fn reinterpret_encoding(&mut self, encoding: FileEncoding) {
@@ -481,15 +515,14 @@ impl App {
                 self.view.zoom = 1;
                 self.set_status("Zoom: reset");
             }
-            ActionId::WordWrapOn => {
-                self.view.word_wrap = true;
-                self.editor.set_word_wrap(true);
-                self.set_status("Word wrap: on");
-            }
-            ActionId::WordWrapOff => {
-                self.view.word_wrap = false;
-                self.editor.set_word_wrap(false);
-                self.set_status("Word wrap: off");
+            ActionId::WordWrapToggle => {
+                self.view.word_wrap = !self.view.word_wrap;
+                self.editor.set_word_wrap(self.view.word_wrap);
+                self.set_status(if self.view.word_wrap {
+                    "Word wrap: on"
+                } else {
+                    "Word wrap: off"
+                });
             }
             ActionId::ShowSymbols => self.view.show_symbols = !self.view.show_symbols,
             ActionId::ShowSpaces => self.view.show_spaces = !self.view.show_spaces,
@@ -515,13 +548,15 @@ impl App {
                 self.view.margin = EditorMargin::TwoLines;
                 self.set_status("Margem: duas linhas");
             }
-            ActionId::BorderVisible => {
-                self.view.border = EditorBorder::Visible;
-                self.set_status("Borda: visível");
-            }
-            ActionId::BorderHidden => {
-                self.view.border = EditorBorder::Hidden;
-                self.set_status("Borda: invisível");
+            ActionId::BorderToggle => {
+                self.view.border = match self.view.border {
+                    EditorBorder::Visible => EditorBorder::Hidden,
+                    EditorBorder::Hidden => EditorBorder::Visible,
+                };
+                self.set_status(match self.view.border {
+                    EditorBorder::Visible => "Borda: visível",
+                    EditorBorder::Hidden => "Borda: invisível",
+                });
             }
             ActionId::EncodingUtf8 => self.set_encoding(FileEncoding::Utf8),
             ActionId::EncodingUtf8NoBom => self.set_encoding(FileEncoding::Utf8NoBom),
@@ -533,6 +568,9 @@ impl App {
             ActionId::TabSpaces4 => self.set_tab(Tabulation::Spaces4),
             ActionId::TabSpaces8 => self.set_tab(Tabulation::Spaces8),
             ActionId::TabLiteral => self.set_tab(Tabulation::TabLiteral),
+            ActionId::ConvertTabulation => {
+                self.modal = Modal::convert_tabulation(self.document.tabulation);
+            }
             ActionId::OpenRecent(i) => {
                 if let Some(path) = self.recent.paths().get(i).cloned() {
                     if self.is_dirty() {
@@ -551,21 +589,29 @@ impl App {
     }
 
     fn set_encoding(&mut self, encoding: FileEncoding) {
-        if self.document.path().is_some() && self.is_dirty() {
-            self.modal = Modal::confirm(
-                "Codificação",
-                format!(
-                    "Reinterpretar arquivo como {}? Alterações não salvas podem ser afetadas.",
-                    encoding.label()
-                ),
-                ConfirmKind::ReinterpretEncoding { encoding },
-            );
-        } else if self.document.path().is_some() {
-            self.reinterpret_encoding(encoding);
-        } else {
-            self.document.encoding = encoding;
-            self.set_status(format!("Codificação: {}", encoding.label()));
+        if encoding == self.document.encoding {
+            return;
         }
+        let mut message = if self.document.path().is_some() {
+            format!(
+                "Alterar codificação para {}?\n\n\
+                 O arquivo será reaberto com a nova codificação.",
+                encoding.label()
+            )
+        } else {
+            format!(
+                "Alterar codificação do documento para {}?",
+                encoding.label()
+            )
+        };
+        if self.is_dirty() {
+            message.push_str("\n\nAlterações não salvas podem ser afetadas.");
+        }
+        self.modal = Modal::confirm(
+            "Codificação",
+            message,
+            ConfirmKind::ChangeEncoding { encoding },
+        );
     }
 
     fn set_tab(&mut self, tab: Tabulation) {

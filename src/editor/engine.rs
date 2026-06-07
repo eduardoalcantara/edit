@@ -9,6 +9,7 @@ use crate::editor::selection::{
     add_cursor_at, delete_block, extract_block_text, extract_linear_text, merge_cursors,
     BlockSelectionState,
 };
+use crate::editor::tabs::{char_col_from_visual, line_visual_len, tab_stop_width, visual_col_in_line};
 use crate::editor::viewport::Viewport;
 use crate::encoding::Tabulation;
 
@@ -26,6 +27,9 @@ pub struct EditorEngine {
     pub tabulation: Tabulation,
     pub search_pattern: String,
     history: EditHistory,
+    /// Atualizado a cada frame em `render::draw` para o rodapé.
+    cached_visible_chars: usize,
+    cached_total_chars: usize,
 }
 
 impl Default for EditorEngine {
@@ -47,6 +51,8 @@ impl EditorEngine {
             tabulation: Tabulation::default(),
             search_pattern: String::new(),
             history: EditHistory::new(),
+            cached_visible_chars: 0,
+            cached_total_chars: 0,
         }
     }
 
@@ -88,6 +94,74 @@ impl EditorEngine {
 
     pub fn byte_size(&self) -> usize {
         self.text.len_bytes()
+    }
+
+    /// Tamanho total do arquivo em caracteres (inclui `\n` e demais codepoints).
+    pub fn total_char_count(&self) -> usize {
+        self.text.len_chars()
+    }
+
+    /// Caracteres do documento visíveis no viewport (conteúdo das linhas, sem `\n`).
+    pub fn visible_char_count(&self) -> usize {
+        self.count_visible_chars(
+            self.viewport.top_line,
+            self.viewport.left_col,
+            self.viewport.width as usize,
+            self.viewport.height as usize,
+        )
+    }
+
+    pub fn footer_visible_chars(&self) -> usize {
+        self.cached_visible_chars
+    }
+
+    pub fn footer_total_chars(&self) -> usize {
+        self.cached_total_chars
+    }
+
+    fn count_visible_chars(
+        &self,
+        top_line: usize,
+        left_col: usize,
+        visible_w: usize,
+        visible_h: usize,
+    ) -> usize {
+        if visible_w == 0 || visible_h == 0 {
+            return 0;
+        }
+
+        let line_count = self.text.len_lines();
+        let mut count = 0usize;
+        for row in 0..visible_h {
+            let doc_line = top_line + row;
+            if doc_line >= line_count {
+                break;
+            }
+            let line_len = self.line_display_len(doc_line);
+            if left_col >= line_len {
+                continue;
+            }
+            count += (line_len - left_col).min(visible_w);
+        }
+        count
+    }
+
+    fn line_display_len(&self, line_idx: usize) -> usize {
+        let line = self.text.line(line_idx).to_string();
+        let line = line.trim_end_matches('\n');
+        line_visual_len(line, tab_stop_width(self.tabulation))
+    }
+
+    pub fn refresh_footer_size_stats(
+        &mut self,
+        top_line: usize,
+        left_col: usize,
+        visible_w: usize,
+        visible_h: usize,
+    ) {
+        self.cached_total_chars = self.total_char_count();
+        self.cached_visible_chars =
+            self.count_visible_chars(top_line, left_col, visible_w, visible_h);
     }
 
     pub fn cursor_line_col(&self) -> (usize, usize) {
@@ -145,13 +219,17 @@ impl EditorEngine {
 
     fn sync_primary_virtual(&mut self) {
         let idx = self.cursors[0].char_idx;
-        let (_, col) = char_idx_to_line_col(&self.text, idx);
-        self.cursors[0].virtual_col = col;
+        let (line, col) = char_idx_to_line_col(&self.text, idx);
+        let line_str = self.text.line(line).to_string();
+        self.cursors[0].virtual_col =
+            visual_col_in_line(&line_str, col, tab_stop_width(self.tabulation));
     }
 
     pub fn ensure_visible(&mut self) {
         let (line, col) = char_idx_to_line_col(&self.text, self.primary().char_idx);
-        self.viewport.ensure_cursor_visible(line, col);
+        let line_str = self.text.line(line).to_string();
+        let vis_col = visual_col_in_line(&line_str, col, tab_stop_width(self.tabulation));
+        self.viewport.ensure_cursor_visible(line, vis_col);
     }
 
     fn record(&mut self, start: usize, removed: String, inserted: String, before: usize, after: usize) {
@@ -247,25 +325,28 @@ impl EditorEngine {
         let char_idx = self.primary().char_idx.min(self.text.len_chars());
         let (line, col) = char_idx_to_line_col(&self.text, char_idx);
         let line_start = self.text.line_to_char(line);
-        let line_len = self.text.line(line).len_chars();
+        let line_str = self.text.line(line).to_string();
+        let tab_width = tab_stop_width(self.tabulation);
+        let line_visual = visual_col_in_line(&line_str, col, tab_width);
+        let line_char_len = self.text.line(line).len_chars();
 
-        if virtual_col <= col {
+        if virtual_col <= line_visual {
             return;
         }
-        if line_len == 0 {
+        if line_char_len == 0 {
             self.primary_mut().virtual_col = 0;
             return;
         }
         // Caret clamped on a shorter line after ↑/↓ — não preencher com espaços.
-        if col < line_len {
-            self.primary_mut().virtual_col = col;
+        if col < line_char_len {
+            self.primary_mut().virtual_col = line_visual;
             return;
         }
         // Só materializa espaços quando o caret está no fim da linha e virtual_col avançou além.
-        if virtual_col > line_len {
-            let spaces: String = " ".repeat(virtual_col - line_len);
-            self.text.insert(line_start + line_len, &spaces);
-            self.primary_mut().char_idx = line_start + virtual_col;
+        if virtual_col > line_visual {
+            let spaces: String = " ".repeat(virtual_col - line_visual);
+            self.text.insert(line_start + line_char_len, &spaces);
+            self.primary_mut().char_idx = line_start + line_char_len + spaces.chars().count();
         }
     }
 
@@ -352,7 +433,10 @@ impl EditorEngine {
         if line == 0 {
             return;
         }
-        let idx = line_col_to_char_idx(&self.text, line - 1, vcol);
+        let target_line = line - 1;
+        let line_str = self.text.line(target_line).to_string();
+        let char_col = char_col_from_visual(&line_str, vcol, tab_stop_width(self.tabulation));
+        let idx = line_col_to_char_idx(&self.text, target_line, char_col);
         self.primary_mut().char_idx = idx;
         self.primary_mut().virtual_col = vcol;
         self.ensure_visible();
@@ -365,7 +449,10 @@ impl EditorEngine {
         if line + 1 >= self.text.len_lines() {
             return;
         }
-        let idx = line_col_to_char_idx(&self.text, line + 1, vcol);
+        let target_line = line + 1;
+        let line_str = self.text.line(target_line).to_string();
+        let char_col = char_col_from_visual(&line_str, vcol, tab_stop_width(self.tabulation));
+        let idx = line_col_to_char_idx(&self.text, target_line, char_col);
         self.primary_mut().char_idx = idx;
         self.primary_mut().virtual_col = vcol;
         self.ensure_visible();
@@ -579,6 +666,7 @@ impl EditorEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::encoding::Tabulation;
 
     #[test]
     fn insert_and_overtype_advances() {
@@ -664,6 +752,37 @@ mod tests {
     }
 
     #[test]
+    fn total_includes_newlines_visible_does_not() {
+        let mut e = EditorEngine::new();
+        e.load_text("hello\nworld\ntest");
+        e.viewport.width = 80;
+        e.viewport.height = 24;
+        assert_eq!(e.text.len_lines(), 3);
+        assert_eq!(e.line_display_len(0), 5);
+        assert_eq!(e.line_display_len(1), 5);
+        assert_eq!(e.line_display_len(2), 4);
+        assert_eq!(e.total_char_count(), 16);
+        assert_eq!(e.visible_char_count(), 14);
+        assert_ne!(e.total_char_count(), e.visible_char_count());
+    }
+
+    #[test]
+    fn visible_char_count_respects_viewport() {
+        let mut e = EditorEngine::new();
+        e.load_text("abcdefghij");
+        e.viewport.width = 4;
+        e.viewport.height = 1;
+        e.viewport.top_line = 0;
+        e.viewport.left_col = 0;
+        assert_eq!(e.total_char_count(), 10);
+        assert_eq!(e.visible_char_count(), 4);
+        e.viewport.left_col = 6;
+        assert_eq!(e.visible_char_count(), 4);
+        e.viewport.left_col = 8;
+        assert_eq!(e.visible_char_count(), 2);
+    }
+
+    #[test]
     fn copy_text_block_after_release() {
         let mut e = EditorEngine::new();
         e.load_text("ab\nxy");
@@ -673,5 +792,22 @@ mod tests {
         assert_eq!(e.selection_mode, SelectionMode::Multi);
         let text = e.copy_text().unwrap();
         assert_eq!(text, "a\nx");
+    }
+
+    #[test]
+    fn literal_tab_advances_visual_column() {
+        let mut e = EditorEngine::new();
+        e.tabulation = Tabulation::TabLiteral;
+        e.load_text("testesdd");
+        e.set_cursor_line_col(0, 8);
+        e.insert_tab();
+        assert_eq!(e.text.to_string(), "testesdd\t");
+        let (_, col) = char_idx_to_line_col(&e.text, e.primary().char_idx);
+        assert_eq!(col, 9);
+        let line = e.text.line(0).to_string();
+        assert_eq!(
+            visual_col_in_line(&line, col, tab_stop_width(Tabulation::TabLiteral)),
+            16
+        );
     }
 }
