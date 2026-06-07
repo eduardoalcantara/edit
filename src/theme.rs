@@ -44,6 +44,7 @@ pub struct ThemePalette {
     pub cursor: Color,
     pub selection: Color,
     pub menu_hotkey: Color,
+    pub menu_shortcut: Color,
     pub menu_focus_bg: Color,
     pub menu_top_active_bg: Color,
     pub button_bg: Color,
@@ -68,6 +69,7 @@ impl ThemePalette {
             cursor: Color::Rgb(255, 255, 255),
             selection: Color::Rgb(60, 80, 120),
             menu_hotkey: Color::Red,
+            menu_shortcut: Color::Rgb(110, 110, 110),
             menu_focus_bg: Color::Green,
             menu_top_active_bg: Color::Red,
             button_bg: Color::Green,
@@ -92,6 +94,7 @@ impl ThemePalette {
             cursor: Color::Black,
             selection: Color::Rgb(180, 200, 255),
             menu_hotkey: Color::Red,
+            menu_shortcut: Color::Rgb(110, 110, 110),
             menu_focus_bg: Color::Green,
             menu_top_active_bg: Color::Red,
             button_bg: Color::Green,
@@ -117,6 +120,7 @@ impl ThemePalette {
             cursor: Color::Yellow,
             selection: Color::Cyan,
             menu_hotkey: Color::Red,
+            menu_shortcut: Color::DarkGray,
             menu_focus_bg: Color::Green,
             menu_top_active_bg: Color::Red,
             button_bg: Color::Green,
@@ -142,6 +146,7 @@ impl ThemePalette {
             cursor: Color::Rgb(0, 255, 65),
             selection: Color::Rgb(0, 70, 18),
             menu_hotkey: Color::Rgb(180, 255, 100),
+            menu_shortcut: Color::Rgb(0, 110, 32),
             menu_focus_bg: Color::Rgb(0, 90, 22),
             menu_top_active_bg: Color::Rgb(0, 110, 28),
             button_bg: Color::Rgb(0, 75, 18),
@@ -231,6 +236,13 @@ impl ThemePalette {
         Style::default().fg(self.border).bg(self.footer_bg)
     }
 
+    pub fn dialog_title_style(self) -> Style {
+        Style::default()
+            .fg(self.footer_fg)
+            .bg(self.footer_bg)
+            .add_modifier(Modifier::BOLD)
+    }
+
     pub fn menu_item_style(self) -> Style {
         Style::default().fg(self.footer_fg).bg(self.footer_bg)
     }
@@ -253,6 +265,29 @@ impl ThemePalette {
             .fg(self.menu_hotkey)
             .bg(self.footer_bg)
             .add_modifier(Modifier::BOLD)
+    }
+
+    /// Marcadores: `√` na coluna esquerda; `>` submenu à direita.
+    pub fn menu_marker_style(self, focused: bool) -> Style {
+        Style::default()
+            .fg(self.menu_hotkey)
+            .bg(if focused {
+                self.menu_focus_bg
+            } else {
+                self.footer_bg
+            })
+            .add_modifier(Modifier::BOLD)
+    }
+
+    /// Atalhos à direita do item (`Ctrl+S`, etc.) — mais discretos que o rótulo.
+    pub fn menu_shortcut_style(self, focused: bool) -> Style {
+        Style::default()
+            .fg(self.menu_shortcut)
+            .bg(if focused {
+                self.menu_focus_bg
+            } else {
+                self.footer_bg
+            })
     }
 
     pub fn button_style(self, focused: bool) -> Style {

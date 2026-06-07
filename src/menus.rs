@@ -40,8 +40,7 @@ pub enum ActionId {
     ZoomIn,
     ZoomOut,
     ZoomReset,
-    WordWrapOn,
-    WordWrapOff,
+    WordWrapToggle,
     ShowSymbols,
     ShowSpaces,
     ShowTabs,
@@ -54,8 +53,7 @@ pub enum ActionId {
     MarginNone,
     MarginOneLine,
     MarginTwoLines,
-    BorderVisible,
-    BorderHidden,
+    BorderToggle,
     EncodingUtf8,
     EncodingUtf8NoBom,
     EncodingUtf16Le,
@@ -66,6 +64,7 @@ pub enum ActionId {
     TabSpaces4,
     TabSpaces8,
     TabLiteral,
+    ConvertTabulation,
     PasteClip(usize),
     OpenRecent(usize),
 }
@@ -399,62 +398,38 @@ fn view_menu(view: &ViewState) -> Vec<MenuNode> {
                 item("Reset Zoom", None, ActionId::ZoomReset, true, None, "Restaura o zoom padrão"),
             ],
         ),
-        submenu(
+        toggle_item(
             "Word Wrap",
-            "Controla a quebra automática de linhas longas no editor",
-            vec![
-                item(
-                    "Ativar",
-                    None,
-                    ActionId::WordWrapOn,
-                    true,
-                    Some(view.word_wrap),
-                    "Ativa a quebra automática de linha",
-                ),
-                item(
-                    "Desativar",
-                    None,
-                    ActionId::WordWrapOff,
-                    true,
-                    Some(!view.word_wrap),
-                    "Desativa a quebra automática de linha",
-                ),
-            ],
+            ActionId::WordWrapToggle,
+            view.word_wrap,
+            "Alterna a quebra automática de linhas longas no editor",
         ),
         submenu(
             "Mostrar",
             "Exibe ou oculta caracteres invisíveis no editor",
             vec![
-                item(
+                toggle_item(
                     "Símbolos",
-                    None,
                     ActionId::ShowSymbols,
-                    true,
-                    Some(view.show_symbols),
+                    view.show_symbols,
                     "Mostra ou oculta símbolos especiais",
                 ),
-                item(
+                toggle_item(
                     "Espaços",
-                    None,
                     ActionId::ShowSpaces,
-                    true,
-                    Some(view.show_spaces),
+                    view.show_spaces,
                     "Mostra ou oculta espaços",
                 ),
-                item(
+                toggle_item(
                     "Tabs",
-                    None,
                     ActionId::ShowTabs,
-                    true,
-                    Some(view.show_tabs),
+                    view.show_tabs,
                     "Mostra ou oculta tabulações",
                 ),
-                item(
+                toggle_item(
                     "Fim de linha",
-                    None,
                     ActionId::ShowEol,
-                    true,
-                    Some(view.show_eol),
+                    view.show_eol,
                     "Mostra ou oculta marcadores de fim de linha",
                 ),
                 item(
@@ -467,106 +442,50 @@ fn view_menu(view: &ViewState) -> Vec<MenuNode> {
                 ),
             ],
         ),
-        submenu(
-            "Painel Lateral",
+        toggle_item(
+            "Painel lateral",
+            ActionId::ToggleSidePanel,
+            view.side_panel,
             "Mostra ou oculta o painel lateral do editor",
-            vec![
-                item(
-                    "Mostrar",
-                    None,
-                    ActionId::ToggleSidePanel,
-                    true,
-                    Some(view.side_panel),
-                    "Exibe o painel lateral",
-                ),
-                item(
-                    "Ocultar",
-                    None,
-                    ActionId::ToggleSidePanel,
-                    true,
-                    Some(!view.side_panel),
-                    "Oculta o painel lateral",
-                ),
-            ],
         ),
-        submenu(
+        toggle_item(
             "Terminal",
+            ActionId::ToggleTerminal,
+            view.terminal,
             "Mostra ou oculta o terminal integrado",
-            vec![
-                item(
-                    "Mostrar",
-                    None,
-                    ActionId::ToggleTerminal,
-                    true,
-                    Some(view.terminal),
-                    "Exibe o terminal integrado",
-                ),
-                item(
-                    "Ocultar",
-                    None,
-                    ActionId::ToggleTerminal,
-                    true,
-                    Some(!view.terminal),
-                    "Oculta o terminal integrado",
-                ),
-            ],
         ),
-        submenu(
+        toggle_item(
             "Rodapé",
+            ActionId::ToggleFooter,
+            view.footer_visible,
             "Mostra ou oculta a barra de status na parte inferior",
-            vec![
-                item(
-                    "Mostrar",
-                    None,
-                    ActionId::ToggleFooter,
-                    true,
-                    Some(view.footer_visible),
-                    "Exibe a barra de status",
-                ),
-                item(
-                    "Ocultar",
-                    None,
-                    ActionId::ToggleFooter,
-                    true,
-                    Some(!view.footer_visible),
-                    "Oculta a barra de status",
-                ),
-            ],
         ),
         submenu(
             "Temas",
             "Seleciona a paleta de cores da interface",
             vec![
-                item(
+                radio_item(
                     "Escuro",
-                    None,
                     ActionId::ThemeDark,
-                    true,
-                    Some(view.theme == crate::theme::ThemeId::Dark),
+                    view.theme == crate::theme::ThemeId::Dark,
                     "Aplica o tema escuro",
                 ),
-                item(
+                radio_item(
                     "Claro",
-                    None,
                     ActionId::ThemeLight,
-                    true,
-                    Some(view.theme == crate::theme::ThemeId::Light),
+                    view.theme == crate::theme::ThemeId::Light,
                     "Aplica o tema claro",
                 ),
-                item(
+                radio_item(
                     "Azul Clássico",
-                    None,
                     ActionId::ThemeClassicBlue,
-                    true,
-                    Some(view.theme == crate::theme::ThemeId::ClassicBlue),
+                    view.theme == crate::theme::ThemeId::ClassicBlue,
                     "Aplica o tema azul clássico estilo Turbo Vision",
                 ),
-                item(
+                radio_item(
                     "Matrix",
-                    None,
                     ActionId::ThemeMatrix,
-                    true,
-                    Some(view.theme == crate::theme::ThemeId::Matrix),
+                    view.theme == crate::theme::ThemeId::Matrix,
                     "Aplica o tema verde terminal estilo Matrix",
                 ),
             ],
@@ -575,75 +494,55 @@ fn view_menu(view: &ViewState) -> Vec<MenuNode> {
             "Colunas",
             "Define a quantidade de colunas de caracteres digitáveis por linha no editor",
             vec![
-                item(
+                radio_item(
                     "80",
-                    None,
                     ActionId::Column80,
-                    true,
-                    Some(view.guide_column == GuideColumn::Col80),
+                    view.guide_column == GuideColumn::Col80,
                     "Limita a linha a 80 colunas",
                 ),
-                item(
+                radio_item(
                     "120",
-                    None,
                     ActionId::Column120,
-                    true,
-                    Some(view.guide_column == GuideColumn::Col120),
+                    view.guide_column == GuideColumn::Col120,
                     "Limita a linha a 120 colunas",
                 ),
-                item(
+                radio_item(
                     "160",
-                    None,
                     ActionId::Column160,
-                    true,
-                    Some(view.guide_column == GuideColumn::Col160),
+                    view.guide_column == GuideColumn::Col160,
                     "Limita a linha a 160 colunas",
                 ),
-                item(
+                radio_item(
                     "Ilimitado",
-                    None,
                     ActionId::ColumnUnlimited,
-                    true,
-                    Some(view.guide_column == GuideColumn::Unlimited),
+                    view.guide_column == GuideColumn::Unlimited,
                     "Remove o limite de colunas por linha",
                 ),
             ],
         ),
-        submenu(
-            "Borda",
-            "Define se a borda externa do editor fica visível ou não",
-            vec![
-                checked_item(
-                    "Visível",
-                    ActionId::BorderVisible,
-                    view.border == EditorBorder::Visible,
-                    "Desenha a borda completa do editor (┌ ─ ┐, │, └ ─ ┘)",
-                ),
-                checked_item(
-                    "Invisível",
-                    ActionId::BorderHidden,
-                    view.border == EditorBorder::Hidden,
-                    "Oculta laterais e base; mantém apenas o título no topo (└ ─ ┘)",
-                ),
-            ],
+        toggle_item(
+            "Borda visível",
+            ActionId::BorderToggle,
+            view.border == EditorBorder::Visible,
+            "Alterna a borda externa do editor (┌ ─ ┐ / apenas título no topo)",
         ),
         submenu(
             "Margem",
             "Define a distância entre a borda do editor e o texto, nos 4 eixos",
             vec![
-                checked_item(
+                radio_item(
                     "Sem Margem",
                     ActionId::MarginNone,
                     view.margin == EditorMargin::None,
                     "Texto começa na linha 1 e coluna 1 logo após a borda",
                 ),
-                checked_item(
+                radio_item(
                     "Uma linha",
                     ActionId::MarginOneLine,
                     view.margin == EditorMargin::OneLine,
                     "1 linha acima/abaixo e 2 colunas à esquerda/direita",
                 ),
-                checked_item(
+                radio_item(
                     "Duas linhas",
                     ActionId::MarginTwoLines,
                     view.margin == EditorMargin::TwoLines,
@@ -660,37 +559,37 @@ fn format_menu(enc: FileEncoding, tab: Tabulation) -> Vec<MenuNode> {
             "Codificação",
             "Define a codificação de caracteres do arquivo",
             vec![
-                checked_item(
+                radio_item(
                     "UTF-8",
                     ActionId::EncodingUtf8,
                     enc == FileEncoding::Utf8,
                     "Salva e abre o arquivo em UTF-8 com BOM",
                 ),
-                checked_item(
+                radio_item(
                     "UTF-8 sem BOM",
                     ActionId::EncodingUtf8NoBom,
                     enc == FileEncoding::Utf8NoBom,
                     "Salva e abre o arquivo em UTF-8 sem BOM",
                 ),
-                checked_item(
+                radio_item(
                     "UTF-16 LE",
                     ActionId::EncodingUtf16Le,
                     enc == FileEncoding::Utf16Le,
                     "Salva e abre o arquivo em UTF-16 little-endian",
                 ),
-                checked_item(
+                radio_item(
                     "UTF-16 BE",
                     ActionId::EncodingUtf16Be,
                     enc == FileEncoding::Utf16Be,
                     "Salva e abre o arquivo em UTF-16 big-endian",
                 ),
-                checked_item(
+                radio_item(
                     "ISO-8859-1",
                     ActionId::EncodingIso88591,
                     enc == FileEncoding::Iso88591,
                     "Salva e abre o arquivo em ISO-8859-1",
                 ),
-                checked_item(
+                radio_item(
                     "ANSI",
                     ActionId::EncodingAnsi,
                     enc == FileEncoding::Ansi,
@@ -702,37 +601,50 @@ fn format_menu(enc: FileEncoding, tab: Tabulation) -> Vec<MenuNode> {
             "Tabulação",
             "Define como a tecla Tab insere espaços ou tabulação literal",
             vec![
-                checked_item(
+                radio_item(
                     "2 espaços",
                     ActionId::TabSpaces2,
                     tab == Tabulation::Spaces2,
                     "Insere 2 espaços ao pressionar Tab",
                 ),
-                checked_item(
+                radio_item(
                     "4 espaços",
                     ActionId::TabSpaces4,
                     tab == Tabulation::Spaces4,
                     "Insere 4 espaços ao pressionar Tab",
                 ),
-                checked_item(
+                radio_item(
                     "8 espaços",
                     ActionId::TabSpaces8,
                     tab == Tabulation::Spaces8,
                     "Insere 8 espaços ao pressionar Tab",
                 ),
-                checked_item(
+                radio_item(
                     "Tab literal",
                     ActionId::TabLiteral,
                     tab == Tabulation::TabLiteral,
                     "Insere o caractere de tabulação literal ao pressionar Tab",
+                ),
+                item(
+                    "Converter Tabulação",
+                    None,
+                    ActionId::ConvertTabulation,
+                    true,
+                    None,
+                    "Converte indentação informando De/Para (2, 4, 8 espaços ou Tab literal)",
                 ),
             ],
         ),
     ]
 }
 
-fn checked_item(label: &'static str, action: ActionId, on: bool, help: &'static str) -> MenuNode {
+fn toggle_item(label: &'static str, action: ActionId, on: bool, help: &'static str) -> MenuNode {
     item(label, None, action, true, Some(on), help)
+}
+
+/// Item de seleção exclusiva (radio): check na opção ativa.
+fn radio_item(label: &'static str, action: ActionId, selected: bool, help: &'static str) -> MenuNode {
+    item(label, None, action, true, Some(selected), help)
 }
 
 fn submenu(label: &'static str, help: &'static str, children: Vec<MenuNode>) -> MenuNode {
@@ -1210,8 +1122,15 @@ fn render_panels(
                     );
                 }
                 _ => {
-                    let text = format_menu_line_padded(node, inner_w);
-                    panel::render_content_row(frame, area, i as u16, &text, style);
+                    let focused = focused_leaf == Some(i);
+                    let line = menu_node_line(
+                        node,
+                        inner_w,
+                        style,
+                        palette.menu_marker_style(focused),
+                        palette.menu_shortcut_style(focused),
+                    );
+                    panel::render_content_line(frame, area, i as u16, line);
                 }
             }
         }
@@ -1269,17 +1188,130 @@ fn measure_panel(nodes: &[MenuNode]) -> (u16, u16) {
     panel::outer_size(max_w, nodes.len())
 }
 
+fn item_right_text(node: &MenuNode) -> Option<String> {
+    match item_right_slot(node)? {
+        MenuRightSlot::Shortcut(s) => Some(s),
+        MenuRightSlot::SubmenuArrow => Some(cp437::SUBMENU_ARROW.to_string()),
+    }
+}
+
+enum MenuRightSlot {
+    Shortcut(String),
+    SubmenuArrow,
+}
+
+fn item_right_slot(node: &MenuNode) -> Option<MenuRightSlot> {
+    match node {
+        MenuNode::Item { shortcut, checked, .. } => {
+            if checked.is_some() {
+                None
+            } else {
+                shortcut.map(|s| MenuRightSlot::Shortcut(s.to_string()))
+            }
+        }
+        MenuNode::SubMenu { .. } => Some(MenuRightSlot::SubmenuArrow),
+        MenuNode::Separator => None,
+    }
+}
+
+/// Primeira coluna interna: espaço ou `√` (substitutivo, não extra).
+fn menu_left_text(label: &str, checked: Option<bool>) -> String {
+    match checked {
+        Some(true) => format!("{}{label}", cp437::CHECK_ON),
+        Some(false) | None => format!(" {label}"),
+    }
+}
+
+fn menu_left_spans(
+    label: &str,
+    checked: Option<bool>,
+    base_style: ratatui::style::Style,
+    marker_style: ratatui::style::Style,
+) -> Vec<Span<'static>> {
+    match checked {
+        Some(true) => vec![
+            Span::styled(cp437::CHECK_ON.to_string(), marker_style),
+            Span::styled(label.to_string(), base_style),
+        ],
+        Some(false) | None => vec![Span::styled(format!(" {label}"), base_style)],
+    }
+}
+
+fn menu_node_line(
+    node: &MenuNode,
+    width: usize,
+    base_style: ratatui::style::Style,
+    marker_style: ratatui::style::Style,
+    shortcut_style: ratatui::style::Style,
+) -> Line<'static> {
+    match node {
+        MenuNode::Separator => Line::from(""),
+        MenuNode::Item {
+            label,
+            checked,
+            ..
+        } => {
+            let left_len = menu_left_text(label, *checked).chars().count();
+            let left_spans = menu_left_spans(label, *checked, base_style, marker_style);
+            let (right_text, right_style) = match item_right_slot(node) {
+                Some(MenuRightSlot::Shortcut(s)) => (Some(s), shortcut_style),
+                None | Some(MenuRightSlot::SubmenuArrow) => (None, base_style),
+            };
+            build_menu_row_line_spans(
+                left_spans,
+                left_len,
+                right_text.as_deref(),
+                width,
+                base_style,
+                right_style,
+            )
+        }
+        MenuNode::SubMenu { label, .. } => {
+            let left = format!(" {label}");
+            let left_len = left.chars().count();
+            let arrow = cp437::SUBMENU_ARROW.to_string();
+            build_menu_row_line_spans(
+                vec![Span::styled(left, base_style)],
+                left_len,
+                Some(&arrow),
+                width,
+                base_style,
+                marker_style,
+            )
+        }
+    }
+}
+
+fn build_menu_row_line_spans(
+    mut left_spans: Vec<Span<'static>>,
+    left_len: usize,
+    right: Option<&str>,
+    width: usize,
+    base_style: ratatui::style::Style,
+    right_style: ratatui::style::Style,
+) -> Line<'static> {
+    let right_part = match right {
+        Some(text) => format!(" {text} "),
+        None => String::new(),
+    };
+    let pad = width.saturating_sub(left_len + right_part.chars().count());
+    left_spans.push(Span::styled(" ".repeat(pad), base_style));
+    if let Some(text) = right {
+        left_spans.push(Span::styled(" ", base_style));
+        left_spans.push(Span::styled(text.to_string(), right_style));
+        left_spans.push(Span::styled(" ", base_style));
+    }
+    Line::from(left_spans)
+}
+
 fn line_width(node: &MenuNode) -> usize {
     match node {
         MenuNode::Separator => 12,
-        MenuNode::Item { label, shortcut, .. } => {
-            menu_row_width(&format!(" {label}"), shortcut.map(|s| s.to_string()).as_deref())
+        MenuNode::Item { label, checked, .. } => {
+            menu_row_width(&menu_left_text(label, *checked), item_right_text(node).as_deref())
         }
         MenuNode::SubMenu { label, .. } => {
-            menu_row_width(
-                &format!(" {label}"),
-                Some(&cp437::SUBMENU_ARROW.to_string()),
-            )
+            menu_row_width(&format!(" {label}"), item_right_text(node).as_deref())
         }
     }
 }
@@ -1288,34 +1320,4 @@ fn line_width(node: &MenuNode) -> usize {
 fn menu_row_width(left: &str, right: Option<&str>) -> usize {
     let right_len = right.map(|r| r.chars().count() + 2).unwrap_or(0);
     left.chars().count() + right_len + 1
-}
-
-fn format_menu_line_padded(node: &MenuNode, width: usize) -> String {
-    match node {
-        MenuNode::Separator => String::new(),
-        MenuNode::Item { label, shortcut, checked, .. } => {
-            let mark = checked.filter(|c| *c).map(|_| "✓ ").unwrap_or_default();
-            format_menu_row(
-                width,
-                &format!(" {mark}{label}"),
-                shortcut.map(|s| s.to_string()).as_deref(),
-            )
-        }
-        MenuNode::SubMenu { label, .. } => format_menu_row(
-            width,
-            &format!(" {label}"),
-            Some(&cp437::SUBMENU_ARROW.to_string()),
-        ),
-    }
-}
-
-fn format_menu_row(width: usize, left: &str, right: Option<&str>) -> String {
-    let right_part = match right {
-        Some(text) => format!(" {text} "),
-        None => String::new(),
-    };
-    let left_len = left.chars().count();
-    let right_len = right_part.chars().count();
-    let pad = width.saturating_sub(left_len + right_len);
-    format!("{left}{}{right_part}", " ".repeat(pad))
 }

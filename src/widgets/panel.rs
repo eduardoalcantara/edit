@@ -4,17 +4,24 @@
 
 use ratatui::layout::Rect;
 use ratatui::style::Style;
-use ratatui::text::Span;
+use ratatui::text::{Line, Span};
 use ratatui::widgets::{Clear, Paragraph};
 use ratatui::Frame;
 
 use crate::theme::ThemePalette;
 
+/// Formato padrão de título embutido na borda: `─[ info ]─` (sem espaço antes de `[`).
+pub fn framed_title(label: &str) -> String {
+    format!("[ {label} ]")
+}
+
 /// Caracteres VGA/CP437 usados na UI (Turbo Vision).
 pub mod cp437 {
-    /// Indicador de submenu (UTF-8). Alternativas úteis:
-    /// `»` U+00BB, `›` U+203A, `▸` U+25B8, `→` U+2192, `>` ASCII.
-    pub const SUBMENU_ARROW: char = '\u{00BB}';
+    /// Indicador de submenu. ASCII `>` funciona em PuTTY/SSH; `»` U+00BB se UTF-8 ok.
+    pub const SUBMENU_ARROW: char = '>';
+    /// Check de item ativado (estilo Turbo Vision / CP437 251 → U+221A).
+    pub const CHECK_ON: char = '\u{221A}';
+
     /// Sombra vertical (CP437 byte 219 → U+2588 bloco cheio).
     pub const SHADOW_V: char = '\u{2588}';
     /// Sombra horizontal (CP437 byte 223 → U+2580 ▀ meio bloco superior).
@@ -106,6 +113,7 @@ pub fn render_editor_frame(
     title: &str,
     fill: Style,
     border_style: Style,
+    title_style: Style,
     border_visible: bool,
     terminal_below: bool,
 ) -> Rect {
@@ -127,6 +135,9 @@ pub fn render_editor_frame(
             c.tr,
             c.h,
             border_style,
+            title_style,
+            false,
+            true,
         );
 
         let side_end = outer.height.saturating_sub(1);
@@ -173,6 +184,9 @@ pub fn render_editor_frame(
             c.br,
             c.h,
             border_style,
+            title_style,
+            false,
+            true,
         );
 
         if terminal_below && outer.height >= 2 {
@@ -237,6 +251,8 @@ pub fn render_titled_frame(
     title: &str,
     fill: Style,
     border_style: Style,
+    title_style: Style,
+    center_title: bool,
     border: PanelBorder,
 ) -> Rect {
     frame.render_widget(Clear, outer);
@@ -259,6 +275,9 @@ pub fn render_titled_frame(
         c.tr,
         c.h,
         border_style,
+        title_style,
+        center_title,
+        false,
     );
 
     for row in 1..h.saturating_sub(1) {
@@ -330,6 +349,29 @@ pub fn render_separator_row(
     );
 }
 
+/// Linha de conteúdo com estilos por span (marcadores à direita com cor distinta).
+pub fn render_content_line(
+    frame: &mut Frame,
+    outer: Rect,
+    row_index: u16,
+    line: Line<'_>,
+) {
+    let inner = inner_rect(outer);
+    let row_y = inner.y.saturating_add(row_index);
+    if row_y >= inner.y.saturating_add(inner.height) {
+        return;
+    }
+    frame.render_widget(
+        Paragraph::new(line),
+        Rect {
+            x: inner.x,
+            y: row_y,
+            width: inner.width,
+            height: 1,
+        },
+    );
+}
+
 /// Linha de conteúdo dentro do painel (entre as bordas verticais).
 pub fn render_content_row(
     frame: &mut Frame,
@@ -371,12 +413,13 @@ pub fn render_drop_shadow(frame: &mut Frame, area: Rect, palette: ThemePalette) 
         );
     }
     if area.y.saturating_add(area.height) < frame.area().height {
+        let h_count = area.width.saturating_sub(1) as usize;
         frame.render_widget(
-            Paragraph::new(Span::styled(h.repeat(area.width as usize), h_style)).style(h_style),
+            Paragraph::new(Span::styled(h.repeat(h_count), h_style)).style(h_style),
             Rect {
                 x: area.x.saturating_add(2),
                 y: area.y.saturating_add(area.height),
-                width: area.width,
+                width: h_count as u16,
                 height: 1,
             },
         );
@@ -439,34 +482,64 @@ fn render_titled_top_row(
     x: u16,
     y: u16,
     width: usize,
-    title: &str,
+    label: &str,
     left: char,
     right: char,
     h: char,
-    style: Style,
+    border_style: Style,
+    title_style: Style,
+    center_title: bool,
+    lead_line_before_title: bool,
 ) {
     if width == 0 {
         return;
     }
     if width == 1 {
-        render_cell(frame, x, y, left, style);
+        render_cell(frame, x, y, left, border_style);
         return;
     }
 
-    let mut title_part = format!(" {title} ");
-    let max_title = width.saturating_sub(2);
-    if title_part.chars().count() > max_title {
-        title_part = title_part.chars().take(max_title).collect();
+    let prefix_len = if lead_line_before_title && !center_title {
+        1
+    } else {
+        0
+    };
+    let interior = width.saturating_sub(2);
+    let max_inner = interior
+        .saturating_sub(prefix_len)
+        .saturating_sub(2);
+    let mut inner = format!(" {label} ");
+    if inner.chars().count() > max_inner {
+        inner = inner.chars().take(max_inner).collect();
     }
-    let title_len = title_part.chars().count();
-    let fill_len = width.saturating_sub(2).saturating_sub(title_len);
-    let line = format!(
-        "{left}{}{}{right}",
-        title_part,
-        h.to_string().repeat(fill_len)
-    );
+    let inner_len = inner.chars().count();
+    let title_core_len = 2 + inner_len;
+
+    let (left_fill, right_fill) = if center_title {
+        let total_fill = interior.saturating_sub(title_core_len);
+        (total_fill / 2, total_fill - total_fill / 2)
+    } else {
+        (
+            0,
+            interior
+                .saturating_sub(prefix_len + title_core_len),
+        )
+    };
+
+    let mut spans = vec![Span::styled(left.to_string(), border_style)];
+    if center_title {
+        spans.push(Span::styled(h.to_string().repeat(left_fill), border_style));
+    } else if lead_line_before_title {
+        spans.push(Span::styled(h.to_string(), border_style));
+    }
+    spans.push(Span::styled("[".to_string(), border_style));
+    spans.push(Span::styled(inner, title_style));
+    spans.push(Span::styled("]".to_string(), border_style));
+    spans.push(Span::styled(h.to_string().repeat(right_fill), border_style));
+    spans.push(Span::styled(right.to_string(), border_style));
+
     frame.render_widget(
-        Paragraph::new(Span::styled(line, style)).style(style),
+        Paragraph::new(Line::from(spans)),
         Rect {
             x,
             y,
@@ -539,5 +612,16 @@ mod tests {
         let outer = Rect::new(0, 0, 10, 5);
         let inner = editor_content_rect(outer, false, true);
         assert_eq!(inner, Rect::new(0, 1, 10, 3));
+    }
+
+    #[test]
+    fn horizontal_shadow_length_compensates_leading_offset() {
+        let area = Rect::new(5, 3, 20, 8);
+        let h_count = area.width.saturating_sub(1) as usize;
+        assert_eq!(h_count, 19);
+        assert_eq!(
+            area.x.saturating_add(2) + h_count as u16 - 1,
+            area.x.saturating_add(area.width)
+        );
     }
 }
