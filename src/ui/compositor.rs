@@ -124,11 +124,13 @@ pub fn footer_help_left(app: &App) -> String {
     app.status_message.clone()
 }
 
-/// Grupos de estado alinhados à direita (linha/coluna, modo, encoding, tab).
+/// Grupos de estado alinhados à direita (tamanho, linha/coluna, modo, encoding, tab).
 pub fn footer_status_right(app: &App) -> String {
     let (ln, col) = app.editor.cursor_line_col();
+    let visible = app.editor.visible_char_count();
+    let total = app.editor.total_char_count();
     format!(
-        "Ln {ln} Col {col} | {} | {} | {}",
+        "Tam {visible}/{total} | Ln {ln} Col {col} | {} | {} | {}",
         app.editor.mode().label(),
         app.document.encoding.label(),
         app.document.tabulation.footer_label(),
