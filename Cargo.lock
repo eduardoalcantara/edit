@@ -370,7 +370,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "editor-linux"
+name = "edit"
 version = "0.1.0"
 dependencies = [
  "arboard",
