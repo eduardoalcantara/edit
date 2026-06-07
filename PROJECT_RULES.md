@@ -67,6 +67,8 @@
 - Não remover proteções de modal, confirmação ou prevenção de perda de dados.
 - **Antes de implementar:** ler e cruzar `PROJECT_RULES.md`, `docs/EDITOR_LINUX_MASTER_REQUIREMENTS.md`, specs aplicáveis em `specs/` e `PROJECT_STATUS.md`. Não codar com base em suposição ou padrões inventados.
 - **Menus:** usar subsistema interativo (`menus.rs`) com pull-down estilo Turbo Vision / EDIT.EXE; **proibido** substituir menus por linhas de texto estático com rótulos de comandos.
+- **Core de edição:** buffer `ropey` em `src/editor/`; **proibido** reintroduzir `tui-textarea` ou widgets genéricos como donos do buffer.
+- **Separação de camadas:** UI (`ui.rs`, `editor/render.rs`) não possui buffer de texto; toda mutação passa por `EditorEngine` via `EditorCommand`.
 
 ## Atalhos de menu (barra)
 

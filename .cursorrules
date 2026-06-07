@@ -28,6 +28,11 @@ Definir como o Cursor deve atuar como desenvolvedor full-stack do Editor Linux, 
 4. `specs/`
 5. `docs/`
 
+## Arquitetura do editor
+
+- Priorizar `specs/done/EDITOR_LINUX_SPEC_ARQUITETURA_GERAL.md` antes de alterar o core.
+- Core em `src/editor/` (ropey); input em `src/input/`; **proibido** `tui-textarea`.
+
 ## Padrão de entrega
 
 - Implementar apenas o escopo aprovado.

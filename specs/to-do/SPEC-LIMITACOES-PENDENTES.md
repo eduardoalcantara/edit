@@ -26,26 +26,22 @@ Registrar limitações conhecidas da implementação atual como **pontos a resol
 
 | Campo | Valor |
 |-------|--------|
-| **Estado** | Lógica em `cursors.rs` / `block_select.rs`; sem render invertido por linha na área de edição |
-| **Impacto** | Usuário não vê claramente a região retangular durante Alt+drag |
-| **Referência** | `docs/SPEC_BLOCK_MULTI_CURSOR.md`, `PROJECT_STATUS.md` |
-| **Resolução esperada** | Camada de render sobre `tui-textarea` ou widget custom; highlight por linha `[StartCol..EndCol]` |
+| **Estado** | ✅ Resolvido — `editor/render.rs` aplica highlight por linha na área visível |
+| **Resolução** | Migração ropey (2026-06-07) |
 
 ### L2 — Mapeamento mouse → cursor impreciso
 
 | Campo | Valor |
 |-------|--------|
-| **Estado** | `events.rs::mouse_to_cursor` usa offset fixo (`row - 3`) e coluna bruta |
-| **Impacto** | Bloco e multi-cursor desalinhados com scroll, wrap, bordas do textarea |
-| **Resolução esperada** | Hit-test real usando geometria do widget / área inner do editor |
+| **Estado** | ✅ Resolvido — `input/mouse.rs` + `Editor::inner_area()` com hit-test real |
+| **Resolução** | Migração ropey (2026-06-07) |
 
 ### L3 — Recortar seleção normal incompleto
 
 | Campo | Valor |
 |-------|--------|
-| **Estado** | `editor.rs::cut_selection` não remove intervalo de seleção linear de forma confiável |
-| **Impacto** | `Ctrl+X` pode falhar ou comportar-se de forma imprevisível fora do modo bloco |
-| **Resolução esperada** | Deletar intervalo `[Start..End]` via linhas ou API estável do textarea |
+| **Estado** | ✅ Resolvido — `EditorEngine::delete_selection` + `cut_selection` no core rope |
+| **Resolução** | Migração ropey (2026-06-07) |
 
 ### L4 — Multi-cursor: setas e digitação parcial
 

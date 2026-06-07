@@ -2,7 +2,7 @@
 
 **Autor:** Perplexity AI  
 **Data:** 2026-06-07  
-**Versão:** 1.8
+**Versão:** 2.1
 
 ## Registro
 
@@ -21,3 +21,43 @@
 - 2026-06-07 — **Menu Formatar** — `encoding.rs`, tabulação TAB, `Alt+F`.
   - Relatório: `specs/report/IMPLEMENTACAO_MENU_FORMATACAO_TABULACAO.md`
   - Spec: `specs/done/SPEC-MENU-FORMATACAO-TABULACAO.md`
+- 2026-06-07 — **Migração arquitetura ropey** — `src/editor/`, `src/input/`; remoção de `tui-textarea`, `cursors.rs`, `block_select.rs`, `find.rs`.
+  - Relatório: `specs/report/IMPLEMENTACAO_ARQUITETURA_ROPEY.md`
+  - Spec: `specs/done/EDITOR_LINUX_SPEC_ARQUITETURA_GERAL.md`
+- 2026-06-07 — **Correções editor pós-ropey** — Enter, seleção (Shift+mouse), Replace em `\n`, layout rodapé (TV4), remoção placeholder, clipboard `arboard` + fix `copy_text`.
+  - Módulos: `src/editor/`, `src/input/`, `src/ui.rs`, `src/clipboard.rs`, `src/events.rs`
+  - Limitações: L1–L3 resolvidos; L14 parcial
+- 2026-06-07 — **Correções UX menu/modal/bordas** — dropdown opaco, submenus lazy, padrão de bordas ASCII, modal quit com Salvar/Não Salvar/Cancelar.
+  - Módulos: `src/menus.rs`, `src/theme.rs`, `src/modal.rs`, `src/ui.rs`, `src/app.rs`, `src/events.rs`, `src/editor/render.rs`
+- 2026-06-07 — **Widget `panel` + z-order menu** — `src/widgets/panel.rs`; dropdown sobre editor; separadores ASCII conectados; medida de painel corrigida.
+  - Módulos: `src/widgets/`, `src/menus.rs`, `src/ui.rs`
+- 2026-06-07 — **Compositor UI (`src/ui/`)** — trait `UiLayer`, camadas OOP, dispatch unificado paint/input.
+  - Camadas: `layers/{desktop,editor,footer,menu_bar,menu_dropdown,modal}.rs`, `compositor.rs`
+- 2026-06-07 — **Atalhos sair + mouse em modais** — `Alt+F4`/`Ctrl+Q` no compositor; hit-test de botões em `ModalLayer`.
+  - Módulos: `src/ui/compositor.rs`, `src/ui/layers/modal.rs`, `src/menus.rs`
+- 2026-06-07 — **Baseline pristine (documento limpo)** — `EMPTY_DOCUMENT_TEXT` alinhado ao rope vazio; `is_dirty()` correto ao abrir/sair sem editar.
+  - Módulos: `src/document.rs`, `src/editor/engine.rs`, `src/app.rs`
+  - Testes: `document::tests::{fresh_document_is_not_dirty, empty_opened_file_is_not_dirty}`
+- 2026-06-07 — **Caracteres UTF-8 na UI (CP437 corrigido)** — submenu `»` (U+00BB); sombra vertical `█` (U+2588); sombra horizontal `▀` (U+2580) com estilo fg/bg separados.
+  - Módulos: `src/widgets/panel.rs`, `src/theme.rs`
+- 2026-06-07 — **Mnemônicos Alt+letra na barra de menu** — destaque usa campo `mnemonic` (Exibir = Alt+X, não Alt+E).
+  - Módulos: `src/menus.rs`
+- 2026-06-07 — **Título do editor** — nome do arquivo na borda como `[ nome ]` (asterisco se dirty).
+  - Módulos: `src/editor/render.rs`
+- 2026-06-07 — **Tema Matrix** — substitui "Personalizado"; paleta verde fosforescente sobre preto.
+  - Módulos: `src/theme.rs`, `src/menus.rs`, `src/app.rs`
+- 2026-06-07 — **Help contextual no rodapé (menus)** — campo `help` em cada item/submenu; exibido à esquerda do rodapé quando em foco.
+  - Módulos: `src/menus.rs`, `src/ui/layers/menu_dropdown.rs`
+  - Exemplo: Colunas → "Define a quantidade de colunas de caracteres digitáveis por linha no editor"
+- 2026-06-07 — **Correção cursor/documento vazio** — rope vazio real (`""`); viewport resetado em `load_text`; `virtual_col` não preenche espaços ao digitar após ↑/↓.
+  - Módulos: `src/editor/engine.rs`
+  - Testes: `empty_document_typing_stays_on_first_line`, `vertical_move_to_empty_line_does_not_pad_on_type`, `load_text_resets_viewport`
+- 2026-06-07 — **Submenu Margem (Exibir)** — `EditorMargin` (sem / uma / duas linhas); padding interno no render do editor.
+  - Módulos: `src/view_state.rs`, `src/menus.rs`, `src/app.rs`, `src/editor/render.rs`, `src/ui/layers/editor.rs`
+- 2026-06-07 — **Input modal (menu/modal)** — compositor respeita `captures_input`; setas ←/→ trocam menu de topo; editor bloqueado com menu aberto.
+  - Módulos: `src/ui/compositor.rs`, `src/menus.rs`, `src/ui/layers/editor.rs`, `src/ui/layers/menu_dropdown.rs`
+- 2026-06-07 — **Submenu Borda (Exibir)** — `EditorBorder` (visível / invisível); moldura customizada no editor; divisor editor↔terminal (`├─┤` ou `─`).
+  - Módulos: `src/view_state.rs`, `src/widgets/panel.rs`, `src/editor/render.rs`, `src/ui/layout.rs`, `src/ui/layers/{editor,terminal}.rs`, `src/menus.rs`, `src/app.rs`
+  - Testes: `widgets::panel::tests::editor_content_rect_*`, `view_state::tests::editor_border_labels`
+- 2026-06-07 — **Ajustes modal de diálogo** — título na borda (`[ Sair ]`); margem interna 1×2; botões compactos (UTF-8); 1 linha entre pergunta e botões; sombra horizontal com 2 espaços.
+  - Módulos: `src/ui/layers/modal.rs`, `src/widgets/panel.rs`

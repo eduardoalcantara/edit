@@ -6,13 +6,13 @@
 
 ## Objetivo
 
-Comportamento customizado de seleção retangular (bloco) e multi-cursor, independente do `tui-textarea`, alinhado ao EDIT.EXE / editores clássicos.
+Comportamento customizado de seleção retangular (bloco) e multi-cursor no core ropey, alinhado ao EDIT.EXE / editores clássicos.
 
 ## Modos
 
 | Modo | Descrição |
 |------|-----------|
-| `Normal` | Um cursor; delegação padrão ao textarea |
+| `Normal` | Um cursor; core rope |
 | `Block` | Retângulo `[StartRow..EndRow] × [StartCol..EndCol]` |
 | `Multi` | Vários cursores alinhados |
 
@@ -37,9 +37,10 @@ Comportamento customizado de seleção retangular (bloco) e multi-cursor, indepe
 
 ## Módulos
 
-- `src/cursors.rs` — `CursorManager`, modos, merge
-- `src/block_select.rs` — geometria, copy com padding
-- `src/editor.rs` — multiplexação de input conforme modo
+- `src/editor/cursor.rs` — `Cursor`, `SelectionMode`
+- `src/editor/selection.rs` — bloco, copy com padding, merge
+- `src/editor/engine.rs` — multiplexação de input conforme modo
+- `src/editor/render.rs` — highlight visual de seleção
 
 ## Critérios de aceite
 
