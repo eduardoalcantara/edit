@@ -1,5 +1,50 @@
 use crate::theme::ThemeId;
 
+/// Visibilidade da borda externa do editor de texto.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum EditorBorder {
+    #[default]
+    Visible,
+    Hidden,
+}
+
+impl EditorBorder {
+    pub fn label(self) -> &'static str {
+        match self {
+            EditorBorder::Visible => "Visível",
+            EditorBorder::Hidden => "Invisível",
+        }
+    }
+}
+
+/// Margem interna entre a borda do editor e a área de texto.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum EditorMargin {
+    #[default]
+    None,
+    OneLine,
+    TwoLines,
+}
+
+impl EditorMargin {
+    pub fn label(self) -> &'static str {
+        match self {
+            EditorMargin::None => "Sem Margem",
+            EditorMargin::OneLine => "Uma linha",
+            EditorMargin::TwoLines => "Duas linhas",
+        }
+    }
+
+    /// (topo, baixo, esquerda, direita) em linhas/colunas de célula.
+    pub fn insets(self) -> (usize, usize, usize, usize) {
+        match self {
+            EditorMargin::None => (0, 0, 0, 0),
+            EditorMargin::OneLine => (1, 1, 2, 2),
+            EditorMargin::TwoLines => (2, 2, 4, 4),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GuideColumn {
     Col80,
@@ -40,6 +85,8 @@ pub struct ViewState {
     pub terminal: bool,
     pub footer_visible: bool,
     pub guide_column: GuideColumn,
+    pub margin: EditorMargin,
+    pub border: EditorBorder,
     pub theme: ThemeId,
 }
 
@@ -56,6 +103,8 @@ impl Default for ViewState {
             terminal: false,
             footer_visible: true,
             guide_column: GuideColumn::Unlimited,
+            margin: EditorMargin::None,
+            border: EditorBorder::Visible,
             theme: ThemeId::Dark,
         }
     }
@@ -76,5 +125,23 @@ impl ViewState {
             self.guide_column.label(),
             self.zoom
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn margin_insets() {
+        assert_eq!(EditorMargin::None.insets(), (0, 0, 0, 0));
+        assert_eq!(EditorMargin::OneLine.insets(), (1, 1, 2, 2));
+        assert_eq!(EditorMargin::TwoLines.insets(), (2, 2, 4, 4));
+    }
+
+    #[test]
+    fn editor_border_labels() {
+        assert_eq!(EditorBorder::Visible.label(), "Visível");
+        assert_eq!(EditorBorder::Hidden.label(), "Invisível");
     }
 }

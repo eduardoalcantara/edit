@@ -5,6 +5,7 @@ pub enum ThemeId {
     Dark,
     Light,
     ClassicBlue,
+    Matrix,
 }
 
 impl ThemeId {
@@ -13,6 +14,7 @@ impl ThemeId {
             ThemeId::Dark => "Escuro",
             ThemeId::Light => "Claro",
             ThemeId::ClassicBlue => "Azul Clássico",
+            ThemeId::Matrix => "Matrix",
         }
     }
 
@@ -21,6 +23,7 @@ impl ThemeId {
             ThemeId::Dark => ThemePalette::dark(),
             ThemeId::Light => ThemePalette::light(),
             ThemeId::ClassicBlue => ThemePalette::classic_blue(),
+            ThemeId::Matrix => ThemePalette::matrix(),
         }
     }
 }
@@ -122,6 +125,31 @@ impl ThemePalette {
         }
     }
 
+    /// Terminal fosforescente anos 70 / Matrix — verde sobre preto.
+    pub fn matrix() -> Self {
+        Self {
+            background: Color::Rgb(0, 0, 0),
+            foreground: Color::Rgb(0, 255, 65),
+            border: Color::Rgb(0, 140, 35),
+            header_bg: Color::Rgb(0, 35, 8),
+            header_fg: Color::Rgb(0, 255, 65),
+            footer_bg: Color::Rgb(0, 28, 6),
+            footer_fg: Color::Rgb(0, 200, 50),
+            accent: Color::Rgb(80, 255, 120),
+            status: Color::Rgb(120, 255, 140),
+            editor_bg: Color::Rgb(0, 0, 0),
+            editor_fg: Color::Rgb(0, 255, 65),
+            cursor: Color::Rgb(0, 255, 65),
+            selection: Color::Rgb(0, 70, 18),
+            menu_hotkey: Color::Rgb(180, 255, 100),
+            menu_focus_bg: Color::Rgb(0, 90, 22),
+            menu_top_active_bg: Color::Rgb(0, 110, 28),
+            button_bg: Color::Rgb(0, 75, 18),
+            button_fg: Color::Rgb(0, 255, 65),
+            shadow: Color::Rgb(0, 18, 4),
+        }
+    }
+
     pub fn header_style(self) -> Style {
         Style::default()
             .fg(self.header_fg)
@@ -185,7 +213,7 @@ impl ThemePalette {
     }
 
     pub fn menu_bar_style(self) -> Style {
-        Style::default().fg(self.header_fg).bg(self.header_bg)
+        Style::default().fg(self.footer_fg).bg(self.footer_bg)
     }
 
     pub fn menu_top_active_style(self) -> Style {
@@ -196,20 +224,20 @@ impl ThemePalette {
     }
 
     pub fn menu_panel_style(self) -> Style {
-        Style::default().fg(self.header_fg).bg(self.header_bg)
+        Style::default().fg(self.footer_fg).bg(self.footer_bg)
     }
 
     pub fn menu_border_style(self) -> Style {
-        Style::default().fg(self.border).bg(self.header_bg)
+        Style::default().fg(self.border).bg(self.footer_bg)
     }
 
     pub fn menu_item_style(self) -> Style {
-        Style::default().fg(self.header_fg).bg(self.header_bg)
+        Style::default().fg(self.footer_fg).bg(self.footer_bg)
     }
 
     pub fn menu_item_focus_style(self) -> Style {
         Style::default()
-            .fg(self.header_fg)
+            .fg(self.footer_fg)
             .bg(self.menu_focus_bg)
             .add_modifier(Modifier::BOLD)
     }
@@ -217,13 +245,13 @@ impl ThemePalette {
     pub fn menu_item_disabled_style(self) -> Style {
         Style::default()
             .fg(Color::DarkGray)
-            .bg(self.header_bg)
+            .bg(self.footer_bg)
     }
 
     pub fn menu_hotkey_style(self) -> Style {
         Style::default()
             .fg(self.menu_hotkey)
-            .bg(self.header_bg)
+            .bg(self.footer_bg)
             .add_modifier(Modifier::BOLD)
     }
 
@@ -238,7 +266,12 @@ impl ThemePalette {
         }
     }
 
-    pub fn shadow_style(self) -> Style {
+    pub fn shadow_vertical_style(self) -> Style {
         Style::default().fg(self.shadow).bg(self.shadow)
+    }
+
+    /// Meio bloco superior (▀): fg = sombra, bg = editor (metade inferior “vazia”).
+    pub fn shadow_horizontal_style(self) -> Style {
+        Style::default().fg(self.shadow).bg(self.editor_bg)
     }
 }
