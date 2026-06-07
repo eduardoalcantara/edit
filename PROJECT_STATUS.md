@@ -17,14 +17,11 @@
 - Specs de menu em `specs/done/`.
 
 ### Em andamento
-- Painel lateral e terminal inferior (placeholders visuais).
-- Tema personalizado por configuração.
-- Motor de encoding universal completo.
+- **Fidelidade Turbo Vision:** `specs/to-do/SPEC-UX-FIDELIDADE-TURBO-VISION.md` (TV7 file picker pendente; TV1–TV6 parcialmente endereçados).
+- Resolução das demais limitações em `specs/to-do/SPEC-LIMITACOES-PENDENTES.md`.
 
 ### Pendências
-- Sistema de abas.
-- Testes automatizados.
-- Highlight visual de bloco na renderização do editor.
+- Ver backlog completo (20 itens L1–L20) em `specs/to-do/SPEC-LIMITACOES-PENDENTES.md`.
 
 ## Ponto de retorno
 

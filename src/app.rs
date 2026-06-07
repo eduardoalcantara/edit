@@ -38,7 +38,7 @@ pub struct App {
 
 impl App {
     pub fn new(mouse_enabled: bool) -> Self {
-        let theme = ThemeId::Dark;
+        let theme = ThemeId::ClassicBlue;
         let palette = theme.palette();
         let recent = RecentFiles::load();
         let view = ViewState {
@@ -90,6 +90,9 @@ impl App {
     pub fn run(&mut self, terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>) -> io::Result<()> {
         while !self.should_quit {
             self.refresh_menu();
+            let palette = self.theme.palette();
+            self.editor
+                .set_window_title(&self.document_title(), &palette);
             terminal.draw(|frame| ui::draw(frame, self))?;
 
             if events::poll(Duration::from_millis(50))? {

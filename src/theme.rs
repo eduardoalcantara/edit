@@ -27,9 +27,7 @@ impl ThemeId {
 
 #[derive(Debug, Clone, Copy)]
 pub struct ThemePalette {
-    #[allow(dead_code)]
     pub background: Color,
-    #[allow(dead_code)]
     pub foreground: Color,
     pub border: Color,
     pub header_bg: Color,
@@ -42,6 +40,12 @@ pub struct ThemePalette {
     pub editor_fg: Color,
     pub cursor: Color,
     pub selection: Color,
+    pub menu_hotkey: Color,
+    pub menu_focus_bg: Color,
+    pub menu_top_active_bg: Color,
+    pub button_bg: Color,
+    pub button_fg: Color,
+    pub shadow: Color,
 }
 
 impl ThemePalette {
@@ -49,7 +53,7 @@ impl ThemePalette {
         Self {
             background: Color::Rgb(28, 28, 28),
             foreground: Color::Rgb(220, 220, 220),
-            border: Color::Rgb(80, 80, 80),
+            border: Color::Rgb(180, 180, 180),
             header_bg: Color::Rgb(45, 45, 45),
             header_fg: Color::Rgb(230, 230, 230),
             footer_bg: Color::Rgb(35, 35, 35),
@@ -60,6 +64,12 @@ impl ThemePalette {
             editor_fg: Color::Rgb(230, 230, 230),
             cursor: Color::Rgb(255, 255, 255),
             selection: Color::Rgb(60, 80, 120),
+            menu_hotkey: Color::Red,
+            menu_focus_bg: Color::Green,
+            menu_top_active_bg: Color::Red,
+            button_bg: Color::Green,
+            button_fg: Color::Black,
+            shadow: Color::Black,
         }
     }
 
@@ -67,7 +77,7 @@ impl ThemePalette {
         Self {
             background: Color::Rgb(245, 245, 245),
             foreground: Color::Rgb(30, 30, 30),
-            border: Color::Rgb(180, 180, 180),
+            border: Color::Rgb(100, 100, 100),
             header_bg: Color::Rgb(230, 230, 230),
             header_fg: Color::Rgb(20, 20, 20),
             footer_bg: Color::Rgb(235, 235, 235),
@@ -78,24 +88,37 @@ impl ThemePalette {
             editor_fg: Color::Black,
             cursor: Color::Black,
             selection: Color::Rgb(180, 200, 255),
+            menu_hotkey: Color::Red,
+            menu_focus_bg: Color::Green,
+            menu_top_active_bg: Color::Red,
+            button_bg: Color::Green,
+            button_fg: Color::Black,
+            shadow: Color::DarkGray,
         }
     }
 
+    /// Paleta inspirada Turbo Pascal / Turbo Vision (VGA 16 cores).
     pub fn classic_blue() -> Self {
         Self {
             background: Color::Blue,
             foreground: Color::White,
-            border: Color::Cyan,
-            header_bg: Color::Rgb(0, 0, 170),
-            header_fg: Color::White,
-            footer_bg: Color::Rgb(0, 0, 140),
-            footer_fg: Color::White,
+            border: Color::White,
+            header_bg: Color::Gray,
+            header_fg: Color::Black,
+            footer_bg: Color::Gray,
+            footer_fg: Color::Black,
             accent: Color::Yellow,
-            status: Color::Green,
-            editor_bg: Color::Rgb(0, 0, 128),
+            status: Color::Yellow,
+            editor_bg: Color::Blue,
             editor_fg: Color::White,
             cursor: Color::Yellow,
-            selection: Color::Rgb(0, 100, 200),
+            selection: Color::Cyan,
+            menu_hotkey: Color::Red,
+            menu_focus_bg: Color::Green,
+            menu_top_active_bg: Color::Red,
+            button_bg: Color::Green,
+            button_fg: Color::Black,
+            shadow: Color::Black,
         }
     }
 
@@ -114,12 +137,23 @@ impl ThemePalette {
         Style::default().fg(self.status).bg(self.footer_bg)
     }
 
+    pub fn footer_hotkey_style(self) -> Style {
+        Style::default()
+            .fg(self.menu_hotkey)
+            .bg(self.footer_bg)
+            .add_modifier(Modifier::BOLD)
+    }
+
     pub fn accent_style(self) -> Style {
         Style::default().fg(self.accent).bg(self.footer_bg)
     }
 
     pub fn editor_text_style(self) -> Style {
         Style::default().fg(self.editor_fg).bg(self.editor_bg)
+    }
+
+    pub fn desktop_style(self) -> Style {
+        Style::default().fg(self.foreground).bg(self.background)
     }
 
     pub fn cursor_style(self) -> Style {
@@ -156,8 +190,8 @@ impl ThemePalette {
 
     pub fn menu_top_active_style(self) -> Style {
         Style::default()
-            .fg(self.header_fg)
-            .bg(self.accent)
+            .fg(Color::White)
+            .bg(self.menu_top_active_bg)
             .add_modifier(Modifier::BOLD)
     }
 
@@ -175,15 +209,36 @@ impl ThemePalette {
 
     pub fn menu_item_focus_style(self) -> Style {
         Style::default()
-            .fg(self.header_bg)
-            .bg(self.header_fg)
+            .fg(self.header_fg)
+            .bg(self.menu_focus_bg)
             .add_modifier(Modifier::BOLD)
     }
 
     pub fn menu_item_disabled_style(self) -> Style {
         Style::default()
-            .fg(self.border)
+            .fg(Color::DarkGray)
             .bg(self.header_bg)
-            .add_modifier(Modifier::DIM)
+    }
+
+    pub fn menu_hotkey_style(self) -> Style {
+        Style::default()
+            .fg(self.menu_hotkey)
+            .bg(self.header_bg)
+            .add_modifier(Modifier::BOLD)
+    }
+
+    pub fn button_style(self, focused: bool) -> Style {
+        if focused {
+            Style::default()
+                .fg(self.button_fg)
+                .bg(Color::White)
+                .add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(self.button_fg).bg(self.button_bg)
+        }
+    }
+
+    pub fn shadow_style(self) -> Style {
+        Style::default().fg(self.shadow).bg(self.shadow)
     }
 }

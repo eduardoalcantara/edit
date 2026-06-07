@@ -1,7 +1,7 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::layout::Rect;
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, Clear, Paragraph};
+use ratatui::widgets::{Block, BorderType, Borders, Clear, Paragraph};
 use ratatui::Frame;
 
 use crate::clipboard::Clipboard;
@@ -664,9 +664,10 @@ pub fn render(frame: &mut Frame, area: Rect, bar: &MenuBar, state: &mut MenuStat
         } else {
             palette.menu_bar_style()
         };
-        spans.push(Span::styled(top.label, style));
+        for span in menu_top_spans(top.label, style, palette) {
+            spans.push(span);
+        }
         x = x.saturating_add(width);
-        spans.push(Span::styled(" ", palette.menu_bar_style()));
     }
 
     frame.render_widget(
@@ -711,19 +712,23 @@ fn render_panels(
             width: width.max(20),
             height,
         };
-        if area.y.saturating_add(area.height) > frame.area().height {
+        if area.y.saturating_add(area.height.saturating_add(1)) > frame.area().height {
             break;
         }
+        render_drop_shadow(frame, area, palette);
         frame.render_widget(Clear, area);
         let block = Block::default()
             .borders(Borders::ALL)
+            .border_type(BorderType::Double)
             .border_style(palette.menu_border_style())
             .style(palette.menu_panel_style());
         let inner = block.inner(area);
         frame.render_widget(block, area);
+        fill_rect(frame, inner, palette.menu_panel_style());
         state.panel_areas.push(area);
 
         let focused_leaf = state.focus_path.get(path_prefix.len()).copied();
+        let inner_w = inner.width as usize;
         for (i, node) in nodes.iter().enumerate() {
             let row_y = inner.y.saturating_add(i as u16);
             let row_area = Rect {
@@ -737,13 +742,17 @@ fn render_panels(
             state.item_hit_areas.push((item_path.clone(), row_area));
 
             let focused = focused_leaf == Some(i);
-            let line = format_menu_line(node, palette, inner.width as usize);
+            let line = format_menu_line(node, palette, inner_w);
             let style = match node {
                 MenuNode::Item { enabled: false, .. } => palette.menu_item_disabled_style(),
+                MenuNode::Separator => palette.menu_item_disabled_style(),
                 _ if focused => palette.menu_item_focus_style(),
                 _ => palette.menu_item_style(),
             };
-            frame.render_widget(Paragraph::new(line).style(style), row_area);
+            frame.render_widget(
+                Paragraph::new(line).style(style.bg(palette.header_bg)),
+                row_area,
+            );
         }
 
         let Some(focus_idx) = state.focus_path.get(path_prefix.len()).copied() else {
@@ -758,6 +767,63 @@ fn render_panels(
             }
             _ => break,
         }
+    }
+}
+
+fn menu_top_spans(label: &str, base: ratatui::style::Style, palette: ThemePalette) -> Vec<Span<'static>> {
+    let trimmed = label.trim();
+    let mut out = Vec::new();
+    out.push(Span::styled(" ", base));
+    if let Some(first) = trimmed.chars().next() {
+        let rest: String = trimmed.chars().skip(1).collect();
+        out.push(Span::styled(
+            first.to_string(),
+            palette.menu_hotkey_style(),
+        ));
+        out.push(Span::styled(format!("{rest} "), base));
+    } else {
+        out.push(Span::styled(label.to_string(), base));
+    }
+    out
+}
+
+fn fill_rect(frame: &mut Frame, area: Rect, style: ratatui::style::Style) {
+    for row in 0..area.height {
+        frame.render_widget(
+            Paragraph::new(Span::styled(" ".repeat(area.width as usize), style)).style(style),
+            Rect {
+                x: area.x,
+                y: area.y.saturating_add(row),
+                width: area.width,
+                height: 1,
+            },
+        );
+    }
+}
+
+fn render_drop_shadow(frame: &mut Frame, area: Rect, palette: ThemePalette) {
+    let shadow = palette.shadow_style();
+    if area.x.saturating_add(area.width) < frame.area().width {
+        frame.render_widget(
+            Paragraph::new(Span::styled("█".repeat(area.height as usize), shadow)).style(shadow),
+            Rect {
+                x: area.x.saturating_add(area.width),
+                y: area.y.saturating_add(1),
+                width: 1,
+                height: area.height,
+            },
+        );
+    }
+    if area.y.saturating_add(area.height) < frame.area().height {
+        frame.render_widget(
+            Paragraph::new(Span::styled("█".repeat(area.width as usize), shadow)).style(shadow),
+            Rect {
+                x: area.x.saturating_add(1),
+                y: area.y.saturating_add(area.height),
+                width: area.width,
+                height: 1,
+            },
+        );
     }
 }
 
@@ -785,7 +851,7 @@ fn line_width(node: &MenuNode) -> usize {
 fn format_menu_line(node: &MenuNode, palette: ThemePalette, width: usize) -> Line<'static> {
     match node {
         MenuNode::Separator => Line::from(Span::styled(
-            "────────────",
+            "─".repeat(width.max(12)),
             palette.menu_item_disabled_style(),
         )),
         MenuNode::Item { label, shortcut, checked, .. } => {

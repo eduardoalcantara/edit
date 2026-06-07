@@ -36,16 +36,25 @@ impl Editor {
         self.textarea.set_selection_style(palette.selection_style());
         self.textarea
             .set_placeholder_style(palette.placeholder_style());
-        let title = format!(" {} │ {} ", self.mode.label(), self.cursors.mode_label());
+        self.set_window_title("Sem título", palette);
+    }
+
+    pub fn set_window_title(&mut self, title: &str, palette: &ThemePalette) {
+        let (line, col) = self.cursor_line_col();
+        let frame_title = format!(
+            " {title} │ Ln {line} Col {col} │ {} ",
+            self.mode.label()
+        );
         self.textarea.set_block(
             Block::default()
                 .borders(ratatui::widgets::Borders::ALL)
+                .border_type(ratatui::widgets::BorderType::Double)
                 .border_style(
                     ratatui::style::Style::default()
                         .fg(palette.border)
                         .bg(palette.editor_bg),
                 )
-                .title(title)
+                .title(frame_title)
                 .style(palette.editor_text_style()),
         );
     }
@@ -108,20 +117,28 @@ impl Editor {
         }
 
         if self.mode == EditMode::Replace {
+            let advance = matches!(
+                input.key,
+                tui_textarea::Key::Char(ch) if ch != '\n' && ch != '\t'
+            );
             if let Input {
                 key: tui_textarea::Key::Char(ch),
                 ctrl: false,
                 alt: false,
                 shift: false,
-            } = input
+            } = &input
             {
-                if ch != '\n' && ch != '\t' {
+                if *ch != '\n' && *ch != '\t' {
                     self.textarea.delete_char();
                 }
             }
+            self.textarea.input(input);
+            if advance {
+                self.textarea.move_cursor(CursorMove::Forward);
+            }
+            self.sync_cursors_from_textarea();
+            return;
         }
-        self.textarea.input(input);
-        self.sync_cursors_from_textarea();
     }
 
     fn handle_multi_input(&mut self, input: Input) {

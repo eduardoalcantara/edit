@@ -125,6 +125,23 @@ fn handle_key(app: &mut App, key: KeyEvent) {
     let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
     let alt = key.modifiers.contains(KeyModifiers::ALT);
 
+    if key.code == KeyCode::F(1) {
+        app.set_status("Ajuda: em breve");
+        return;
+    }
+    if key.code == KeyCode::F(2) {
+        app.request_save();
+        return;
+    }
+    if key.code == KeyCode::F(3) {
+        app.request_open();
+        return;
+    }
+    if key.code == KeyCode::F(10) {
+        app.menu_state.open_top_menu(0, &app.menu_bar);
+        return;
+    }
+
     if alt && matches!(key.code, KeyCode::Char('r' | 'R')) {
         app.menu_state.open_top_menu(0, &app.menu_bar);
         return;
