@@ -10,6 +10,7 @@ use crate::editor::selection::{
     BlockSelectionState,
 };
 use crate::editor::tabs::{char_col_from_visual, line_visual_len, tab_stop_width, visual_col_in_line};
+use crate::editor::word_boundary::{get_next_word_boundary, WordDirection};
 use crate::editor::viewport::Viewport;
 use crate::encoding::Tabulation;
 
@@ -424,6 +425,24 @@ impl EditorEngine {
             self.sync_primary_virtual();
             self.ensure_visible();
         }
+    }
+
+    pub fn move_word_left(&mut self, extend: bool) {
+        self.prepare_move(extend);
+        let pos = self.primary().char_idx;
+        let next = get_next_word_boundary(&self.text, pos, WordDirection::Left);
+        self.primary_mut().char_idx = next;
+        self.sync_primary_virtual();
+        self.ensure_visible();
+    }
+
+    pub fn move_word_right(&mut self, extend: bool) {
+        self.prepare_move(extend);
+        let pos = self.primary().char_idx;
+        let next = get_next_word_boundary(&self.text, pos, WordDirection::Right);
+        self.primary_mut().char_idx = next;
+        self.sync_primary_virtual();
+        self.ensure_visible();
     }
 
     pub fn move_up(&mut self, extend: bool) {

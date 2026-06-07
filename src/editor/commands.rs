@@ -5,6 +5,8 @@ pub enum EditorCommand {
     Delete,
     MoveLeft { extend: bool },
     MoveRight { extend: bool },
+    MoveWordLeft { extend: bool },
+    MoveWordRight { extend: bool },
     MoveUp { extend: bool },
     MoveDown { extend: bool },
     Home { extend: bool },

@@ -184,6 +184,14 @@ fn handle_ctrl_key(app: &mut crate::app::App, key: KeyEvent) -> InputResult {
                 app.set_status("Colado");
             }
         }
+        KeyCode::Left => {
+            let extend = key.modifiers.contains(crossterm::event::KeyModifiers::SHIFT);
+            app.editor.execute(EditorCommand::MoveWordLeft { extend });
+        }
+        KeyCode::Right => {
+            let extend = key.modifiers.contains(crossterm::event::KeyModifiers::SHIFT);
+            app.editor.execute(EditorCommand::MoveWordRight { extend });
+        }
         _ => {
             if let Some(cmd) = keyboard::key_to_command(key) {
                 app.editor.execute(cmd);

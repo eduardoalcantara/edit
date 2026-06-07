@@ -3,7 +3,8 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 const MAX_RECENT: usize = 10;
-const RECENT_DIR: &str = ".editor-linux";
+pub const APP_DIR: &str = ".edit";
+const LEGACY_APP_DIR: &str = ".editor-linux";
 const RECENT_FILE: &str = "recent.json";
 
 #[derive(Debug, Clone, Default)]
@@ -13,6 +14,7 @@ pub struct RecentFiles {
 
 impl RecentFiles {
     pub fn load() -> Self {
+        migrate_legacy_data();
         let path = recent_path();
         if let Ok(content) = fs::read_to_string(&path) {
             if let Some(list) = serde_parse(&content) {
@@ -51,8 +53,34 @@ impl RecentFiles {
     }
 }
 
+pub fn app_dir() -> PathBuf {
+    PathBuf::from(APP_DIR)
+}
+
 fn recent_path() -> PathBuf {
-    PathBuf::from(RECENT_DIR).join(RECENT_FILE)
+    app_dir().join(RECENT_FILE)
+}
+
+fn migrate_legacy_data() {
+    let new_path = recent_path();
+    if new_path.exists() {
+        return;
+    }
+
+    let legacy_path = PathBuf::from(LEGACY_APP_DIR).join(RECENT_FILE);
+    if !legacy_path.exists() {
+        return;
+    }
+
+    if let Some(parent) = new_path.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+
+    if fs::rename(&legacy_path, &new_path).is_err() {
+        let _ = fs::copy(&legacy_path, &new_path);
+    }
+
+    let _ = fs::remove_dir(PathBuf::from(LEGACY_APP_DIR));
 }
 
 fn escape_json(s: &str) -> String {
@@ -110,4 +138,65 @@ pub fn display_name(path: &Path) -> String {
         .and_then(|n| n.to_str())
         .unwrap_or("?")
         .to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::{Mutex, MutexGuard};
+
+    static TEST_DIR_LOCK: Mutex<()> = Mutex::new(());
+
+    struct TestDirGuard {
+        _lock: MutexGuard<'static, ()>,
+        created: Vec<PathBuf>,
+    }
+
+    impl TestDirGuard {
+        fn new() -> Self {
+            let lock = TEST_DIR_LOCK.lock().unwrap();
+            Self {
+                _lock: lock,
+                created: Vec::new(),
+            }
+        }
+
+        fn track(&mut self, path: PathBuf) {
+            self.created.push(path);
+        }
+    }
+
+    impl Drop for TestDirGuard {
+        fn drop(&mut self) {
+            for path in self.created.iter().rev() {
+                let _ = fs::remove_file(path);
+                if let Some(parent) = path.parent() {
+                    let _ = fs::remove_dir(parent);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn migrates_recent_json_from_legacy_dir() {
+        let mut guard = TestDirGuard::new();
+
+        let _ = fs::remove_file(recent_path());
+        let _ = fs::remove_dir(app_dir());
+        let _ = fs::remove_dir(PathBuf::from(LEGACY_APP_DIR));
+
+        let legacy_dir = PathBuf::from(LEGACY_APP_DIR);
+        fs::create_dir_all(&legacy_dir).unwrap();
+        let legacy_file = legacy_dir.join(RECENT_FILE);
+        fs::write(&legacy_file, r#"["/tmp/exemplo.txt"]"#).unwrap();
+        guard.track(legacy_file.clone());
+
+        let recent = RecentFiles::load();
+        assert_eq!(recent.paths(), &[PathBuf::from("/tmp/exemplo.txt")]);
+        assert!(recent_path().exists());
+        assert!(!legacy_file.exists());
+
+        guard.track(recent_path());
+        guard.track(app_dir());
+    }
 }

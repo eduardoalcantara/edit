@@ -2,7 +2,7 @@
 
 **Autor:** Perplexity AI  
 **Data:** 2026-06-07  
-**Versão:** 2.2
+**Versão:** 2.3
 
 ## Registro
 
@@ -72,3 +72,14 @@
 - 2026-06-07 — **Conversão De/Para no modal de tabulação** — usuário informa formato atual e desejado (2/4/8/Tab literal); [Converter] aplica e sincroniza menu Tabulação; confirmação ao trocar codificação.
   - Módulos: `src/modal/convert_tab.rs`, `src/encoding.rs`, `src/app.rs`
   - Testes: `modal::convert_tab::tests::*`, `convert_tabulation_between` roundtrip
+- 2026-06-07 — **Modal Converter Tabulação (UI De/Para)** — caixas lado a lado com listas completas; títulos na borda; foco por borda (sem verde); Tab/Shift+Tab/←/→; mouse nas listas.
+  - Módulos: `src/modal/convert_tab.rs`, `src/modal/dialog.rs`, `src/theme.rs`, `src/ui/layers/modal.rs`
+  - Commits: `530a8b8`
+- 2026-06-07 — **Renomeação binário `edit`** — pacote Cargo e executável de `editor-linux` para `edit`.
+  - Commit: `4a27905`
+- 2026-06-07 — **Pasta de dados `.edit/`** — recentes em `.edit/recent.json`; migração automática de `.editor-linux/`; constante `APP_DIR`.
+  - Módulos: `src/recent.rs`
+  - Testes: `recent::tests::migrates_recent_json_from_legacy_dir`
+- 2026-06-07 — **Smart Word Navigation** — `Ctrl+←/→` e `Ctrl+Shift+←/→`; segmentação camelCase, acrônimos, separadores e dígitos.
+  - Módulos: `src/editor/word_boundary.rs`, `src/editor/{commands,engine,mod}.rs`, `src/ui/layers/editor.rs`
+  - Testes: `editor::word_boundary::tests::*` (14 casos incl. tabela parseHTTPResponse, user_profile_id, etc.)

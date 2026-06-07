@@ -128,7 +128,7 @@ Registrar limitações conhecidas da implementação atual como **pontos a resol
 |-------|--------|
 | **Estado** | Wrap, coluna guia, tema etc. vivem só na sessão |
 | **Impacto** | Preferências resetam ao fechar o editor |
-| **Resolução esperada** | JSON em `.editor-linux/config.json` (ou equivalente) |
+| **Resolução esperada** | JSON em `.edit/config.json` (ou equivalente) |
 
 ---
 

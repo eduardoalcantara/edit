@@ -7,6 +7,7 @@ mod search;
 mod selection;
 mod tabs;
 mod viewport;
+mod word_boundary;
 
 pub use commands::EditorCommand;
 pub use cursor::{Cursor, SelectionMode};
@@ -83,6 +84,8 @@ impl Editor {
             EditorCommand::Delete => self.engine.delete(),
             EditorCommand::MoveLeft { extend } => self.engine.move_left(extend),
             EditorCommand::MoveRight { extend } => self.engine.move_right(extend),
+            EditorCommand::MoveWordLeft { extend } => self.engine.move_word_left(extend),
+            EditorCommand::MoveWordRight { extend } => self.engine.move_word_right(extend),
             EditorCommand::MoveUp { extend } => self.engine.move_up(extend),
             EditorCommand::MoveDown { extend } => self.engine.move_down(extend),
             EditorCommand::Home { extend } => self.engine.move_home(extend),

@@ -11,7 +11,7 @@ Menus **Arquivo** e **Exibir** funcionais com histórico de recentes, estado vis
 
 | Módulo | Função |
 |--------|--------|
-| `src/recent.rs` | 10 arquivos, JSON em `.editor-linux/recent.json`, submenu cascata |
+| `src/recent.rs` | 10 arquivos, JSON em `.edit/recent.json`, submenu cascata |
 | `src/view_state.rs` | Zoom, wrap, mostrar, painel, terminal, rodapé, coluna guia, tema |
 | `src/menus.rs` | Árvore Arquivo/Exibir expandida, itens habilitados |
 | `src/app.rs` | `dispatch_action` para operações de arquivo e toggles Exibir |

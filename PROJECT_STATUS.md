@@ -2,7 +2,7 @@
 
 **Autor:** Perplexity AI  
 **Data:** 2026-06-07  
-**Versão:** 2.2
+**Versão:** 2.3
 
 ## Estado atual
 
@@ -55,8 +55,15 @@
 - **Modais reutilizáveis (`src/modal/`) (2026-06-07):**
   - Componente `Dialog` (layout, botões, mouse, teclado, rodapé com help por botão).
   - Presets em `buttons.rs`; `ModalLayer` delega pintura/input ao `Dialog`.
-  - Modal **Converter Tabulação** com campos **De** / **Para** (2, 4, 8 espaços ou Tab literal); botão [Converter]; opção **Para** vira tabulação do menu após confirmar.
+  - Modal **Converter Tabulação** com caixas **De** / **Para** lado a lado (listas completas, títulos `[ De ]` / `[ Para ]` na borda); foco sutil (borda preta/branca, sem fundo verde); Tab/Shift+Tab e ←/→ entre listas; botão [Converter]; opção **Para** vira tabulação do menu após confirmar.
   - Confirmação obrigatória ao **trocar codificação** (UTF-8, ANSI, etc.), com aviso se documento dirty.
+- **Renomeação do binário (2026-06-07):**
+  - Pacote e executável: `editor-linux` → **`edit`** (`cargo run` / `target/debug/edit`).
+- **Pasta de dados local (2026-06-07):**
+  - Config/recentes em **`~/.edit/`** (antes `.editor-linux/`); migração automática de `recent.json` na primeira execução.
+- **Smart Word Navigation (2026-06-07):**
+  - `Ctrl+←/→` e `Ctrl+Shift+←/→`: saltos por unidade de palavra (separadores, `camelCase`, blocos `HTTP`/`Server`, dígitos).
+  - Módulo `src/editor/word_boundary.rs` com `get_next_word_boundary` (reutilizável para Ctrl+Backspace futuro).
 - **Menus booleanos estilo Turbo Vision (2026-06-07):**
   - Itens toggle únicos (Word Wrap, Painel, Terminal, Rodapé, Borda) em vez de submenus Ativar/Desativar.
   - Marcador `√` substitutivo na margem esquerda (1 célula, sem coluna extra); atalhos de menu em cinza (`menu_shortcut_style`).
@@ -66,7 +73,7 @@
   - Exibir → Mostrar tabs: `»` onde há `\t` no texto.
 - Relatórios em `specs/report/` para as 4 fases de menu + migração ropey.
 - Specs de menu e arquitetura em `specs/done/`.
-- **41 testes** unitários passando (`cargo test`).
+- **57 testes** unitários passando (`cargo test`).
 
 ### Em andamento
 - **Fidelidade Turbo Vision:** `specs/to-do/SPEC-UX-FIDELIDADE-TURBO-VISION.md` (TV1–TV3 paleta/rodapé; TV7 file picker pendente).
