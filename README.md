@@ -8,7 +8,7 @@ Editor de terminal Linux com foco em usabilidade, previsibilidade e proteção c
 
 ## Estrutura
 
-- `specs/` — especificações funcionais e técnicas.
+- `specs/` — especificações (`to-do/`, `done/`, `report/`).
 - `docs/` — documentação do projeto.
 - `scripts/` — automações e utilitários.
 - `tests/` — testes automatizados e manuais.
