@@ -1,5 +1,6 @@
 mod app;
 mod clipboard;
+mod config;
 mod document;
 mod edit_mode;
 mod editor;
@@ -69,6 +70,7 @@ fn run_app() -> io::Result<()> {
     let mut app = App::new(guard.mouse_enabled);
 
     let result = app.run(&mut terminal);
+    app.shutdown();
 
     guard.leave()?;
     result

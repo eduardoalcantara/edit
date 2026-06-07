@@ -6,6 +6,7 @@ use ratatui::backend::CrosstermBackend;
 use ratatui::Terminal;
 
 use crate::clipboard::Clipboard;
+use crate::config::{config_from_view, EditConfig};
 use crate::document::Document;
 use crate::editor::Editor;
 use crate::encoding::{FileEncoding, Tabulation};
@@ -39,20 +40,43 @@ pub struct App {
     pub last_frame_width: u16,
     pub last_frame_height: u16,
     pub memory: MemoryMonitor,
+    user_config: EditConfig,
 }
 
 impl App {
     pub fn new(mouse_enabled: bool) -> Self {
-        let theme = ThemeId::ClassicBlue;
+        let user_config = EditConfig::load();
+        let view_snapshot = user_config.view_settings();
+        let theme = view_snapshot.theme;
         let palette = theme.palette();
-        let recent = RecentFiles::load();
+        let recent = RecentFiles::from_paths(user_config.recent_paths());
+        let encoding = user_config.default_encoding();
+        let tabulation = user_config.default_tabulation();
         let view = ViewState {
-            theme,
-            ..ViewState::default()
+            zoom: view_snapshot.zoom,
+            word_wrap: view_snapshot.word_wrap,
+            show_symbols: view_snapshot.show_symbols,
+            show_spaces: view_snapshot.show_spaces,
+            show_tabs: view_snapshot.show_tabs,
+            show_eol: view_snapshot.show_eol,
+            side_panel: view_snapshot.side_panel,
+            terminal: view_snapshot.terminal,
+            footer_visible: view_snapshot.footer_visible,
+            show_memory: view_snapshot.show_memory,
+            guide_column: view_snapshot.guide_column,
+            margin: view_snapshot.margin,
+            border: view_snapshot.border,
+            theme: view_snapshot.theme,
         };
+        let mut document = Document::new();
+        document.encoding = encoding;
+        document.tabulation = tabulation;
+        let mut editor = Editor::new(&palette);
+        editor.set_tabulation(tabulation);
+        editor.set_word_wrap(view.word_wrap);
         let mut app = Self {
-            editor: Editor::new(&palette),
-            document: Document::new(),
+            editor,
+            document,
             theme,
             view,
             recent,
@@ -69,9 +93,25 @@ impl App {
             last_frame_width: 80,
             last_frame_height: 24,
             memory: MemoryMonitor::new(),
+            user_config,
         };
         app.refresh_menu();
         app
+    }
+
+    fn persist_user_config(&mut self) {
+        self.user_config = config_from_view(
+            self.recent.paths(),
+            &self.view,
+            self.document.encoding,
+            self.document.tabulation,
+        );
+        let _ = self.user_config.save();
+    }
+
+    fn note_recent_file(&mut self, path: PathBuf) {
+        self.recent.push(path);
+        self.persist_user_config();
     }
 
     pub fn refresh_menu(&mut self) {
@@ -111,6 +151,10 @@ impl App {
         Ok(())
     }
 
+    pub fn shutdown(&mut self) {
+        self.persist_user_config();
+    }
+
     pub fn set_status(&mut self, message: impl Into<String>) {
         self.status_message = message.into();
     }
@@ -120,6 +164,7 @@ impl App {
         self.view.theme = theme;
         let palette = theme.palette();
         self.editor.apply_theme(&palette);
+        self.persist_user_config();
     }
 
     pub fn request_new_document(&mut self) {
@@ -136,7 +181,8 @@ impl App {
 
     pub fn new_document(&mut self) {
         self.editor.clear();
-        self.document.reset();
+        self.document
+            .reset_with(self.user_config.default_encoding(), self.user_config.default_tabulation());
         self.editor.set_tabulation(self.document.tabulation);
         self.set_status("Novo documento");
     }
@@ -201,7 +247,7 @@ impl App {
         match file_io::write_lines_encoded(&path, &lines, self.document.encoding) {
             Ok(()) => {
                 self.document.mark_saved(content, path.clone());
-                self.recent.push(path.clone());
+                self.note_recent_file(path.clone());
                 self.set_status(format!("Salvo: {}", path.display()));
                 if self.pending_quit {
                     self.pending_quit = false;
@@ -220,7 +266,7 @@ impl App {
                 self.editor.set_lines(lines);
                 self.document
                     .set_opened(self.editor.content_string(), path.clone());
-                self.recent.push(path.clone());
+                self.note_recent_file(path.clone());
                 self.editor.set_tabulation(self.document.tabulation);
                 self.set_status(format!("Aberto: {}", path.display()));
             }
@@ -409,6 +455,7 @@ impl App {
             self.document.encoding = encoding;
             self.set_status(format!("Codificação: {}", encoding.label()));
         }
+        self.persist_user_config();
     }
 
     fn reinterpret_encoding(&mut self, encoding: FileEncoding) {
@@ -425,9 +472,44 @@ impl App {
     fn convert_encoding(&mut self, encoding: FileEncoding) {
         self.document.encoding = encoding;
         self.set_status(format!("Salvar converterá para {}", encoding.label()));
+        self.persist_user_config();
+    }
+
+    fn set_tab(&mut self, tab: Tabulation) {
+        self.document.tabulation = tab;
+        self.editor.set_tabulation(tab);
+        self.set_status(format!("Tab: {}", tab.label()));
+        self.persist_user_config();
+    }
+
+    fn set_encoding(&mut self, encoding: FileEncoding) {
+        if encoding == self.document.encoding {
+            return;
+        }
+        let mut message = if self.document.path().is_some() {
+            format!(
+                "Alterar codificação para {}?\n\n\
+                 O arquivo será reaberto com a nova codificação.",
+                encoding.label()
+            )
+        } else {
+            format!(
+                "Alterar codificação do documento para {}?",
+                encoding.label()
+            )
+        };
+        if self.is_dirty() {
+            message.push_str("\n\nAlterações não salvas podem ser afetadas.");
+        }
+        self.modal = Modal::confirm(
+            "Codificação",
+            message,
+            ConfirmKind::ChangeEncoding { encoding },
+        );
     }
 
     pub fn dispatch_action(&mut self, action: ActionId) {
+        let persist = is_persistent_setting(action);
         match action {
             ActionId::Quit => self.request_quit(),
             ActionId::New => self.request_new_document(),
@@ -601,37 +683,35 @@ impl App {
             }
             ActionId::Recent | ActionId::PastePrevious | ActionId::NoOp => {}
         }
-    }
-
-    fn set_encoding(&mut self, encoding: FileEncoding) {
-        if encoding == self.document.encoding {
-            return;
+        if persist {
+            self.persist_user_config();
         }
-        let mut message = if self.document.path().is_some() {
-            format!(
-                "Alterar codificação para {}?\n\n\
-                 O arquivo será reaberto com a nova codificação.",
-                encoding.label()
-            )
-        } else {
-            format!(
-                "Alterar codificação do documento para {}?",
-                encoding.label()
-            )
-        };
-        if self.is_dirty() {
-            message.push_str("\n\nAlterações não salvas podem ser afetadas.");
-        }
-        self.modal = Modal::confirm(
-            "Codificação",
-            message,
-            ConfirmKind::ChangeEncoding { encoding },
-        );
     }
+}
 
-    fn set_tab(&mut self, tab: Tabulation) {
-        self.document.tabulation = tab;
-        self.editor.set_tabulation(tab);
-        self.set_status(format!("Tab: {}", tab.label()));
-    }
+fn is_persistent_setting(action: ActionId) -> bool {
+    matches!(
+        action,
+        ActionId::ToggleSidePanel
+            | ActionId::ToggleTerminal
+            | ActionId::ToggleFooter
+            | ActionId::ShowMemoryToggle
+            | ActionId::ZoomIn
+            | ActionId::ZoomOut
+            | ActionId::ZoomReset
+            | ActionId::WordWrapToggle
+            | ActionId::ShowSymbols
+            | ActionId::ShowSpaces
+            | ActionId::ShowTabs
+            | ActionId::ShowEol
+            | ActionId::ShowAll
+            | ActionId::Column80
+            | ActionId::Column120
+            | ActionId::Column160
+            | ActionId::ColumnUnlimited
+            | ActionId::MarginNone
+            | ActionId::MarginOneLine
+            | ActionId::MarginTwoLines
+            | ActionId::BorderToggle
+    )
 }

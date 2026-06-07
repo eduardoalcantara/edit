@@ -2,7 +2,7 @@
 
 **Autor:** Perplexity AI  
 **Data:** 2026-06-07  
-**Versão:** 2.4
+**Versão:** 2.5
 
 ## Registro
 
@@ -88,3 +88,7 @@
   - Módulos: `src/memory.rs`, `src/{app,menus,view_state}.rs`, `src/editor/engine.rs`, `src/ui/compositor.rs`
   - Dependência: `sysinfo` (feature `system`)
   - Testes: `memory::tests::*`, `editor::engine::tests::visible_char_count_*`, `ui::compositor::tests::footer_*`, `view_state::tests::show_memory_enabled_by_default`
+- 2026-06-07 — **Configuração persistente `edit.json`** — ao lado do executável; seções `arquivo`, `exibir`, `formatar` (mesma organização dos menus); recentes + toggles + tema + formatação; migração de `.edit/recent.json`.
+  - Módulos: `src/config.rs`, `src/app.rs`, `src/recent.rs`, `src/main.rs`
+  - Dependências: `serde`, `serde_json`
+  - Testes: `config::tests::*`

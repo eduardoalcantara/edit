@@ -45,11 +45,15 @@ impl Document {
         self.path = Some(path);
     }
 
-    pub fn reset(&mut self) {
+    pub fn reset_with(&mut self, encoding: FileEncoding, tabulation: Tabulation) {
         self.path = None;
         self.saved_content = EMPTY_DOCUMENT_TEXT.to_string();
-        self.encoding = FileEncoding::default();
-        self.tabulation = Tabulation::default();
+        self.encoding = encoding;
+        self.tabulation = tabulation;
+    }
+
+    pub fn reset(&mut self) {
+        self.reset_with(FileEncoding::default(), Tabulation::default());
     }
 
     pub fn set_opened(&mut self, content: String, path: PathBuf) {

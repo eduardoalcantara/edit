@@ -2,7 +2,7 @@
 
 **Autor:** Perplexity AI  
 **Data:** 2026-06-07  
-**Versão:** 2.4
+**Versão:** 2.5
 
 ## Estado atual
 
@@ -60,7 +60,13 @@
 - **Renomeação do binário (2026-06-07):**
   - Pacote e executável: `editor-linux` → **`edit`** (`cargo run` / `target/debug/edit`).
 - **Pasta de dados local (2026-06-07):**
-  - Config/recentes em **`~/.edit/`** (antes `.editor-linux/`); migração automática de `recent.json` na primeira execução.
+  - ~~Config/recentes em **`~/.edit/`**~~ substituído por **`edit.json`** ao lado do executável (ver abaixo).
+  - Migração automática de `.edit/recent.json` e `.editor-linux/recent.json` na primeira execução.
+- **Configuração persistente `edit.json` (2026-06-07):**
+  - Arquivo **`edit.json`** na mesma pasta de `edit` / `edit.exe`; estrutura espelha os menus **Arquivo**, **Exibir** e **Formatar**.
+  - **Arquivo → recentes**; toggles de Exibir (zoom, wrap, mostrar, painel, terminal, rodapé, memória, tema, colunas, borda, margem); codificação e tabulação padrão.
+  - Gravação automática ao alterar opções, abrir/salvar arquivo e ao encerrar; `serde`/`serde_json`.
+  - Módulo `src/config.rs`; `RecentFiles` deixa de gravar arquivo próprio.
 - **Smart Word Navigation (2026-06-07):**
   - `Ctrl+←/→` e `Ctrl+Shift+←/→`: saltos por unidade de palavra (separadores, `camelCase`, blocos `HTTP`/`Server`, dígitos).
   - Módulo `src/editor/word_boundary.rs` com `get_next_word_boundary` (reutilizável para Ctrl+Backspace futuro).
@@ -77,7 +83,7 @@
   - Exibir → **Mostrar consumo de memória** (toggle, ativo por padrão); segmento `Mem NMB` no rodapé quando disponível.
 - Relatórios em `specs/report/` para as 4 fases de menu + migração ropey.
 - Specs de menu e arquitetura em `specs/done/`.
-- **68 testes** unitários passando (`cargo test`).
+- **70 testes** unitários passando (`cargo test`).
 
 ### Em andamento
 - **Fidelidade Turbo Vision:** `specs/to-do/SPEC-UX-FIDELIDADE-TURBO-VISION.md` (TV1–TV3 paleta/rodapé; TV7 file picker pendente).
