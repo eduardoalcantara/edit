@@ -11,13 +11,12 @@ use crate::editor::Editor;
 use crate::encoding::{FileEncoding, Tabulation};
 use crate::events;
 use crate::file_io;
-use crate::find::{find_next, find_prev, replace_one};
 use crate::menus::{ActionId, MenuBar, MenuState};
-use crate::modal::{ConfirmKind, Modal, PathInputKind};
+use crate::modal::{ConfirmKind, ConfirmLayout, Modal, PathInputKind};
 use crate::recent::RecentFiles;
 use crate::theme::ThemeId;
 use crate::ui;
-use crate::view_state::{GuideColumn, ViewState};
+use crate::view_state::{EditorBorder, EditorMargin, GuideColumn, ViewState};
 
 pub struct App {
     pub editor: Editor,
@@ -30,10 +29,13 @@ pub struct App {
     pub menu_state: MenuState,
     pub find_pattern: String,
     pub should_quit: bool,
+    pub pending_quit: bool,
     pub status_message: String,
     pub mouse_enabled: bool,
     pub modal: Modal,
     pub is_ssh_session: bool,
+    pub last_frame_width: u16,
+    pub last_frame_height: u16,
 }
 
 impl App {
@@ -56,10 +58,13 @@ impl App {
             menu_state: MenuState::default(),
             find_pattern: String::new(),
             should_quit: false,
+            pending_quit: false,
             status_message: "Pronto".to_string(),
             mouse_enabled,
             modal: Modal::None,
             is_ssh_session: std::env::var("SSH_CONNECTION").is_ok(),
+            last_frame_width: 80,
+            last_frame_height: 24,
         };
         app.refresh_menu();
         app
@@ -84,15 +89,12 @@ impl App {
     }
 
     pub fn is_dirty(&self) -> bool {
-        self.document.is_dirty(&self.editor.lines())
+        self.document.is_dirty(&self.editor.content_string())
     }
 
     pub fn run(&mut self, terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>) -> io::Result<()> {
         while !self.should_quit {
             self.refresh_menu();
-            let palette = self.theme.palette();
-            self.editor
-                .set_window_title(&self.document_title(), &palette);
             terminal.draw(|frame| ui::draw(frame, self))?;
 
             if events::poll(Duration::from_millis(50))? {
@@ -172,11 +174,7 @@ impl App {
 
     pub fn request_quit(&mut self) {
         if self.is_dirty() {
-            self.modal = Modal::confirm(
-                "Sair",
-                "Existem alterações não salvas. Deseja sair sem salvar?",
-                ConfirmKind::QuitUnsaved,
-            );
+            self.modal = Modal::quit_unsaved(&self.document_title());
             return;
         }
         self.should_quit = true;
@@ -194,11 +192,16 @@ impl App {
         }
 
         let lines = self.editor.lines();
+        let content = self.editor.content_string();
         match file_io::write_lines_encoded(&path, &lines, self.document.encoding) {
             Ok(()) => {
-                self.document.mark_saved(lines, path.clone());
+                self.document.mark_saved(content, path.clone());
                 self.recent.push(path.clone());
                 self.set_status(format!("Salvo: {}", path.display()));
+                if self.pending_quit {
+                    self.pending_quit = false;
+                    self.should_quit = true;
+                }
             }
             Err(error) => {
                 self.set_status(format!("Erro ao salvar: {error}"));
@@ -209,8 +212,9 @@ impl App {
     pub fn open_path(&mut self, path: PathBuf) {
         match file_io::read_lines_encoded(&path, self.document.encoding) {
             Ok(lines) => {
-                self.editor.set_lines(lines.clone());
-                self.document.set_opened(lines, path.clone());
+                self.editor.set_lines(lines);
+                self.document
+                    .set_opened(self.editor.content_string(), path.clone());
                 self.recent.push(path.clone());
                 self.editor.set_tabulation(self.document.tabulation);
                 self.set_status(format!("Aberto: {}", path.display()));
@@ -222,12 +226,40 @@ impl App {
     }
 
     pub fn confirm_modal(&mut self) {
-        let Some(kind) = self.take_confirm_kind() else {
-            return;
+        let (kind, selected, layout) = match std::mem::replace(&mut self.modal, Modal::None) {
+            Modal::Confirm {
+                kind,
+                selected,
+                layout,
+                ..
+            } => (kind, selected, layout),
+            other => {
+                self.modal = other;
+                return;
+            }
         };
 
         match kind {
-            ConfirmKind::QuitUnsaved => self.should_quit = true,
+            ConfirmKind::QuitUnsaved => match selected {
+                0 => {
+                    self.pending_quit = true;
+                    if self.document.path().is_some() {
+                        self.request_save();
+                        if !self.is_dirty() {
+                            self.pending_quit = false;
+                            self.should_quit = true;
+                        }
+                    } else {
+                        self.modal =
+                            Modal::path_input("Salvar como", "Caminho:", PathInputKind::SaveAs);
+                    }
+                }
+                1 => self.should_quit = true,
+                _ => self.set_status("Ação cancelada"),
+            },
+            _ if layout == ConfirmLayout::OkCancel && selected == 1 => {
+                self.set_status("Ação cancelada");
+            }
             ConfirmKind::DiscardForNew | ConfirmKind::CloseDocument => self.new_document(),
             ConfirmKind::DiscardForOpen => {
                 self.modal = Modal::path_input("Abrir arquivo", "Caminho:", PathInputKind::Open);
@@ -267,22 +299,19 @@ impl App {
             return;
         };
         self.find_pattern = pattern.clone();
+        self.editor.set_search_pattern(&pattern);
         if pattern.is_empty() {
             self.set_status("Padrão vazio");
             self.modal = Modal::None;
             return;
         }
-        let (row, col) = self.editor.cursor_raw();
         if replace_mode {
-            let mut lines = self.editor.lines();
-            if replace_one(&mut lines, row, col, &pattern, &replacement) {
-                self.editor.set_lines(lines);
+            if self.editor.replace_one(&replacement) {
                 self.set_status("Substituído");
             } else {
                 self.set_status("Nenhuma ocorrência");
             }
-        } else if let Some((r, c)) = find_next(&self.editor.lines(), &pattern, row, col) {
-            self.editor.set_cursor(r, c);
+        } else if self.editor.find_next() {
             self.set_status(format!("Busca: {pattern}"));
         } else {
             self.set_status("Não encontrado");
@@ -295,9 +324,8 @@ impl App {
             self.set_status("Defina um padrão com Ctrl+F");
             return;
         }
-        let (row, col) = self.editor.cursor_raw();
-        if let Some((r, c)) = find_next(&self.editor.lines(), &self.find_pattern, row, col) {
-            self.editor.set_cursor(r, c);
+        self.editor.set_search_pattern(&self.find_pattern);
+        if self.editor.find_next() {
             self.set_status("Próximo");
         } else {
             self.set_status("Fim da busca");
@@ -308,20 +336,9 @@ impl App {
         if self.find_pattern.is_empty() {
             return;
         }
-        let (row, col) = self.editor.cursor_raw();
-        if let Some((r, c)) = find_prev(&self.editor.lines(), &self.find_pattern, row, col) {
-            self.editor.set_cursor(r, c);
+        self.editor.set_search_pattern(&self.find_pattern);
+        if self.editor.find_prev() {
             self.set_status("Anterior");
-        }
-    }
-
-    fn take_confirm_kind(&mut self) -> Option<ConfirmKind> {
-        match std::mem::replace(&mut self.modal, Modal::None) {
-            Modal::Confirm { kind, .. } => Some(kind),
-            other => {
-                self.modal = other;
-                None
-            }
         }
     }
 
@@ -399,7 +416,7 @@ impl App {
                 }
             }
             ActionId::Paste => {
-                if let Some(text) = self.clipboard.latest().map(str::to_string) {
+                if let Some(text) = self.clipboard.paste_text() {
                     self.editor.paste(&text);
                     self.set_status("Colado");
                 }
@@ -429,7 +446,10 @@ impl App {
                 self.apply_theme(ThemeId::ClassicBlue);
                 self.set_status("Tema: Azul Clássico");
             }
-            ActionId::ThemeCustom => self.set_status("Tema personalizado: em breve"),
+            ActionId::ThemeMatrix => {
+                self.apply_theme(ThemeId::Matrix);
+                self.set_status("Tema Matrix");
+            }
             ActionId::ToggleSidePanel => {
                 self.view.side_panel = !self.view.side_panel;
                 self.set_status(if self.view.side_panel {
@@ -483,6 +503,26 @@ impl App {
             ActionId::Column120 => self.view.guide_column = GuideColumn::Col120,
             ActionId::Column160 => self.view.guide_column = GuideColumn::Col160,
             ActionId::ColumnUnlimited => self.view.guide_column = GuideColumn::Unlimited,
+            ActionId::MarginNone => {
+                self.view.margin = EditorMargin::None;
+                self.set_status("Margem: sem margem");
+            }
+            ActionId::MarginOneLine => {
+                self.view.margin = EditorMargin::OneLine;
+                self.set_status("Margem: uma linha");
+            }
+            ActionId::MarginTwoLines => {
+                self.view.margin = EditorMargin::TwoLines;
+                self.set_status("Margem: duas linhas");
+            }
+            ActionId::BorderVisible => {
+                self.view.border = EditorBorder::Visible;
+                self.set_status("Borda: visível");
+            }
+            ActionId::BorderHidden => {
+                self.view.border = EditorBorder::Hidden;
+                self.set_status("Borda: invisível");
+            }
             ActionId::EncodingUtf8 => self.set_encoding(FileEncoding::Utf8),
             ActionId::EncodingUtf8NoBom => self.set_encoding(FileEncoding::Utf8NoBom),
             ActionId::EncodingUtf16Le => self.set_encoding(FileEncoding::Utf16Le),

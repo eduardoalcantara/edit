@@ -19,6 +19,12 @@ pub enum PathInputKind {
     SaveAs,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConfirmLayout {
+    OkCancel,
+    SaveDiscardCancel,
+}
+
 #[derive(Debug, Clone)]
 pub enum Modal {
     None,
@@ -26,6 +32,7 @@ pub enum Modal {
         title: String,
         message: String,
         kind: ConfirmKind,
+        layout: ConfirmLayout,
         selected: usize,
     },
     PathInput {
@@ -47,11 +54,26 @@ impl Modal {
         !matches!(self, Modal::None)
     }
 
-    pub fn confirm(title: impl Into<String>, message: impl Into<String>, kind: ConfirmKind) -> Self {
+    pub fn confirm(
+        title: impl Into<String>,
+        message: impl Into<String>,
+        kind: ConfirmKind,
+    ) -> Self {
         Modal::Confirm {
             title: title.into(),
             message: message.into(),
             kind,
+            layout: ConfirmLayout::OkCancel,
+            selected: 0,
+        }
+    }
+
+    pub fn quit_unsaved(filename: &str) -> Self {
+        Modal::Confirm {
+            title: "Sair".to_string(),
+            message: format!("Sair sem salvar o arquivo {filename}?"),
+            kind: ConfirmKind::QuitUnsaved,
+            layout: ConfirmLayout::SaveDiscardCancel,
             selected: 0,
         }
     }
