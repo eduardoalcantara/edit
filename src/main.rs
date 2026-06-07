@@ -1,20 +1,19 @@
 mod app;
-mod block_select;
 mod clipboard;
-mod cursors;
 mod document;
 mod edit_mode;
 mod editor;
 mod encoding;
 mod events;
 mod file_io;
-mod find;
+mod input;
 mod menus;
 mod modal;
 mod recent;
 mod theme;
 mod ui;
 mod view_state;
+mod widgets;
 
 use std::io::{self, stdout, IsTerminal, Write};
 
