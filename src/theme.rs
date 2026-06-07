@@ -3,9 +3,7 @@ use ratatui::style::{Color, Modifier, Style};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ThemeId {
     Dark,
-    #[allow(dead_code)]
     Light,
-    #[allow(dead_code)]
     ClassicBlue,
 }
 
@@ -131,6 +129,16 @@ impl ThemePalette {
             .add_modifier(Modifier::REVERSED)
     }
 
+    pub fn cursor_style_for_mode(self, mode: crate::edit_mode::EditMode) -> Style {
+        match mode {
+            crate::edit_mode::EditMode::Insert => self.cursor_style(),
+            crate::edit_mode::EditMode::Replace => Style::default()
+                .fg(self.editor_bg)
+                .bg(self.status)
+                .add_modifier(Modifier::REVERSED | Modifier::UNDERLINED),
+        }
+    }
+
     pub fn selection_style(self) -> Style {
         Style::default().fg(self.editor_fg).bg(self.selection)
     }
@@ -140,5 +148,42 @@ impl ThemePalette {
             .fg(self.border)
             .bg(self.editor_bg)
             .add_modifier(Modifier::ITALIC)
+    }
+
+    pub fn menu_bar_style(self) -> Style {
+        Style::default().fg(self.header_fg).bg(self.header_bg)
+    }
+
+    pub fn menu_top_active_style(self) -> Style {
+        Style::default()
+            .fg(self.header_fg)
+            .bg(self.accent)
+            .add_modifier(Modifier::BOLD)
+    }
+
+    pub fn menu_panel_style(self) -> Style {
+        Style::default().fg(self.header_fg).bg(self.header_bg)
+    }
+
+    pub fn menu_border_style(self) -> Style {
+        Style::default().fg(self.border).bg(self.header_bg)
+    }
+
+    pub fn menu_item_style(self) -> Style {
+        Style::default().fg(self.header_fg).bg(self.header_bg)
+    }
+
+    pub fn menu_item_focus_style(self) -> Style {
+        Style::default()
+            .fg(self.header_bg)
+            .bg(self.header_fg)
+            .add_modifier(Modifier::BOLD)
+    }
+
+    pub fn menu_item_disabled_style(self) -> Style {
+        Style::default()
+            .fg(self.border)
+            .bg(self.header_bg)
+            .add_modifier(Modifier::DIM)
     }
 }

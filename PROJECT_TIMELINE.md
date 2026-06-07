@@ -1,30 +1,23 @@
 # PROJECT_TIMELINE — Editor Linux
 
 **Autor:** Perplexity AI  
-**Data:** 2026-06-06  
-**Versão:** 1.1
-
-## Objetivo
-
-Registrar cronologicamente mudanças do repositório, incluindo implementações de especificações, documentação, correções de bugs, ajustes de UI/UX e commits relevantes.
-
-## Regra de uso
-
-Cada entrada deve conter:
-
-- data;
-- tipo da mudança;
-- resumo objetivo;
-- arquivos afetados;
-- referência de commit, quando existir.
+**Data:** 2026-06-07  
+**Versão:** 1.8
 
 ## Registro
 
-- 2026-06-06 — Criação da estrutura inicial do repositório.
-- 2026-06-06 — Definição da especificação funcional v1 do Editor Linux.
-- 2026-06-06 — Definição das regras iniciais de UX, temas, recentes, clipboard, modais e terminal inferior.
-- 2026-06-06 — **Implementação:** V1 compilável conforme `specs/to-do/EDITOR_LINUX_SPEC_CURSOR_V1.1.md`.
-  - **Tipo:** implementação de base técnica.
-  - **Resumo:** Editor TUI compilável com loop de app, `tui-textarea`, tema escuro, layout (barra/editor/rodapé), eventos teclado/mouse, compatibilidade TTY/SSH com degradação graciosa e saída via `Ctrl+Q`.
-  - **Arquivos:** `Cargo.toml`, `.gitignore`, `src/main.rs`, `src/app.rs`, `src/editor.rs`, `src/ui.rs`, `src/events.rs`, `src/theme.rs`, `PROJECT_STATUS.md`, `PROJECT_TIMELINE.md`, `specs/to-do/EDITOR_LINUX_SPEC_CURSOR_V1.1.md`.
-  - **Commit:** ver histórico git desta data.
+- 2026-06-06 — V1 compilável (`2446fa7`).
+- 2026-06-06 — Inicial Completa (documento, modais, file I/O) — commit pendente anterior.
+- 2026-06-07 — **Menu Shell** — `src/menus.rs`, remoção de `menu.rs` falso, prioridade modal→menu→editor.
+  - Relatório: `specs/report/IMPLEMENTACAO_MENU_SHELL.md`
+  - Spec: `specs/done/SPEC-MENU-SHELL.md`
+- 2026-06-07 — **Menus Arquivo/Exibir** — `recent.rs`, `view_state.rs`, dispatch completo.
+  - Relatório: `specs/report/IMPLEMENTACAO_MENU_ARQUIVO_EXIBIR.md`
+  - Spec: `specs/done/SPEC-MENU-ARQUIVO-EXIBIR.md`
+- 2026-06-07 — **Menu Editar + bloco/multi-cursor** — `clipboard.rs`, `find.rs`, `cursors.rs`, `block_select.rs`.
+  - Doc: `docs/SPEC_BLOCK_MULTI_CURSOR.md`
+  - Relatório: `specs/report/IMPLEMENTACAO_MENU_EDITAR.md`
+  - Spec: `specs/done/SPEC-MENU-EDITAR.md`
+- 2026-06-07 — **Menu Formatar** — `encoding.rs`, tabulação TAB, `Alt+F`.
+  - Relatório: `specs/report/IMPLEMENTACAO_MENU_FORMATACAO_TABULACAO.md`
+  - Spec: `specs/done/SPEC-MENU-FORMATACAO-TABULACAO.md`

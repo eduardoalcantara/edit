@@ -1,8 +1,20 @@
 mod app;
+mod block_select;
+mod clipboard;
+mod cursors;
+mod document;
+mod edit_mode;
 mod editor;
+mod encoding;
 mod events;
+mod file_io;
+mod find;
+mod menus;
+mod modal;
+mod recent;
 mod theme;
 mod ui;
+mod view_state;
 
 use std::io::{self, stdout, IsTerminal, Write};
 
@@ -37,10 +49,7 @@ impl TerminalGuard {
         let backend = CrosstermBackend::new(out);
         let terminal = Terminal::new(backend)?;
 
-        Ok((
-            terminal,
-            Self { mouse_enabled },
-        ))
+        Ok((terminal, Self { mouse_enabled }))
     }
 
     fn leave(self) -> io::Result<()> {

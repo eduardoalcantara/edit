@@ -1,39 +1,31 @@
 # PROJECT_STATUS — Editor Linux
 
 **Autor:** Perplexity AI  
-**Data:** 2026-06-06  
-**Versão:** 1.1
+**Data:** 2026-06-07  
+**Versão:** 1.8
 
 ## Estado atual
 
 ### Concluído
-- Estrutura base do repositório definida.
-- Diretórios principais criados.
-- Especificação funcional v1 elaborada.
-- Regras iniciais de comportamento documentadas.
-- **V1 compilável (spec Cursor v1.1):** projeto Rust com Ratatui, Crossterm e `tui-textarea`.
-- Arquitetura modular em `src/` (`main`, `app`, `editor`, `ui`, `events`, `theme`).
-- Loop principal de aplicação com renderização TUI.
-- Área central de edição real via `tui-textarea`.
-- Tema escuro nativo como padrão (paleta semântica preparada para claro e azul clássico).
-- Layout básico: barra superior, editor central e rodapé com atalhos.
-- Tratamento de eventos de teclado e mouse com degradação graciosa (SSH/TTY).
-- Saída limpa com `Ctrl+Q` e verificação de terminal interativo.
+- Estrutura base do repositório e V1 compilável.
+- Inicial Completa: documento, file I/O, modais, Insert/Replace, status bar contextual.
+- **Menu Shell (SPEC-MENU-SHELL):** subsistema Turbo Vision real (`src/menus.rs`).
+- **Menus Arquivo/Exibir (SPEC-MENU-ARQUIVO-EXIBIR):** recentes, view_state, toggles visuais.
+- **Menu Editar (SPEC-MENU-EDITAR):** clipboard 5 itens, busca, bloco/multi-cursor custom.
+- **Menu Formatar (SPEC-MENU-FORMATACAO-TABULACAO):** encoding e tabulação.
+- Relatórios em `specs/report/` para as 4 fases de menu.
+- Specs de menu em `specs/done/`.
 
 ### Em andamento
-- Planejar pipeline de testes e validação automatizada.
+- Painel lateral e terminal inferior (placeholders visuais).
+- Tema personalizado por configuração.
+- Motor de encoding universal completo.
 
 ### Pendências
-- Implementar persistência de arquivos (Ctrl+S / Ctrl+O).
-- Implementar menus interativos completos.
-- Implementar alternância de temas (claro, azul clássico, customizado).
-- Implementar abrir recente.
-- Implementar clipboard interno.
-- Implementar modais de confirmação.
-- Implementar terminal inferior.
-- Implementar seleção retangular.
-- Implementar sistema de abas.
+- Sistema de abas.
+- Testes automatizados.
+- Highlight visual de bloco na renderização do editor.
 
 ## Ponto de retorno
 
-Se houver perda de contexto, iniciar por este arquivo e seguir para `PROJECT_RULES.md`, depois `PROJECT_TIMELINE.md`.
+`PROJECT_RULES.md` → `PROJECT_TIMELINE.md` → specs em `specs/done/`.
