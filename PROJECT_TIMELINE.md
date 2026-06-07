@@ -2,7 +2,7 @@
 
 **Autor:** Perplexity AI  
 **Data:** 2026-06-07  
-**Versão:** 2.1
+**Versão:** 2.2
 
 ## Registro
 
@@ -61,3 +61,14 @@
   - Testes: `widgets::panel::tests::editor_content_rect_*`, `view_state::tests::editor_border_labels`
 - 2026-06-07 — **Ajustes modal de diálogo** — título na borda (`[ Sair ]`); margem interna 1×2; botões compactos (UTF-8); 1 linha entre pergunta e botões; sombra horizontal com 2 espaços.
   - Módulos: `src/ui/layers/modal.rs`, `src/widgets/panel.rs`
+- 2026-06-07 — **Componente `Dialog` e módulo `src/modal/`** — shell reutilizável (layout, botões, mouse, help no rodapé); `ModalLayer` enxuta; remoção de `src/modal.rs` monolítico.
+  - Módulos: `src/modal/{dialog,buttons,mod}.rs`, `src/ui/layers/modal.rs`, `src/ui/compositor.rs`
+  - Testes: `modal::dialog::tests::*`
+- 2026-06-07 — **Menus toggle estilo Turbo Vision** — itens booleanos únicos; marcador `√` substitutivo (1 célula); atalhos de menu em cinza; radios para tabulação/encoding.
+  - Módulos: `src/menus.rs`, `src/widgets/panel.rs`, `src/theme.rs`
+- 2026-06-07 — **Tabulação literal e rodapé Tam** — `src/editor/tabs.rs`; render/cursor/viewport por coluna visual; Tam XXX/YYY (visível vs total com `\n`).
+  - Módulos: `src/editor/{tabs,render,engine}.rs`, `src/ui/layers/editor.rs`
+  - Testes: `editor::tabs::tests::*`, `editor::engine::tests::total_includes_newlines_visible_does_not`
+- 2026-06-07 — **Conversão De/Para no modal de tabulação** — usuário informa formato atual e desejado (2/4/8/Tab literal); [Converter] aplica e sincroniza menu Tabulação; confirmação ao trocar codificação.
+  - Módulos: `src/modal/convert_tab.rs`, `src/encoding.rs`, `src/app.rs`
+  - Testes: `modal::convert_tab::tests::*`, `convert_tabulation_between` roundtrip

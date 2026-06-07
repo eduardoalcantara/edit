@@ -2,7 +2,7 @@
 
 **Autor:** Perplexity AI  
 **Data:** 2026-06-07  
-**Versão:** 2.1
+**Versão:** 2.2
 
 ## Estado atual
 
@@ -52,8 +52,21 @@
 - **Borda do editor (2026-06-07):**
   - Exibir → Borda: Visível / Invisível; laterais e base ocultas no modo invisível; título mantido no topo (`└ [ nome ] ─┘`).
   - Com terminal ativo: divisor `├─────┤` (borda visível) ou `─────` (invisível); layout divide área editor/terminal; camada placeholder `TerminalLayer`.
+- **Modais reutilizáveis (`src/modal/`) (2026-06-07):**
+  - Componente `Dialog` (layout, botões, mouse, teclado, rodapé com help por botão).
+  - Presets em `buttons.rs`; `ModalLayer` delega pintura/input ao `Dialog`.
+  - Modal **Converter Tabulação** com campos **De** / **Para** (2, 4, 8 espaços ou Tab literal); botão [Converter]; opção **Para** vira tabulação do menu após confirmar.
+  - Confirmação obrigatória ao **trocar codificação** (UTF-8, ANSI, etc.), com aviso se documento dirty.
+- **Menus booleanos estilo Turbo Vision (2026-06-07):**
+  - Itens toggle únicos (Word Wrap, Painel, Terminal, Rodapé, Borda) em vez de submenus Ativar/Desativar.
+  - Marcador `√` substitutivo na margem esquerda (1 célula, sem coluna extra); atalhos de menu em cinza (`menu_shortcut_style`).
+- **Tabulação e rodapé Tam (2026-06-07):**
+  - Módulo `src/editor/tabs.rs`: expansão visual de `\t`, cursor e scroll por coluna visual; parada 8 para Tab literal.
+  - Rodapé **Tam XXX/YYY**: XXX = chars visíveis no viewport (sem `\n`); YYY = total no documento (com `\n`).
+  - Exibir → Mostrar tabs: `»` onde há `\t` no texto.
 - Relatórios em `specs/report/` para as 4 fases de menu + migração ropey.
 - Specs de menu e arquitetura em `specs/done/`.
+- **41 testes** unitários passando (`cargo test`).
 
 ### Em andamento
 - **Fidelidade Turbo Vision:** `specs/to-do/SPEC-UX-FIDELIDADE-TURBO-VISION.md` (TV1–TV3 paleta/rodapé; TV7 file picker pendente).
