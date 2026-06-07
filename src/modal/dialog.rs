@@ -157,12 +157,41 @@ impl Dialog {
             },
         );
         let button_y = content.y.saturating_add(content.height.saturating_sub(1));
-        draw_buttons(frame, content, button_y, self.selected, self.buttons, palette);
+        paint_dialog_buttons(frame, content, button_y, self.selected, self.buttons, palette);
     }
 
     pub fn hit_button(&self, mouse: &MouseEvent, dialog: Rect) -> Option<usize> {
-        hit_button(mouse, dialog, self.buttons)
+        hit_dialog_button(mouse, dialog, self.buttons)
     }
+}
+
+pub(crate) fn paint_titled_dialog_content(
+    frame: &mut Frame<'_>,
+    area: Rect,
+    title: &str,
+    palette: ThemePalette,
+) -> Rect {
+    draw_titled_content(frame, area, title, palette)
+}
+
+pub(crate) fn dialog_content_rect(area: Rect) -> Rect {
+    content_rect(area)
+}
+
+pub(crate) fn dialog_button_row_y(content: Rect) -> u16 {
+    button_row_y(content)
+}
+
+pub(crate) fn centered_dialog_rect(area: Rect, width: u16, height: u16) -> Rect {
+    centered_rect_fixed(area, width, height)
+}
+
+pub(crate) fn hit_dialog_button(
+    mouse: &MouseEvent,
+    dialog: Rect,
+    buttons: &[DialogButton],
+) -> Option<usize> {
+    hit_button(mouse, dialog, buttons)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -194,7 +223,7 @@ fn draw_titled_content(
     panel::inset_rect(inner, top, bottom, left, right)
 }
 
-fn draw_buttons(
+pub(crate) fn paint_dialog_buttons(
     frame: &mut Frame<'_>,
     content: Rect,
     y: u16,

@@ -301,6 +301,33 @@ impl ThemePalette {
         }
     }
 
+    /// Borda de caixa De/Para no modal de conversão (sem fundo verde).
+    pub fn convert_field_border_style(self, focused: bool) -> Style {
+        Style::default()
+            .fg(if focused { self.footer_fg } else { self.border })
+            .bg(self.footer_bg)
+    }
+
+    /// Título `[ De ]` / `[ Para ]` embutido na borda da caixa.
+    pub fn convert_field_title_style(self, focused: bool) -> Style {
+        Style::default()
+            .fg(self.footer_fg)
+            .bg(self.footer_bg)
+            .add_modifier(if focused { Modifier::BOLD } else { Modifier::empty() })
+    }
+
+    /// Item dentro da lista De/Para (texto sobre o fundo do modal).
+    pub fn convert_field_item_style(self, focused: bool, selected: bool) -> Style {
+        Style::default()
+            .fg(self.footer_fg)
+            .bg(self.footer_bg)
+            .add_modifier(if focused && selected {
+                Modifier::BOLD
+            } else {
+                Modifier::empty()
+            })
+    }
+
     pub fn shadow_vertical_style(self) -> Style {
         Style::default().fg(self.shadow).bg(self.shadow)
     }

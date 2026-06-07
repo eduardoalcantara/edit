@@ -28,12 +28,20 @@ impl UiLayer for ModalLayer {
         _: UiLayout,
         palette: ThemePalette,
     ) {
-        app.modal.refresh_body();
-        let Some(dialog) = app.modal.dialog() else {
-            return;
-        };
-        let area = dialog.outer_rect(frame.area());
-        dialog.paint(frame, area, palette);
+        match &app.modal {
+            Modal::ConvertTabulation(modal) => {
+                let area = modal.outer_rect(frame.area());
+                modal.paint(frame, area, palette);
+            }
+            _ => {
+                app.modal.refresh_body();
+                let Some(dialog) = app.modal.dialog() else {
+                    return;
+                };
+                let area = dialog.outer_rect(frame.area());
+                dialog.paint(frame, area, palette);
+            }
+        }
     }
 
     fn on_key(&self, key: KeyEvent, app: &mut crate::app::App, _: UiLayout) -> InputResult {
@@ -136,25 +144,67 @@ impl UiLayer for ModalLayer {
             height: app.last_frame_height,
         };
 
-        let Some(dialog) = app.modal.dialog() else {
-            return InputResult::Consumed;
-        };
-        let outer = dialog.outer_rect(frame);
+        match &mut app.modal {
+            Modal::ConvertTabulation(modal) => {
+                let outer = modal.outer_rect(frame);
+                match mouse.kind {
+                    MouseEventKind::Down(MouseButton::Left) => {
+                        if let Some((field, idx)) = modal.hit_list(&mouse, outer) {
+                            modal.field_focus = Some(field);
+                            match field {
+                                crate::modal::convert_tab::ConvertTabField::From => {
+                                    modal.from_idx = idx;
+                                }
+                                crate::modal::convert_tab::ConvertTabField::To => {
+                                    modal.to_idx = idx;
+                                }
+                            }
+                        } else if let Some(idx) = modal.hit_button(&mouse, outer) {
+                            activate_button(app, idx);
+                        }
+                    }
+                    MouseEventKind::Moved => {
+                        if let Some((field, idx)) = modal.hit_list(&mouse, outer) {
+                            modal.field_focus = Some(field);
+                            match field {
+                                crate::modal::convert_tab::ConvertTabField::From => {
+                                    modal.from_idx = idx;
+                                }
+                                crate::modal::convert_tab::ConvertTabField::To => {
+                                    modal.to_idx = idx;
+                                }
+                            }
+                        } else if let Some(idx) = modal.hit_button(&mouse, outer) {
+                            modal.field_focus = None;
+                            modal.dialog.set_selected(idx);
+                        }
+                    }
+                    _ => {}
+                }
+                InputResult::Consumed
+            }
+            _ => {
+                let Some(dialog) = app.modal.dialog() else {
+                    return InputResult::Consumed;
+                };
+                let outer = dialog.outer_rect(frame);
 
-        match mouse.kind {
-            MouseEventKind::Down(MouseButton::Left) => {
-                if let Some(idx) = dialog.hit_button(&mouse, outer) {
-                    activate_button(app, idx);
+                match mouse.kind {
+                    MouseEventKind::Down(MouseButton::Left) => {
+                        if let Some(idx) = dialog.hit_button(&mouse, outer) {
+                            activate_button(app, idx);
+                        }
+                    }
+                    MouseEventKind::Moved => {
+                        if let Some(idx) = dialog.hit_button(&mouse, outer) {
+                            app.modal.dialog_mut().map(|dialog| dialog.set_selected(idx));
+                        }
+                    }
+                    _ => {}
                 }
+                InputResult::Consumed
             }
-            MouseEventKind::Moved => {
-                if let Some(idx) = dialog.hit_button(&mouse, outer) {
-                    app.modal.dialog_mut().map(|dialog| dialog.set_selected(idx));
-                }
-            }
-            _ => {}
         }
-        InputResult::Consumed
     }
 
     fn footer_hint(&self, app: &crate::app::App) -> Option<String> {
