@@ -119,7 +119,7 @@ pub fn draw(
         palette,
         show_cursor,
     );
-    engine.refresh_footer_size_stats(top, left, visible_w, visible_h);
+    engine.refresh_footer_size_stats(top, visible_h);
     content
 }
 

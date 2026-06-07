@@ -102,12 +102,10 @@ impl EditorEngine {
         self.text.len_chars()
     }
 
-    /// Caracteres do documento visíveis no viewport (conteúdo das linhas, sem `\n`).
+    /// Caracteres das linhas presentes no viewport vertical (conteúdo completo de cada linha, sem `\n`).
     pub fn visible_char_count(&self) -> usize {
         self.count_visible_chars(
             self.viewport.top_line,
-            self.viewport.left_col,
-            self.viewport.width as usize,
             self.viewport.height as usize,
         )
     }
@@ -120,14 +118,9 @@ impl EditorEngine {
         self.cached_total_chars
     }
 
-    fn count_visible_chars(
-        &self,
-        top_line: usize,
-        left_col: usize,
-        visible_w: usize,
-        visible_h: usize,
-    ) -> usize {
-        if visible_w == 0 || visible_h == 0 {
+    /// Soma o comprimento visual das linhas visíveis verticalmente (ignora recorte horizontal).
+    fn count_visible_chars(&self, top_line: usize, visible_h: usize) -> usize {
+        if visible_h == 0 {
             return 0;
         }
 
@@ -138,11 +131,7 @@ impl EditorEngine {
             if doc_line >= line_count {
                 break;
             }
-            let line_len = self.line_display_len(doc_line);
-            if left_col >= line_len {
-                continue;
-            }
-            count += (line_len - left_col).min(visible_w);
+            count += self.line_display_len(doc_line);
         }
         count
     }
@@ -156,13 +145,10 @@ impl EditorEngine {
     pub fn refresh_footer_size_stats(
         &mut self,
         top_line: usize,
-        left_col: usize,
-        visible_w: usize,
         visible_h: usize,
     ) {
         self.cached_total_chars = self.total_char_count();
-        self.cached_visible_chars =
-            self.count_visible_chars(top_line, left_col, visible_w, visible_h);
+        self.cached_visible_chars = self.count_visible_chars(top_line, visible_h);
     }
 
     pub fn cursor_line_col(&self) -> (usize, usize) {
@@ -786,6 +772,29 @@ mod tests {
     }
 
     #[test]
+    fn visible_char_count_grows_on_long_single_line() {
+        let mut e = EditorEngine::new();
+        let line = "x".repeat(553);
+        e.load_text(&line);
+        e.viewport.width = 153;
+        e.viewport.height = 24;
+        e.viewport.left_col = 400;
+        assert_eq!(e.total_char_count(), 553);
+        assert_eq!(e.visible_char_count(), 553);
+    }
+
+    #[test]
+    fn visible_char_count_respects_vertical_viewport() {
+        let mut e = EditorEngine::new();
+        e.load_text("a\nb\nc\nd\ne");
+        e.viewport.height = 2;
+        e.viewport.top_line = 0;
+        assert_eq!(e.visible_char_count(), 2);
+        e.viewport.top_line = 2;
+        assert_eq!(e.visible_char_count(), 2);
+    }
+
+    #[test]
     fn visible_char_count_respects_viewport() {
         let mut e = EditorEngine::new();
         e.load_text("abcdefghij");
@@ -794,11 +803,9 @@ mod tests {
         e.viewport.top_line = 0;
         e.viewport.left_col = 0;
         assert_eq!(e.total_char_count(), 10);
-        assert_eq!(e.visible_char_count(), 4);
+        assert_eq!(e.visible_char_count(), 10);
         e.viewport.left_col = 6;
-        assert_eq!(e.visible_char_count(), 4);
-        e.viewport.left_col = 8;
-        assert_eq!(e.visible_char_count(), 2);
+        assert_eq!(e.visible_char_count(), 10);
     }
 
     #[test]

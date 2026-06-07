@@ -12,6 +12,7 @@ use crate::encoding::{FileEncoding, Tabulation};
 use crate::editor::convert_tabulation_between;
 use crate::events;
 use crate::file_io;
+use crate::memory::MemoryMonitor;
 use crate::menus::{ActionId, MenuBar, MenuState};
 use crate::modal::{ConfirmKind, DialogButtonAction, Modal, PathInputKind};
 use crate::recent::RecentFiles;
@@ -37,6 +38,7 @@ pub struct App {
     pub is_ssh_session: bool,
     pub last_frame_width: u16,
     pub last_frame_height: u16,
+    pub memory: MemoryMonitor,
 }
 
 impl App {
@@ -66,6 +68,7 @@ impl App {
             is_ssh_session: std::env::var("SSH_CONNECTION").is_ok(),
             last_frame_width: 80,
             last_frame_height: 24,
+            memory: MemoryMonitor::new(),
         };
         app.refresh_menu();
         app
@@ -95,6 +98,7 @@ impl App {
 
     pub fn run(&mut self, terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>) -> io::Result<()> {
         while !self.should_quit {
+            self.memory.refresh_if_due();
             self.refresh_menu();
             terminal.draw(|frame| ui::draw(frame, self))?;
 
@@ -502,6 +506,17 @@ impl App {
             }
             ActionId::ToggleFooter => {
                 self.view.footer_visible = !self.view.footer_visible;
+            }
+            ActionId::ShowMemoryToggle => {
+                self.view.show_memory = !self.view.show_memory;
+                if self.view.show_memory {
+                    self.memory.refresh_if_due();
+                }
+                self.set_status(if self.view.show_memory {
+                    "Consumo de memória: ativado"
+                } else {
+                    "Consumo de memória: desativado"
+                });
             }
             ActionId::ZoomIn => {
                 self.view.zoom = self.view.zoom.saturating_add(1).min(3);

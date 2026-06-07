@@ -84,6 +84,7 @@ pub struct ViewState {
     pub side_panel: bool,
     pub terminal: bool,
     pub footer_visible: bool,
+    pub show_memory: bool,
     pub guide_column: GuideColumn,
     pub margin: EditorMargin,
     pub border: EditorBorder,
@@ -102,6 +103,7 @@ impl Default for ViewState {
             side_panel: false,
             terminal: false,
             footer_visible: true,
+            show_memory: true,
             guide_column: GuideColumn::Unlimited,
             margin: EditorMargin::None,
             border: EditorBorder::Visible,
@@ -143,5 +145,10 @@ mod tests {
     fn editor_border_labels() {
         assert_eq!(EditorBorder::Visible.label(), "Visível");
         assert_eq!(EditorBorder::Hidden.label(), "Invisível");
+    }
+
+    #[test]
+    fn show_memory_enabled_by_default() {
+        assert!(ViewState::default().show_memory);
     }
 }

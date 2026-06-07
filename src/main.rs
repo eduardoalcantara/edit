@@ -7,6 +7,7 @@ mod encoding;
 mod events;
 mod file_io;
 mod input;
+mod memory;
 mod menus;
 mod modal;
 mod recent;

@@ -2,7 +2,7 @@
 
 **Autor:** Perplexity AI  
 **Data:** 2026-06-07  
-**Versão:** 2.3
+**Versão:** 2.4
 
 ## Registro
 
@@ -83,3 +83,8 @@
 - 2026-06-07 — **Smart Word Navigation** — `Ctrl+←/→` e `Ctrl+Shift+←/→`; segmentação camelCase, acrônimos, separadores e dígitos.
   - Módulos: `src/editor/word_boundary.rs`, `src/editor/{commands,engine,mod}.rs`, `src/ui/layers/editor.rs`
   - Testes: `editor::word_boundary::tests::*` (14 casos incl. tabela parseHTTPResponse, user_profile_id, etc.)
+  - Commit: `ff0edd5`
+- 2026-06-07 — **Rodapé: memória, Tam corrigido e Pos** — `Mem NMB` (toggle Exibir, default ativo); Tam XXX soma linhas visíveis verticalmente (fix linha longa); `Pos XX/YY` no lugar de `Ln XX Col YY`.
+  - Módulos: `src/memory.rs`, `src/{app,menus,view_state}.rs`, `src/editor/engine.rs`, `src/ui/compositor.rs`
+  - Dependência: `sysinfo` (feature `system`)
+  - Testes: `memory::tests::*`, `editor::engine::tests::visible_char_count_*`, `ui::compositor::tests::footer_*`, `view_state::tests::show_memory_enabled_by_default`

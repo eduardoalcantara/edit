@@ -37,6 +37,7 @@ pub enum ActionId {
     ToggleSidePanel,
     ToggleTerminal,
     ToggleFooter,
+    ShowMemoryToggle,
     ZoomIn,
     ZoomOut,
     ZoomReset,
@@ -459,6 +460,12 @@ fn view_menu(view: &ViewState) -> Vec<MenuNode> {
             ActionId::ToggleFooter,
             view.footer_visible,
             "Mostra ou oculta a barra de status na parte inferior",
+        ),
+        toggle_item(
+            "Mostrar consumo de memória",
+            ActionId::ShowMemoryToggle,
+            view.show_memory,
+            "Exibe o consumo total de memória do aplicativo no rodapé",
         ),
         submenu(
             "Temas",

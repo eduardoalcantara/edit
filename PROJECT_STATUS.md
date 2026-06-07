@@ -2,7 +2,7 @@
 
 **Autor:** Perplexity AI  
 **Data:** 2026-06-07  
-**Versão:** 2.3
+**Versão:** 2.4
 
 ## Estado atual
 
@@ -18,7 +18,7 @@
   - Enter cria nova linha; cursor EOF corrigido (`char_idx_to_line_col`).
   - Seleção linear: Shift+setas, arraste mouse, Ctrl+A; highlight no render.
   - Modo Replace: não apaga `\n` (linhas permanecem independentes).
-  - Layout TV4 parcial: título da janela = só nome do arquivo; rodapé com Ln/Col | Insert | encoding | tab | status (sem F-keys).
+  - Layout TV4 parcial: título da janela = só nome do arquivo; rodapé com Tam/Pos | Insert | encoding | tab | status (sem F-keys).
   - Placeholder removido; editor vazio com cursor em 0,0.
   - Clipboard: `arboard` (SO + ring interno); `copy_text` corrigido para bloco e linear.
 - **Correções UX menu/modal/bordas (2026-06-07):**
@@ -69,11 +69,15 @@
   - Marcador `√` substitutivo na margem esquerda (1 célula, sem coluna extra); atalhos de menu em cinza (`menu_shortcut_style`).
 - **Tabulação e rodapé Tam (2026-06-07):**
   - Módulo `src/editor/tabs.rs`: expansão visual de `\t`, cursor e scroll por coluna visual; parada 8 para Tab literal.
-  - Rodapé **Tam XXX/YYY**: XXX = chars visíveis no viewport (sem `\n`); YYY = total no documento (com `\n`).
+  - Rodapé **Tam XXX/YYY**: XXX = soma do conteúdo completo das linhas visíveis verticalmente (sem `\n`); YYY = total no documento (com `\n`); não trava em ~153 em linhas longas.
+  - Rodapé **Pos XX/YY**: linha e coluna do cursor (1-based), formato compacto (antes `Ln XX Col YY`).
   - Exibir → Mostrar tabs: `»` onde há `\t` no texto.
+- **Consumo de memória no rodapé (2026-06-07):**
+  - Módulo `src/memory.rs` com `sysinfo` (amostragem a cada 2s, leve).
+  - Exibir → **Mostrar consumo de memória** (toggle, ativo por padrão); segmento `Mem NMB` no rodapé quando disponível.
 - Relatórios em `specs/report/` para as 4 fases de menu + migração ropey.
 - Specs de menu e arquitetura em `specs/done/`.
-- **57 testes** unitários passando (`cargo test`).
+- **68 testes** unitários passando (`cargo test`).
 
 ### Em andamento
 - **Fidelidade Turbo Vision:** `specs/to-do/SPEC-UX-FIDELIDADE-TURBO-VISION.md` (TV1–TV3 paleta/rodapé; TV7 file picker pendente).

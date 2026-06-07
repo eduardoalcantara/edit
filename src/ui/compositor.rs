@@ -124,17 +124,24 @@ pub fn footer_help_left(app: &App) -> String {
     app.status_message.clone()
 }
 
-/// Grupos de estado alinhados à direita (tamanho, linha/coluna, modo, encoding, tab).
+/// Grupos de estado alinhados à direita (tamanho, linha/coluna, modo, encoding, tab, memória).
 pub fn footer_status_right(app: &App) -> String {
     let (ln, col) = app.editor.cursor_line_col();
     let visible = app.editor.visible_char_count();
     let total = app.editor.total_char_count();
-    format!(
-        "Tam {visible}/{total} | Ln {ln} Col {col} | {} | {} | {}",
-        app.editor.mode().label(),
-        app.document.encoding.label(),
-        app.document.tabulation.footer_label(),
-    )
+    let mut segments = vec![
+        format!("Tam {visible}/{total}"),
+        format!("Pos {ln}/{col}"),
+        app.editor.mode().label().to_string(),
+        app.document.encoding.label().to_string(),
+        app.document.tabulation.footer_label().to_string(),
+    ];
+    if app.view.show_memory {
+        if let Some(label) = app.memory.display_label() {
+            segments.push(label);
+        }
+    }
+    segments.join(" | ")
 }
 
 /// Monta linha do rodapé: ajuda à esquerda, status à direita, com espaço entre eles.
@@ -161,5 +168,41 @@ pub fn footer_inner(area: ratatui::layout::Rect) -> ratatui::layout::Rect {
         y: area.y,
         width: area.width.saturating_sub(2),
         height: area.height,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::app::App;
+
+    #[test]
+    fn footer_includes_memory_when_enabled() {
+        let mut app = App::new(false);
+        app.view.show_memory = true;
+        app.memory.set_cached_for_test(Some(128 * 1024 * 1024));
+
+        let status = footer_status_right(&app);
+        assert!(status.contains("Mem 128MB"));
+    }
+
+    #[test]
+    fn footer_omits_memory_when_disabled() {
+        let mut app = App::new(false);
+        app.view.show_memory = false;
+        app.memory.set_cached_for_test(Some(128 * 1024 * 1024));
+
+        let status = footer_status_right(&app);
+        assert!(!status.contains("Mem"));
+    }
+
+    #[test]
+    fn footer_omits_memory_when_unavailable() {
+        let mut app = App::new(false);
+        app.view.show_memory = true;
+        app.memory.set_cached_for_test(None);
+
+        let status = footer_status_right(&app);
+        assert!(!status.contains("Mem"));
     }
 }

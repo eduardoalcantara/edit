@@ -9,3 +9,4 @@ ratatui = "0.30"
 crossterm = "0.29"
 ropey = "1"
 arboard = "3"
+sysinfo = { version = "0.33", default-features = false, features = ["system"] }
