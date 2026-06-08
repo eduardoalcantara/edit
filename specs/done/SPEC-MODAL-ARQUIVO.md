@@ -1,6 +1,6 @@
 # SPEC — Modal navegador de arquivos (Abrir / Salvar / Salvar Como)
 
-**Status:** to-do  
+**Status:** done  
 **Data:** 2026-06-08  
 **Prioridade:** alta (fecha **TV7** em `SPEC-UX-FIDELIDADE-TURBO-VISION.md`; substitui modal path manual)  
 **Relacionado:** `PROJECT_RULES.md`, `SPEC-UX-FIDELIDADE-TURBO-VISION.md` (TV7), `SPEC-MULTPLOS-ARQUIVOS.md`, `src/modal/`, `src/file_io.rs`, `src/app.rs`

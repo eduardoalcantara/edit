@@ -399,7 +399,7 @@ impl App {
                     self.save_to_path_internal(path, false);
                 }
             } else {
-                self.modal = Modal::path_input("Salvar como", "Caminho:", crate::modal::PathInputKind::SaveAs, "");
+                self.open_file_browser(crate::modal::FileBrowserMode::SaveAs);
                 self.pending_save_all = true;
                 return;
             }
@@ -453,12 +453,7 @@ impl App {
                         });
                     }
                 } else {
-                    self.modal = Modal::path_input(
-                        "Salvar como",
-                        "Caminho:",
-                        crate::modal::PathInputKind::SaveAs,
-                        "",
-                    );
+                    self.open_file_browser(crate::modal::FileBrowserMode::SaveAs);
                     self.pending_dirty_save = Some((tab_index, reason));
                 }
             }

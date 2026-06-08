@@ -1,6 +1,6 @@
 # SPEC — Menu Ajuda
 
-**Status:** to-do  
+**Status:** done  
 **Data:** 2026-06-08  
 **Relacionado:** `PROJECT_RULES.md`, `SPEC-MENU-SHELL.md`, `README.md`, `src/menus.rs`, `src/ui/compositor.rs`
 

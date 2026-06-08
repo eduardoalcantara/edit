@@ -1,11 +1,16 @@
 mod buttons;
 pub mod convert_tab;
 pub mod dialog;
+pub mod file_browser;
+pub mod help;
+pub mod help_content;
 
 use std::path::PathBuf;
 
 pub use convert_tab::ConvertTabulationModal;
 pub use dialog::{Dialog, DialogButton, DialogButtonAction, DialogKeyResult};
+pub use file_browser::{FileBrowserModal, FileBrowserMode};
+pub use help::{HelpKind, HelpModal};
 
 use crate::encoding::FileEncoding;
 use crate::workspace::PromptReason;
@@ -63,6 +68,8 @@ pub enum Modal {
         col: String,
         field_line: bool,
     },
+    FileBrowser(FileBrowserModal),
+    Help(HelpModal),
 }
 
 impl Modal {
@@ -77,6 +84,8 @@ impl Modal {
             | Modal::Find { dialog, .. } => Some(dialog),
             Modal::ConvertTabulation(modal) => Some(&modal.dialog),
             Modal::GoToLine { dialog, .. } => Some(dialog),
+            Modal::FileBrowser(modal) => Some(&modal.dialog),
+            Modal::Help(modal) => Some(&modal.dialog),
             Modal::None => None,
         }
     }
@@ -88,6 +97,8 @@ impl Modal {
             | Modal::Find { dialog, .. } => Some(dialog),
             Modal::ConvertTabulation(modal) => Some(&mut modal.dialog),
             Modal::GoToLine { dialog, .. } => Some(dialog),
+            Modal::FileBrowser(modal) => Some(&mut modal.dialog),
+            Modal::Help(modal) => Some(&mut modal.dialog),
             Modal::None => None,
         }
     }
@@ -213,6 +224,26 @@ impl Modal {
         let mut modal = ConvertTabulationModal::new(current);
         modal.refresh_body();
         Modal::ConvertTabulation(modal)
+    }
+
+    pub fn file_browser(
+        mode: FileBrowserMode,
+        current_dir: PathBuf,
+        name: impl Into<String>,
+        filter: impl Into<String>,
+        show_hidden: bool,
+    ) -> Self {
+        Modal::FileBrowser(FileBrowserModal::new(
+            mode,
+            current_dir,
+            name.into(),
+            filter.into(),
+            show_hidden,
+        ))
+    }
+
+    pub fn help(kind: HelpKind) -> Self {
+        Modal::Help(HelpModal::new(kind))
     }
 
     pub fn refresh_body(&mut self) {

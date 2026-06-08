@@ -383,7 +383,7 @@ fn handle_global_function_keys(app: &mut App, key: KeyEvent) -> bool {
 
     match key.code {
         KeyCode::F(1) => {
-            app.set_status("Ajuda: em breve");
+            app.open_help_features();
             true
         }
         KeyCode::F(2) => {

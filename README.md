@@ -84,6 +84,7 @@ edit --workspace -- main.rs tests/mod.rs
 - Título do editor na borda: `[ nome ]` ou `[ Novo2* ]` (asterisco se dirty).
 - Rodapé: help do menu ou hover dos grupos à esquerda; à direita `Tam XXX/NNN/YYYY | Pos XX/YY | modo | encoding | tab | Mem NMB` (XXX = chars visíveis no viewport, NNN = linhas, YYY = total com `\n`).
 - Modais com mouse/hover; sair/fechar com **[Salvar] [Não Salvar] [Cancelar]**; `Ctrl+Q` / `Alt+F4` global.
+- **Navegador de arquivos** estilo Turbo Pascal para Abrir / Salvar Como (`Ctrl+O`, `Ctrl+Shift+S`).
 
 ### Persistência
 
@@ -108,6 +109,8 @@ edit --workspace -- main.rs tests/mod.rs
 | `Ctrl+Q`, `Alt+F4` | Sair (global) |
 | `Esc` | Sair (editor, sem menu/modal) |
 | `Alt+A` | Menu Arquivo |
+| `Alt+H` | Menu Ajuda |
+| **`F1`** | Ajuda → Features |
 | `Ctrl+T` / `Ctrl+'` | Do editor: abre/foca terminal; do terminal: fecha painel |
 | **`Ctrl+E`** | Foco no editor |
 | **`Ctrl+G`** | Ir para linha... |

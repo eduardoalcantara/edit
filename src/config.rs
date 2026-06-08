@@ -36,6 +36,16 @@ pub struct ArquivoConfig {
     pub recentes: Vec<String>,
     #[serde(default)]
     pub abas: AbasConfig,
+    #[serde(default)]
+    pub ultimo_diretorio: Option<String>,
+    #[serde(default)]
+    pub mostrar_ocultos: bool,
+    #[serde(default = "default_filtro_abrir")]
+    pub filtro_abrir: String,
+}
+
+fn default_filtro_abrir() -> String {
+    "*.*".to_string()
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -179,6 +189,9 @@ pub fn config_from_view(
                 .map(|path| path.display().to_string())
                 .collect(),
             abas,
+            ultimo_diretorio: None,
+            mostrar_ocultos: false,
+            filtro_abrir: default_filtro_abrir(),
         },
         exibir: ExibirConfig {
             word_wrap: view.word_wrap,
@@ -213,6 +226,9 @@ impl Default for EditConfig {
             arquivo: ArquivoConfig {
                 recentes: Vec::new(),
                 abas: AbasConfig::default(),
+                ultimo_diretorio: None,
+                mostrar_ocultos: false,
+                filtro_abrir: default_filtro_abrir(),
             },
             exibir: ExibirConfig {
                 word_wrap: false,

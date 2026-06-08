@@ -1,7 +1,12 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::layout::Rect;
 
-use crate::modal::{convert_tab::ConvertTabKeyResult, DialogButtonAction, DialogKeyResult, Modal};
+use crate::modal::{
+    convert_tab::ConvertTabKeyResult, file_browser::FileBrowserKeyResult, help::HelpKeyResult,
+    DialogButtonAction, DialogKeyResult, Modal,
+};
+use crate::modal::dialog::hit_dialog_button;
+use crate::modal::file_browser::FileBrowserModal;
 use crate::theme::ThemePalette;
 use crate::ui::layer::{InputResult, LayerId, UiLayer};
 use crate::ui::layout::UiLayout;
@@ -30,6 +35,14 @@ impl UiLayer for ModalLayer {
     ) {
         match &app.modal {
             Modal::ConvertTabulation(modal) => {
+                let area = modal.outer_rect(frame.area());
+                modal.paint(frame, area, palette);
+            }
+            Modal::FileBrowser(modal) => {
+                let area = modal.outer_rect(frame.area());
+                modal.paint(frame, area, palette);
+            }
+            Modal::Help(modal) => {
                 let area = modal.outer_rect(frame.area());
                 modal.paint(frame, area, palette);
             }
@@ -171,6 +184,24 @@ impl UiLayer for ModalLayer {
                 }
                 ConvertTabKeyResult::Consumed => InputResult::Consumed,
             },
+            Modal::FileBrowser(modal) => match modal.handle_key(key) {
+                FileBrowserKeyResult::Submit => {
+                    app.submit_file_browser();
+                    InputResult::Consumed
+                }
+                FileBrowserKeyResult::Cancel => {
+                    app.cancel_modal();
+                    InputResult::Consumed
+                }
+                FileBrowserKeyResult::Consumed => InputResult::Consumed,
+            },
+            Modal::Help(modal) => match modal.handle_key(key) {
+                HelpKeyResult::Close => {
+                    app.cancel_modal();
+                    InputResult::Consumed
+                }
+                HelpKeyResult::Consumed => InputResult::Consumed,
+            },
             Modal::None => InputResult::Unhandled,
         }
     }
@@ -226,6 +257,32 @@ impl UiLayer for ModalLayer {
                 }
                 InputResult::Consumed
             }
+            Modal::FileBrowser(modal) => {
+                let outer = modal.outer_rect(frame);
+                if matches!(mouse.kind, MouseEventKind::Down(MouseButton::Left)) {
+                    if modal.handle_mouse(&mouse, outer) && modal.pending_submit {
+                        app.submit_file_browser();
+                    } else if let Some(idx) = hit_dialog_button_file_browser(modal, &mouse, outer) {
+                        activate_button(app, idx);
+                    }
+                } else {
+                    modal.handle_mouse(&mouse, outer);
+                }
+                InputResult::Consumed
+            }
+            Modal::Help(modal) => {
+                let outer = modal.outer_rect(frame);
+                if matches!(mouse.kind, MouseEventKind::Down(MouseButton::Left)) {
+                    if let Some(idx) = modal.hit_button(&mouse, outer) {
+                        activate_button(app, idx);
+                    }
+                } else if matches!(mouse.kind, MouseEventKind::Moved) {
+                    if let Some(idx) = modal.hit_button(&mouse, outer) {
+                        app.modal.dialog_mut().map(|d| d.set_selected(idx));
+                    }
+                }
+                InputResult::Consumed
+            }
             _ => {
                 let Some(dialog) = app.modal.dialog() else {
                     return InputResult::Consumed;
@@ -253,6 +310,8 @@ impl UiLayer for ModalLayer {
     fn footer_hint(&self, app: &crate::app::App) -> Option<String> {
         match &app.modal {
             Modal::ConvertTabulation(modal) => modal.focused_help().map(str::to_string),
+            Modal::FileBrowser(modal) => modal.focused_help().map(str::to_string),
+            Modal::Help(modal) => modal.focused_help().map(str::to_string),
             _ => app
                 .modal
                 .dialog()
@@ -273,6 +332,8 @@ fn activate_button(app: &mut crate::app::App, index: usize) {
         (Modal::ConvertTabulation(_), Some(DialogButtonAction::Primary)) => {
             app.submit_convert_tabulation();
         }
+        (Modal::FileBrowser(_), Some(DialogButtonAction::Primary)) => app.submit_file_browser(),
+        (Modal::Help(_), Some(DialogButtonAction::Primary)) => app.cancel_modal(),
         (_, Some(DialogButtonAction::Primary)) => match &app.modal {
             Modal::PathInput { .. } => app.submit_path_input(),
             Modal::Find { .. } => app.submit_find(),
@@ -281,4 +342,12 @@ fn activate_button(app: &mut crate::app::App, index: usize) {
         },
         _ => app.cancel_modal(),
     }
+}
+
+fn hit_dialog_button_file_browser(
+    modal: &FileBrowserModal,
+    mouse: &MouseEvent,
+    outer: ratatui::layout::Rect,
+) -> Option<usize> {
+    hit_dialog_button(mouse, outer, modal.dialog.buttons)
 }

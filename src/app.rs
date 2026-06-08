@@ -17,7 +17,7 @@ use crate::events;
 use crate::file_io;
 use crate::memory::MemoryMonitor;
 use crate::menus::{ActionId, MenuBar, MenuState};
-use crate::modal::{ConfirmKind, DialogButtonAction, Modal, PathInputKind};
+use crate::modal::{ConfirmKind, DialogButtonAction, FileBrowserMode, HelpKind, Modal, PathInputKind};
 use crate::recent::RecentFiles;
 use crate::theme::ThemeId;
 use crate::ui;
@@ -173,6 +173,9 @@ impl App {
 
     pub(crate) fn persist_user_config(&mut self) {
         self.sync_active_tab();
+        let ultimo = self.user_config.arquivo.ultimo_diretorio.clone();
+        let ocultos = self.user_config.arquivo.mostrar_ocultos;
+        let filtro = self.user_config.arquivo.filtro_abrir.clone();
         self.user_config = config_from_view(
             self.recent.paths(),
             &self.view,
@@ -180,6 +183,9 @@ impl App {
             self.document.tabulation,
             self.build_abas_config(),
         );
+        self.user_config.arquivo.ultimo_diretorio = ultimo;
+        self.user_config.arquivo.mostrar_ocultos = ocultos;
+        self.user_config.arquivo.filtro_abrir = filtro;
         let _ = self.user_config.save();
     }
 
@@ -286,19 +292,52 @@ impl App {
             );
             return;
         }
-        self.modal = Modal::path_input("Abrir arquivo", "Caminho:", PathInputKind::Open, "");
+        self.open_file_browser(FileBrowserMode::Open);
     }
 
     pub fn request_save(&mut self) {
         if let Some(path) = self.document.path().map(Path::to_path_buf) {
             self.save_to_path(path, false);
         } else {
-            self.modal = Modal::path_input("Salvar como", "Caminho:", PathInputKind::SaveAs, "");
+            self.open_file_browser(FileBrowserMode::SaveAs);
         }
     }
 
     pub fn request_save_as(&mut self) {
-        self.modal = Modal::path_input("Salvar como", "Caminho:", PathInputKind::SaveAs, "");
+        self.open_file_browser(FileBrowserMode::SaveAs);
+    }
+
+    pub(crate) fn open_file_browser(&mut self, mode: FileBrowserMode) {
+        use crate::modal::file_browser::{
+            infer_filter_from_path, initial_directory, suggest_file_name,
+        };
+        let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+        let last = self
+            .user_config
+            .arquivo
+            .ultimo_diretorio
+            .as_deref()
+            .map(Path::new);
+        let dir = initial_directory(self.document.path(), last, &cwd);
+        let name = suggest_file_name(self.document.path(), "Novo.txt");
+        let filter = match mode {
+            FileBrowserMode::Open => {
+                if self.user_config.arquivo.filtro_abrir.is_empty() {
+                    infer_filter_from_path(self.document.path())
+                } else {
+                    self.user_config.arquivo.filtro_abrir.clone()
+                }
+            }
+            FileBrowserMode::Save | FileBrowserMode::SaveAs => {
+                infer_filter_from_path(Some(Path::new(&name)))
+            }
+        };
+        let show_hidden = self.user_config.arquivo.mostrar_ocultos;
+        self.modal = Modal::file_browser(mode, dir, name, filter, show_hidden);
+    }
+
+    pub fn open_help_features(&mut self) {
+        self.modal = Modal::help(HelpKind::Features);
     }
 
     pub fn request_rename(&mut self) {
@@ -682,8 +721,7 @@ impl App {
                         self.should_quit = true;
                     }
                 } else {
-                    self.modal =
-                        Modal::path_input("Salvar como", "Caminho:", PathInputKind::SaveAs, "");
+                    self.open_file_browser(FileBrowserMode::SaveAs);
                 }
             }
             (ConfirmKind::QuitUnsaved, DialogButtonAction::Secondary) => self.should_quit = true,
@@ -694,7 +732,7 @@ impl App {
                 if let Some(path) = self.pending_open_path.take() {
                     self.open_path(path);
                 } else {
-                    self.modal = Modal::path_input("Abrir arquivo", "Caminho:", PathInputKind::Open, "");
+                    self.open_file_browser(FileBrowserMode::Open);
                 }
             }
             (ConfirmKind::OverwriteSave { path }, DialogButtonAction::Primary) => {
@@ -734,6 +772,45 @@ impl App {
     pub fn cancel_modal(&mut self) {
         self.modal = Modal::None;
         self.set_status("Ação cancelada");
+    }
+
+    pub fn submit_file_browser(&mut self) {
+        let Modal::FileBrowser(modal) = &self.modal else {
+            return;
+        };
+        let mode = modal.mode;
+        let path = modal.resolved_path();
+        if modal.name_input.trim().is_empty() {
+            self.set_status("Informe um nome de arquivo");
+            return;
+        }
+        match mode {
+            FileBrowserMode::Open if !path.is_file() => {
+                self.set_status("Arquivo não encontrado");
+                return;
+            }
+            _ => {}
+        }
+
+        let show_hidden = modal.show_hidden;
+        let filter = modal.filter_input.clone();
+        let dir = modal.current_dir.clone();
+        self.modal = Modal::None;
+
+        self.user_config.arquivo.ultimo_diretorio = Some(dir.display().to_string());
+        self.user_config.arquivo.mostrar_ocultos = show_hidden;
+        if mode == FileBrowserMode::Open {
+            self.user_config.arquivo.filtro_abrir = filter;
+        }
+
+        match mode {
+            FileBrowserMode::Open => {
+                self.open_path(file_io::normalize_open_path(&path));
+            }
+            FileBrowserMode::Save | FileBrowserMode::SaveAs => {
+                self.save_to_path(path, false);
+            }
+        }
     }
 
     pub fn submit_path_input(&mut self) {
@@ -1132,6 +1209,9 @@ impl App {
                 self.workspace.sort_tabs(TabSortStrategy::Status);
                 self.focus_tab(self.workspace.active_index);
             }
+            ActionId::HelpFeatures => self.modal = Modal::help(HelpKind::Features),
+            ActionId::HelpShortcuts => self.modal = Modal::help(HelpKind::Shortcuts),
+            ActionId::HelpAbout => self.modal = Modal::help(HelpKind::About),
             ActionId::Recent | ActionId::PastePrevious | ActionId::NoOp => {}
         }
         if persist {

@@ -2,7 +2,7 @@
 
 **Autor:** Perplexity AI  
 **Data:** 2026-06-08  
-**Versão:** 3.4
+**Versão:** 3.5
 
 ## Registro
 
@@ -150,3 +150,7 @@
 - 2026-06-08 — **Correção tecla End** — cursor no fim da linha (não na seguinte); `line_content_len` ignora `\n` no comprimento ropey; `char_idx_to_line_col` normaliza delimitador.
   - Módulos: `src/editor/{cursor,engine}.rs`
   - Testes: **130** total (`cargo test`)
+- 2026-06-09 — **Navegador de arquivos (TV7) + menu Ajuda** — `FileBrowserModal` Abrir/Salvar/Salvar Como; `HelpModal` Features/Atalhos/Sobre; `Alt+H`, `F1`; config `arquivo.ultimo_diretorio` / `mostrar_ocultos` / `filtro_abrir`.
+  - Módulos: `src/modal/{file_browser,help,help_content}.rs`, `src/ui/layers/modal.rs`, `src/menus.rs`, `src/app.rs`, `src/config.rs`
+  - Specs: `specs/done/SPEC-MODAL-ARQUIVO.md`, `specs/done/SPEC-MENU-AJUDA.md`
+  - Testes: **138** total (`cargo test`); branch **`fase2`**

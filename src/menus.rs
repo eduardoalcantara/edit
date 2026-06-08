@@ -78,6 +78,9 @@ pub enum ActionId {
     SortOpenedFirst,
     SortOpenedLast,
     SortStatus,
+    HelpFeatures,
+    HelpShortcuts,
+    HelpAbout,
 }
 
 #[derive(Clone)]
@@ -219,6 +222,11 @@ impl MenuBar {
                     label: " Formatar ",
                     mnemonic: 'F',
                     children: format_menu(enc, tab),
+                },
+                MenuTopItem {
+                    label: " Ajuda ",
+                    mnemonic: 'H',
+                    children: help_menu(),
                 },
             ],
         }
@@ -718,6 +726,35 @@ fn view_menu(view: &ViewState) -> Vec<MenuNode> {
                     "2 linhas acima/abaixo e 4 colunas à esquerda/direita",
                 ),
             ],
+        ),
+    ]
+}
+
+fn help_menu() -> Vec<MenuNode> {
+    vec![
+        item(
+            "Features",
+            Some("F1"),
+            ActionId::HelpFeatures,
+            true,
+            None,
+            "Lista resumida das capacidades do editor",
+        ),
+        item(
+            "Atalhos",
+            None,
+            ActionId::HelpShortcuts,
+            true,
+            None,
+            "Referência de teclado agrupada por categoria",
+        ),
+        item(
+            "Sobre",
+            None,
+            ActionId::HelpAbout,
+            true,
+            None,
+            "Versão, descrição e informações do produto",
         ),
     ]
 }
@@ -1461,6 +1498,41 @@ fn build_menu_row_line_spans(
         left_spans.push(Span::styled(" ", base_style));
     }
     Line::from(left_spans)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::clipboard::Clipboard;
+    use crate::encoding::{FileEncoding, Tabulation};
+    use crate::recent::RecentFiles;
+    use crate::view_state::ViewState;
+    use crate::workspace::Workspace;
+
+    fn empty_workspace() -> Workspace {
+        Workspace {
+            tabs: Vec::new(),
+            active_index: 0,
+            max_tabs: 10,
+            fechar_tudo_ao_sair: false,
+            salvar_desfazer_recentes: true,
+        }
+    }
+
+    #[test]
+    fn build_includes_ajuda_menu() {
+        let bar = MenuBar::build(
+            &RecentFiles::default(),
+            &ViewState::default(),
+            FileEncoding::Utf8,
+            Tabulation::Spaces4,
+            &Clipboard::default(),
+            &empty_workspace(),
+        );
+        assert!(bar.tops.iter().any(|t| t.mnemonic == 'H'));
+        let help = bar.tops.iter().find(|t| t.mnemonic == 'H').unwrap();
+        assert!(help.label.contains("Ajuda"));
+    }
 }
 
 fn line_width(node: &MenuNode) -> usize {

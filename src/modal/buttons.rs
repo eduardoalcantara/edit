@@ -166,6 +166,15 @@ pub const PATH_SAVE_AS: [DialogButton; 2] = [
     ),
 ];
 
+pub const FILE_BROWSER_OPEN: [DialogButton; 2] = PATH_OPEN;
+pub const FILE_BROWSER_SAVE: [DialogButton; 2] = PATH_SAVE_AS;
+
+pub const HELP_CLOSE: [DialogButton; 1] = [DialogButton::new(
+    "Fechar",
+    "Fecha a janela de ajuda",
+    DialogButtonAction::Primary,
+)];
+
 pub const PATH_RENAME: [DialogButton; 2] = [
     DialogButton::new(
         "OK",

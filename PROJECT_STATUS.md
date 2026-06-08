@@ -2,7 +2,7 @@
 
 **Autor:** Perplexity AI  
 **Data:** 2026-06-08  
-**Versão:** 3.4
+**Versão:** 3.5
 
 ## Estado atual
 
@@ -133,15 +133,18 @@
   - **126 testes** unitários passando (`cargo test`).
 - **Terminal — encerramento automático ao `exit` (2026-06-08):** `child.try_wait()` detecta fim do shell; remove sessão; oculta painel se era a única (sem respawn automático).
   - Módulos: `src/terminal/{session,workspace}.rs`, `src/app.rs`
-- **Spec split view (2026-06-08):** `specs/to-do/SPEC-EDITOR-SPLIT-VIEW.md` — duas abas visíveis lado a lado (após barra de abas, fase 2 workspace).
-- **Spec menu Ajuda (2026-06-08):** `specs/to-do/SPEC-MENU-AJUDA.md` — Features, Atalhos, Sobre.
-- **Spec modal arquivo (2026-06-08):** `specs/to-do/SPEC-MODAL-ARQUIVO.md` — navegador Abrir/Salvar/Salvar Como estilo Turbo Pascal (TV7).
 - **Atalhos e UX (2026-06-08):** `Ctrl+E` foco editor; `Ctrl+T`/`Ctrl+'` abre/foca ou fecha conforme foco; `Ctrl+G` e **Editar → Ir para linha...**; clique **Pos** / encoding no rodapé.
-  - **127 testes** unitários passando (`cargo test`).
+  - **130 testes** unitários passando (`cargo test`).
+- **Navegador de arquivos + menu Ajuda (2026-06-09, branch `fase2`):**
+  - Modal **FileBrowser** estilo Turbo Pascal para Abrir / Salvar / Salvar Como (`src/modal/file_browser.rs`); filtro glob, ocultos, barra de status; persiste `ultimo_diretorio`, `mostrar_ocultos`, `filtro_abrir` em `edit.json`.
+  - Menu **Ajuda** (`Alt+H`): Features, Atalhos, Sobre; **`F1`** abre Features; modais com scroll PgUp/PgDn.
+  - `PathInput` mantido apenas para Renomear (`F2`).
+  - Specs: `specs/done/SPEC-MODAL-ARQUIVO.md`, `specs/done/SPEC-MENU-AJUDA.md` (TV7 fechado).
+  - **138 testes** unitários passando (`cargo test`).
 
 ### Em andamento
 - **Múltiplos arquivos — fase 2:** barra de abas visual; serialização `undo.json`/`redo.json`; modal recarregar arquivo alterado externamente.
-- **Fidelidade Turbo Vision:** `specs/to-do/SPEC-UX-FIDELIDADE-TURBO-VISION.md` (TV1–TV3 paleta/rodapé; TV7 file picker pendente).
+- **Fidelidade Turbo Vision:** `specs/to-do/SPEC-UX-FIDELIDADE-TURBO-VISION.md` (TV1–TV3 paleta/rodapé; demais itens TV8+).
 - Resolução das demais limitações em `specs/to-do/SPEC-LIMITACOES-PENDENTES.md`.
 
 ### Pendências

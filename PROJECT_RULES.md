@@ -86,13 +86,13 @@ Regras estáveis do projeto. Para estado de implementação, ver `PROJECT_STATUS
 | `Alt` + arraste | Seleção retangular (bloco) |
 | `Ctrl` + clique | Adicionar cursor (multi-cursor) |
 
-Menu Arquivo: **`Alt+A`** (mnemônico). *`F10` deixou de abrir o menu — reservado para Salvar (ver teclas Fn abaixo).*
+Menu Arquivo: **`Alt+A`** (mnemônico). Menu Ajuda: **`Alt+H`**. *`F10` deixou de abrir o menu — reservado para Salvar (ver teclas Fn abaixo).*
 
 ## Regras de UX — teclas de função (editor)
 
 | Tecla | Ação |
 |-------|------|
-| **`F1`** | Ajuda (placeholder) |
+| **`F1`** | Ajuda → **Features** (modal) |
 | **`F2`** | **Renomear** arquivo no FS (aba ativa com path; modal; `std::fs::rename`) |
 | **`F3`** | Próxima ocorrência de busca (`Shift+F3` = anterior) |
 | **`F4`** | Próxima aba de edição |

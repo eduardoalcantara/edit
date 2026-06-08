@@ -83,15 +83,16 @@ Fechar a lacuna entre a UI implementada e a referência Turbo Vision / EDIT.EXE.
 
 ### TV7 — Abrir arquivo: path manual, sem browser FS
 
-| Atual | Esperado (EDIT.EXE) |
-|-------|---------------------|
-| Modal pede caminho digitado | Diálogo **Pick file** com árvore/lista de diretórios |
-| Sem navegação `..`, drives | Painel dirs + painel arquivos + máscara `*.*` |
-| Sem preview de seleção | Highlight de arquivo focado; Enter confirma |
+**Status:** implementado — ver `specs/done/SPEC-MODAL-ARQUIVO.md`
 
-**Spec detalhada:** `specs/to-do/SPEC-MODAL-ARQUIVO.md`  
-**Módulos:** novo `src/modal/file_browser.rs` (ou `src/file_browser/`)  
-**Critério de aceite:** abrir `.rs` navegando pastas sem digitar path completo.
+| Antes | Agora |
+|-------|-------|
+| Modal pede caminho digitado | `FileBrowserModal` com lista de diretórios |
+| Sem navegação `..`, drives | `..`, filtro `*.*`, ocultos, barra de status |
+| Sem preview de seleção | Highlight + metadados (tamanho/data) |
+
+**Módulos:** `src/modal/file_browser.rs`  
+**Critério de aceite:** abrir `.rs` navegando pastas sem digitar path completo — **atendido**.
 
 ---
 
