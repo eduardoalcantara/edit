@@ -2,7 +2,7 @@
 
 **Autor:** Perplexity AI  
 **Data:** 2026-06-07  
-**Versão:** 2.5
+**Versão:** 2.6
 
 ## Estado atual
 
@@ -84,8 +84,11 @@
 - Relatórios em `specs/report/` para as 4 fases de menu + migração ropey.
 - Specs de menu e arquitetura em `specs/done/`.
 - **70 testes** unitários passando (`cargo test`).
+- **PROJECT_RULES.md v2.0** — regras consolidadas (arquitetura, UI/UX, `edit.json`, compositor).
+- **README.md v2.0** — visão do produto, features e atalhos.
 
 ### Em andamento
+- **Múltiplos arquivos / workspace:** `specs/to-do/SPEC-MULTPLOS-ARQUIVOS.md` — spec fechada para implementação (menu Abas, 10 abas, `.edit-session/`, undo persistido opcional, higiene FS). **Código ainda não iniciado.**
 - **Fidelidade Turbo Vision:** `specs/to-do/SPEC-UX-FIDELIDADE-TURBO-VISION.md` (TV1–TV3 paleta/rodapé; TV7 file picker pendente).
 - Resolução das demais limitações em `specs/to-do/SPEC-LIMITACOES-PENDENTES.md`.
 

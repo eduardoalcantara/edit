@@ -2,7 +2,7 @@
 
 **Autor:** Perplexity AI  
 **Data:** 2026-06-07  
-**Versão:** 2.5
+**Versão:** 2.6
 
 ## Registro
 
@@ -92,3 +92,8 @@
   - Módulos: `src/config.rs`, `src/app.rs`, `src/recent.rs`, `src/main.rs`
   - Dependências: `serde`, `serde_json`
   - Testes: `config::tests::*`
+- 2026-06-07 — **PROJECT_RULES v2.0** — arquitetura compositor, `edit.json`, UI Turbo Vision, atalhos, domínio.
+  - Commit: `8207de6`
+- 2026-06-07 — **SPEC múltiplos arquivos (workspace)** — spec em `specs/to-do/SPEC-MULTPLOS-ARQUIVOS.md`: menu Abas (`Alt+S`), 10 abas, evicção final da fila, `Ctrl+Alt+S`/`Ctrl+Shift+W`, `.edit-session/`, undo persistido (toggle + modal Apagar), higiene FS com timestamp, `NovoN`, restore sessão.
+  - Docs: README v2.0, STATUS/TIMELINE v2.6
+  - Implementação: pendente
