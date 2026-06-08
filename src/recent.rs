@@ -20,6 +20,10 @@ impl RecentFiles {
         self.paths.truncate(MAX_RECENT);
     }
 
+    pub fn remove_path(&mut self, path: &Path) {
+        self.paths.retain(|p| p != path);
+    }
+
     pub fn paths(&self) -> &[PathBuf] {
         &self.paths
     }

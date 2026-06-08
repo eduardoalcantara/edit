@@ -1,4 +1,5 @@
 mod app;
+mod app_workspace;
 mod clipboard;
 mod config;
 mod document;
@@ -12,7 +13,9 @@ mod memory;
 mod menus;
 mod modal;
 mod recent;
+mod session;
 mod theme;
+mod workspace;
 mod ui;
 mod view_state;
 mod widgets;

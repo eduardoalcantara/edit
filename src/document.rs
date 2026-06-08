@@ -60,6 +60,14 @@ impl Document {
         self.saved_content = content;
         self.path = Some(path);
     }
+
+    pub fn restore_untitled(&mut self, content: String, encoding: FileEncoding, tabulation: Tabulation) {
+        self.path = None;
+        self.encoding = encoding;
+        self.tabulation = tabulation;
+        self.saved_content = EMPTY_DOCUMENT_TEXT.to_string();
+        let _ = content; // dirty derivado pelo conteúdo atual vs baseline
+    }
 }
 
 #[cfg(test)]

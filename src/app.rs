@@ -6,6 +6,7 @@ use ratatui::backend::CrosstermBackend;
 use ratatui::Terminal;
 
 use crate::clipboard::Clipboard;
+use crate::app_workspace::{workspace_from_config, AfterDirtyResolved, DirtyFlow};
 use crate::config::{config_from_view, EditConfig};
 use crate::document::Document;
 use crate::editor::Editor;
@@ -19,7 +20,9 @@ use crate::modal::{ConfirmKind, DialogButtonAction, Modal, PathInputKind};
 use crate::recent::RecentFiles;
 use crate::theme::ThemeId;
 use crate::ui;
+use crate::session::has_any_undo_files;
 use crate::view_state::{EditorBorder, EditorMargin, GuideColumn, ViewState};
+use crate::workspace::{PromptReason, TabSortStrategy, Workspace};
 
 pub struct App {
     pub editor: Editor,
@@ -40,21 +43,31 @@ pub struct App {
     pub last_frame_width: u16,
     pub last_frame_height: u16,
     pub memory: MemoryMonitor,
+    pub workspace: Workspace,
+    pub dirty_flow: Option<DirtyFlow>,
+    pub pending_dirty_save: Option<(usize, PromptReason)>,
+    pub pending_save_all: bool,
+    pub pending_open_path: Option<PathBuf>,
     user_config: EditConfig,
 }
 
 impl App {
+    pub(crate) fn user_config(&self) -> &EditConfig {
+        &self.user_config
+    }
+
     pub fn new(mouse_enabled: bool) -> Self {
         let user_config = EditConfig::load();
         let view_snapshot = user_config.view_settings();
         let theme = view_snapshot.theme;
         let palette = theme.palette();
         let recent = RecentFiles::from_paths(user_config.recent_paths());
-        let encoding = user_config.default_encoding();
-        let tabulation = user_config.default_tabulation();
+        let _encoding = user_config.default_encoding();
+        let _tabulation = user_config.default_tabulation();
+        let word_wrap = view_snapshot.word_wrap;
         let view = ViewState {
             zoom: view_snapshot.zoom,
-            word_wrap: view_snapshot.word_wrap,
+            word_wrap,
             show_symbols: view_snapshot.show_symbols,
             show_spaces: view_snapshot.show_spaces,
             show_tabs: view_snapshot.show_tabs,
@@ -68,12 +81,13 @@ impl App {
             border: view_snapshot.border,
             theme: view_snapshot.theme,
         };
-        let mut document = Document::new();
-        document.encoding = encoding;
-        document.tabulation = tabulation;
-        let mut editor = Editor::new(&palette);
-        editor.set_tabulation(tabulation);
+        let (workspace, editor, document) =
+            workspace_from_config(&user_config, &palette, word_wrap);
+        let mut editor = editor;
+        let document = document;
+        editor.set_tabulation(document.tabulation);
         editor.set_word_wrap(view.word_wrap);
+
         let mut app = Self {
             editor,
             document,
@@ -81,7 +95,14 @@ impl App {
             view,
             recent,
             clipboard: Clipboard::default(),
-            menu_bar: MenuBar::build(&RecentFiles::default(), &ViewState::default(), FileEncoding::Utf8, Tabulation::Spaces4, &Clipboard::default()),
+            menu_bar: MenuBar::build(
+                &RecentFiles::default(),
+                &ViewState::default(),
+                FileEncoding::Utf8,
+                Tabulation::Spaces4,
+                &Clipboard::default(),
+                &workspace,
+            ),
             menu_state: MenuState::default(),
             find_pattern: String::new(),
             should_quit: false,
@@ -93,18 +114,25 @@ impl App {
             last_frame_width: 80,
             last_frame_height: 24,
             memory: MemoryMonitor::new(),
+            workspace,
+            dirty_flow: None,
+            pending_dirty_save: None,
+            pending_save_all: false,
+            pending_open_path: None,
             user_config,
         };
         app.refresh_menu();
         app
     }
 
-    fn persist_user_config(&mut self) {
+    pub(crate) fn persist_user_config(&mut self) {
+        self.sync_active_tab();
         self.user_config = config_from_view(
             self.recent.paths(),
             &self.view,
             self.document.encoding,
             self.document.tabulation,
+            self.build_abas_config(),
         );
         let _ = self.user_config.save();
     }
@@ -121,11 +149,16 @@ impl App {
             self.document.encoding,
             self.document.tabulation,
             &self.clipboard,
+            &self.workspace,
         );
     }
 
     pub fn document_title(&self) -> String {
-        let mut title = self.document.title();
+        let mut title = if self.document.path().is_some() {
+            self.document.title()
+        } else {
+            self.workspace.active_tab().display_name.clone()
+        };
         if self.is_dirty() {
             title.push('*');
         }
@@ -152,6 +185,7 @@ impl App {
     }
 
     pub fn shutdown(&mut self) {
+        self.persist_session_artifacts();
         self.persist_user_config();
     }
 
@@ -168,23 +202,28 @@ impl App {
     }
 
     pub fn request_new_document(&mut self) {
-        if self.is_dirty() {
-            self.modal = Modal::confirm(
-                "Novo documento",
-                "Existem alterações não salvas. Descartar e criar novo documento?",
-                ConfirmKind::DiscardForNew,
-            );
+        self.sync_active_tab();
+        if self.active_tab_is_pristine() {
             return;
         }
-        self.new_document();
-    }
-
-    pub fn new_document(&mut self) {
-        self.editor.clear();
-        self.document
-            .reset_with(self.user_config.default_encoding(), self.user_config.default_tabulation());
-        self.editor.set_tabulation(self.document.tabulation);
-        self.set_status("Novo documento");
+        if let Some(index) = self.workspace.find_first_pristine_untitled() {
+            self.focus_tab(index);
+            self.set_status("Documento novo");
+            return;
+        }
+        if self.workspace.needs_eviction() {
+            let tail = self.workspace.tail_index().expect("tail");
+            if self.workspace.tabs[tail].is_dirty() {
+                self.begin_dirty_flow(
+                    vec![tail],
+                    PromptReason::EvictTail,
+                    AfterDirtyResolved::EvictThenNew,
+                );
+                return;
+            }
+            self.evict_tail_silent();
+        }
+        self.create_new_tab_at_top();
     }
 
     pub fn request_open(&mut self) {
@@ -212,26 +251,43 @@ impl App {
     }
 
     pub fn request_close(&mut self) {
+        self.sync_active_tab();
         if self.is_dirty() {
-            self.modal = Modal::confirm(
-                "Fechar documento",
-                "Existem alterações não salvas. Descartar alterações?",
-                ConfirmKind::CloseDocument,
+            self.begin_dirty_flow(
+                vec![self.workspace.active_index],
+                PromptReason::CloseTab,
+                AfterDirtyResolved::CloseTab,
             );
             return;
         }
-        self.new_document();
+        self.close_active_tab_final();
+    }
+
+    pub fn request_close_all(&mut self) {
+        self.sync_active_tab();
+        let dirty = self.workspace.dirty_indices_menu_order();
+        if dirty.is_empty() {
+            self.close_all_tabs_final();
+            return;
+        }
+        self.begin_dirty_flow(dirty, PromptReason::CloseAll, AfterDirtyResolved::CloseAll);
     }
 
     pub fn request_quit(&mut self) {
-        if self.is_dirty() {
-            self.modal = Modal::quit_unsaved(&self.document.title());
+        self.sync_active_tab();
+        let dirty = self.workspace.dirty_indices_menu_order();
+        if dirty.is_empty() {
+            self.should_quit = true;
             return;
         }
-        self.should_quit = true;
+        self.begin_dirty_flow(dirty, PromptReason::Quit, AfterDirtyResolved::Quit);
     }
 
     fn save_to_path(&mut self, path: PathBuf, confirmed: bool) {
+        self.save_to_path_internal(path, confirmed);
+    }
+
+    pub(crate) fn save_to_path_internal(&mut self, path: PathBuf, confirmed: bool) {
         let is_current = self.document.path().is_some_and(|current| current == path.as_path());
         if !confirmed && file_io::path_exists(&path) && !is_current {
             self.modal = Modal::confirm(
@@ -253,6 +309,22 @@ impl App {
                     self.pending_quit = false;
                     self.should_quit = true;
                 }
+                if self.pending_dirty_save.is_some() || self.dirty_flow.is_some() {
+                    if !self.is_dirty() {
+                        if let Some((index, reason)) = self.pending_dirty_save.take() {
+                            self.handle_tab_unsaved_modal(
+                                index,
+                                reason,
+                                DialogButtonAction::Primary,
+                            );
+                        } else if self.dirty_flow.is_some() {
+                            self.advance_dirty_flow(true);
+                        }
+                    }
+                }
+                if self.pending_save_all && !self.is_dirty() {
+                    self.save_all_remaining();
+                }
             }
             Err(error) => {
                 self.set_status(format!("Erro ao salvar: {error}"));
@@ -261,19 +333,7 @@ impl App {
     }
 
     pub fn open_path(&mut self, path: PathBuf) {
-        match file_io::read_lines_encoded(&path, self.document.encoding) {
-            Ok(lines) => {
-                self.editor.set_lines(lines);
-                self.document
-                    .set_opened(self.editor.content_string(), path.clone());
-                self.note_recent_file(path.clone());
-                self.editor.set_tabulation(self.document.tabulation);
-                self.set_status(format!("Aberto: {}", path.display()));
-            }
-            Err(error) => {
-                self.set_status(format!("Erro ao abrir: {error}"));
-            }
-        }
+        self.open_path_impl(path);
     }
 
     pub fn confirm_modal(&mut self) {
@@ -291,6 +351,23 @@ impl App {
         };
 
         match (kind, action) {
+            (ConfirmKind::TabUnsaved { tab_index, reason }, action) => {
+                self.handle_tab_unsaved_modal(tab_index, reason, action);
+            }
+            (ConfirmKind::PurgeUndoOnToggle, DialogButtonAction::Primary) => {
+                let _ = crate::session::purge_all_undo();
+                self.workspace.salvar_desfazer_recentes = false;
+                self.persist_user_config();
+                self.set_status("Desfazer persistido apagado");
+            }
+            (ConfirmKind::PurgeUndoOnToggle, DialogButtonAction::Secondary) => {
+                self.workspace.salvar_desfazer_recentes = false;
+                self.persist_user_config();
+                self.set_status("Persistência de desfazer desligada");
+            }
+            (ConfirmKind::PurgeUndoOnToggle, DialogButtonAction::Cancel) => {
+                self.set_status("Toggle mantido");
+            }
             (ConfirmKind::QuitUnsaved, DialogButtonAction::Primary) => {
                 self.pending_quit = true;
                 if self.document.path().is_some() {
@@ -306,10 +383,14 @@ impl App {
             }
             (ConfirmKind::QuitUnsaved, DialogButtonAction::Secondary) => self.should_quit = true,
             (_, DialogButtonAction::Cancel) => self.set_status("Ação cancelada"),
-            (ConfirmKind::DiscardForNew, DialogButtonAction::Primary)
-            | (ConfirmKind::CloseDocument, DialogButtonAction::Primary) => self.new_document(),
+            (ConfirmKind::DiscardForNew, DialogButtonAction::Primary) => self.request_new_document(),
+            (ConfirmKind::CloseDocument, DialogButtonAction::Primary) => self.request_close(),
             (ConfirmKind::DiscardForOpen, DialogButtonAction::Primary) => {
-                self.modal = Modal::path_input("Abrir arquivo", "Caminho:", PathInputKind::Open);
+                if let Some(path) = self.pending_open_path.take() {
+                    self.open_path(path);
+                } else {
+                    self.modal = Modal::path_input("Abrir arquivo", "Caminho:", PathInputKind::Open);
+                }
             }
             (ConfirmKind::OverwriteSave { path }, DialogButtonAction::Primary) => {
                 self.save_to_path(path, true)
@@ -516,7 +597,9 @@ impl App {
             ActionId::Open => self.request_open(),
             ActionId::Save => self.request_save(),
             ActionId::SaveAs => self.request_save_as(),
+            ActionId::SaveAll => self.save_all_dirty(),
             ActionId::Close => self.request_close(),
+            ActionId::CloseAll => self.request_close_all(),
             ActionId::Undo => {
                 self.editor.undo();
                 self.set_status("Desfazer");
@@ -670,7 +753,9 @@ impl App {
             }
             ActionId::OpenRecent(i) => {
                 if let Some(path) = self.recent.paths().get(i).cloned() {
+                    self.sync_active_tab();
                     if self.is_dirty() {
+                        self.pending_open_path = Some(path);
                         self.modal = Modal::confirm(
                             "Abrir recente",
                             "Descartar alterações e abrir arquivo recente?",
@@ -681,10 +766,62 @@ impl App {
                     }
                 }
             }
+            ActionId::FocusTab(i) => self.focus_tab(i),
+            ActionId::ToggleCloseAllOnExit => {
+                self.workspace.fechar_tudo_ao_sair = !self.workspace.fechar_tudo_ao_sair;
+                self.persist_user_config();
+                self.set_status(if self.workspace.fechar_tudo_ao_sair {
+                    "Fechar tudo ao sair: ligado"
+                } else {
+                    "Fechar tudo ao sair: desligado"
+                });
+            }
+            ActionId::TogglePersistUndo => self.toggle_persist_undo(),
+            ActionId::SortFileName => {
+                self.sync_active_tab();
+                self.workspace.sort_tabs(TabSortStrategy::FileName);
+                self.focus_tab(self.workspace.active_index);
+            }
+            ActionId::SortFilePath => {
+                self.sync_active_tab();
+                self.workspace.sort_tabs(TabSortStrategy::FilePath);
+                self.focus_tab(self.workspace.active_index);
+            }
+            ActionId::SortOpenedFirst => {
+                self.sync_active_tab();
+                self.workspace.sort_tabs(TabSortStrategy::OpenedFirst);
+                self.focus_tab(self.workspace.active_index);
+            }
+            ActionId::SortOpenedLast => {
+                self.sync_active_tab();
+                self.workspace.sort_tabs(TabSortStrategy::OpenedLast);
+                self.focus_tab(self.workspace.active_index);
+            }
+            ActionId::SortStatus => {
+                self.sync_active_tab();
+                self.workspace.sort_tabs(TabSortStrategy::Status);
+                self.focus_tab(self.workspace.active_index);
+            }
             ActionId::Recent | ActionId::PastePrevious | ActionId::NoOp => {}
         }
         if persist {
             self.persist_user_config();
+        }
+    }
+
+    fn toggle_persist_undo(&mut self) {
+        if self.workspace.salvar_desfazer_recentes {
+            if has_any_undo_files().unwrap_or(false) {
+                self.modal = Modal::purge_undo_toggle();
+                return;
+            }
+            self.workspace.salvar_desfazer_recentes = false;
+            self.persist_user_config();
+            self.set_status("Salvar desfazer recentes: desligado");
+        } else {
+            self.workspace.salvar_desfazer_recentes = true;
+            self.persist_user_config();
+            self.set_status("Salvar desfazer recentes: ligado");
         }
     }
 }
@@ -692,7 +829,9 @@ impl App {
 fn is_persistent_setting(action: ActionId) -> bool {
     matches!(
         action,
-        ActionId::ToggleSidePanel
+        ActionId::ToggleCloseAllOnExit
+            | ActionId::TogglePersistUndo
+            | ActionId::ToggleSidePanel
             | ActionId::ToggleTerminal
             | ActionId::ToggleFooter
             | ActionId::ShowMemoryToggle

@@ -108,6 +108,43 @@ impl UiLayer for EditorLayer {
         }
 
         if ctrl
+            && key.modifiers.contains(crossterm::event::KeyModifiers::ALT)
+            && matches!(key.code, crossterm::event::KeyCode::Char('S' | 's'))
+        {
+            app.save_all_dirty();
+            return InputResult::Consumed;
+        }
+
+        if ctrl
+            && key.modifiers.contains(crossterm::event::KeyModifiers::SHIFT)
+            && matches!(key.code, crossterm::event::KeyCode::Char('W' | 'w'))
+        {
+            app.request_close_all();
+            return InputResult::Consumed;
+        }
+
+        if key.modifiers.contains(crossterm::event::KeyModifiers::ALT)
+            && matches!(key.code, crossterm::event::KeyCode::Char(c) if c.is_ascii_digit())
+        {
+            let n = match key.code {
+                crossterm::event::KeyCode::Char('0') => 0,
+                crossterm::event::KeyCode::Char(d) => d.to_digit(10).unwrap_or(1) as usize,
+                _ => 1,
+            };
+            app.focus_tab_by_menu_number(n);
+            return InputResult::Consumed;
+        }
+
+        if ctrl && matches!(key.code, crossterm::event::KeyCode::Tab) {
+            if key.modifiers.contains(crossterm::event::KeyModifiers::SHIFT) {
+                app.focus_tab_relative(-1);
+            } else {
+                app.focus_tab_relative(1);
+            }
+            return InputResult::Consumed;
+        }
+
+        if ctrl
             && key.modifiers.contains(crossterm::event::KeyModifiers::SHIFT)
             && matches!(key.code, crossterm::event::KeyCode::Char('V' | 'v'))
         {

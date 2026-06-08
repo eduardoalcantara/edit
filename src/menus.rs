@@ -9,6 +9,7 @@ use crate::encoding::{FileEncoding, Tabulation};
 use crate::recent::{display_name, RecentFiles};
 use crate::theme::ThemePalette;
 use crate::view_state::{EditorBorder, EditorMargin, GuideColumn, ViewState};
+use crate::workspace::Workspace;
 use crate::widgets::panel::{self, cp437, PanelBorder};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -20,7 +21,9 @@ pub enum ActionId {
     Recent,
     Save,
     SaveAs,
+    SaveAll,
     Close,
+    CloseAll,
     Undo,
     Redo,
     Cut,
@@ -68,6 +71,14 @@ pub enum ActionId {
     ConvertTabulation,
     PasteClip(usize),
     OpenRecent(usize),
+    FocusTab(usize),
+    ToggleCloseAllOnExit,
+    TogglePersistUndo,
+    SortFileName,
+    SortFilePath,
+    SortOpenedFirst,
+    SortOpenedLast,
+    SortStatus,
 }
 
 #[derive(Clone)]
@@ -155,13 +166,25 @@ impl MenuState {
 }
 
 impl MenuBar {
-    pub fn build(recent: &RecentFiles, view: &ViewState, enc: FileEncoding, tab: Tabulation, clip: &Clipboard) -> Self {
+    pub fn build(
+        recent: &RecentFiles,
+        view: &ViewState,
+        enc: FileEncoding,
+        tab: Tabulation,
+        clip: &Clipboard,
+        workspace: &Workspace,
+    ) -> Self {
         Self {
             tops: vec![
                 MenuTopItem {
                     label: " Arquivo ",
                     mnemonic: 'A',
                     children: file_menu(recent),
+                },
+                MenuTopItem {
+                    label: " Abas ",
+                    mnemonic: 'S',
+                    children: tabs_menu(workspace),
                 },
                 MenuTopItem {
                     label: " Editar ",
@@ -197,6 +220,108 @@ pub fn focused_help(bar: &MenuBar, state: &MenuState) -> Option<&'static str> {
         MenuNode::Item { help, .. } | MenuNode::SubMenu { help, .. } => *help,
         MenuNode::Separator => None,
     }
+}
+
+fn tabs_menu(workspace: &Workspace) -> Vec<MenuNode> {
+    let mut nodes: Vec<MenuNode> = workspace
+        .tabs
+        .iter()
+        .enumerate()
+        .map(|(i, tab)| {
+            item(
+                format!(" {}", tab.menu_label()),
+                None,
+                ActionId::FocusTab(i),
+                true,
+                Some(i == workspace.active_index),
+                if i < 9 {
+                    "Foca esta aba (Alt+1…Alt+0)"
+                } else {
+                    "Foca esta aba aberta"
+                },
+            )
+        })
+        .collect();
+
+    if nodes.is_empty() {
+        nodes.push(item(
+            "(vazio)",
+            None,
+            ActionId::NoOp,
+            false,
+            None,
+            "Nenhuma aba aberta",
+        ));
+    }
+
+    nodes.push(MenuNode::Separator);
+    nodes.push(item(
+        "Fechar Todos",
+        Some("Ctrl+Shift+W"),
+        ActionId::CloseAll,
+        true,
+        None,
+        "Fecha todas as abas abertas",
+    ));
+    nodes.push(toggle_item(
+        "Fechar tudo ao sair",
+        ActionId::ToggleCloseAllOnExit,
+        workspace.fechar_tudo_ao_sair,
+        "Persiste abas abertas ao encerrar o editor",
+    ));
+    nodes.push(toggle_item(
+        "Salvar desfazer recentes",
+        ActionId::TogglePersistUndo,
+        workspace.salvar_desfazer_recentes,
+        "Mantém até 5+ passos de desfazer por aba entre sessões; desligue para economizar disco",
+    ));
+    nodes.push(submenu(
+        "Ordenar por",
+        "Reordena abas abertas na sessão atual",
+        vec![
+            item(
+                "Nome de Arquivo",
+                None,
+                ActionId::SortFileName,
+                true,
+                None,
+                "Ordem alfabética pelo rótulo exibido",
+            ),
+            item(
+                "Caminho",
+                None,
+                ActionId::SortFilePath,
+                true,
+                None,
+                "Ordem alfabética pelo caminho completo",
+            ),
+            item(
+                "Abertos Primeiro",
+                None,
+                ActionId::SortOpenedFirst,
+                true,
+                None,
+                "Abas abertas há mais tempo no topo",
+            ),
+            item(
+                "Abertos por Último",
+                None,
+                ActionId::SortOpenedLast,
+                true,
+                None,
+                "Abas abertas recentemente no topo",
+            ),
+            item(
+                "Status",
+                None,
+                ActionId::SortStatus,
+                true,
+                None,
+                "Abas com alterações pendentes no topo",
+            ),
+        ],
+    ));
+    nodes
 }
 
 fn file_menu(recent: &RecentFiles) -> Vec<MenuNode> {
@@ -265,6 +390,14 @@ fn file_menu(recent: &RecentFiles) -> Vec<MenuNode> {
             true,
             None,
             "Salva o documento com um novo nome ou caminho",
+        ),
+        item(
+            "Salvar Todos",
+            Some("Ctrl+Alt+S"),
+            ActionId::SaveAll,
+            true,
+            None,
+            "Salva todas as abas com alterações pendentes",
         ),
         MenuNode::Separator,
         item(

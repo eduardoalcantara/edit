@@ -2,7 +2,7 @@
 
 **Autor:** Perplexity AI  
 **Data:** 2026-06-07  
-**Versão:** 2.6
+**Versão:** 2.7
 
 ## Registro
 
@@ -94,6 +94,11 @@
   - Testes: `config::tests::*`
 - 2026-06-07 — **PROJECT_RULES v2.0** — arquitetura compositor, `edit.json`, UI Turbo Vision, atalhos, domínio.
   - Commit: `8207de6`
-- 2026-06-07 — **SPEC múltiplos arquivos (workspace)** — spec em `specs/to-do/SPEC-MULTPLOS-ARQUIVOS.md`: menu Abas (`Alt+S`), 10 abas, evicção final da fila, `Ctrl+Alt+S`/`Ctrl+Shift+W`, `.edit-session/`, undo persistido (toggle + modal Apagar), higiene FS com timestamp, `NovoN`, restore sessão.
+- 2026-06-07 — **SPEC múltiplos arquivos (workspace)** — spec em `specs/to-do/SPEC-MULTPLOS-ARQUIVOS.md`: menu Abas (`Alt+S`), 10 abas, evicção final da fila, `Ctrl+Alt+S`/`Ctrl+Shift+W`, `.edit-session/`, undo persistido (toggle + modal Apagar), higiene FS, `NovoN`, restore sessão.
   - Docs: README v2.0, STATUS/TIMELINE v2.6
-  - Implementação: pendente
+  - Commit spec: `f67b362`
+- 2026-06-07 — **Implementação workspace fase 1** — menu Abas, até 10 abas, swap ativo, fila dirty global, `edit.json` v2, `.edit-session/`.
+  - Módulos: `src/workspace/{tab,workspace,mod}.rs`, `src/app_workspace.rs`, `src/session/store.rs`, `src/config.rs`, `src/app.rs`, `src/menus.rs`, `src/modal/`, `src/ui/layers/editor.rs`
+  - Testes: `workspace::workspace::tests::*`, `session::store::tests::*` — **74** total
+  - Pendente fase 2: barra de abas, `undo.json`/`redo.json`, reload FS externo
+  - Docs: README v2.1, STATUS/TIMELINE v2.7

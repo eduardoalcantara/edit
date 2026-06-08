@@ -2,7 +2,7 @@
 
 **Autor:** Perplexity AI  
 **Data:** 2026-06-07  
-**Versão:** 2.6
+**Versão:** 2.7
 
 ## Estado atual
 
@@ -83,12 +83,20 @@
   - Exibir → **Mostrar consumo de memória** (toggle, ativo por padrão); segmento `Mem NMB` no rodapé quando disponível.
 - Relatórios em `specs/report/` para as 4 fases de menu + migração ropey.
 - Specs de menu e arquitetura em `specs/done/`.
-- **70 testes** unitários passando (`cargo test`).
 - **PROJECT_RULES.md v2.0** — regras consolidadas (arquitetura, UI/UX, `edit.json`, compositor).
 - **README.md v2.0** — visão do produto, features e atalhos.
+- **Workspace / múltiplas abas — fase 1 (2026-06-07):**
+  - Módulos `src/workspace/` (`Tab`, `Workspace`, evicção, ordenação), `src/app_workspace.rs`, `src/session/` (`.edit-session/`).
+  - Menu **Abas** (`Alt+S`): lista dinâmica, Fechar Todos, toggles, Ordenar por.
+  - Até 10 abas; swap ativo via `mem::swap`; `Ctrl+Tab`, `Alt+1…0`, `Ctrl+Alt+S`, `Ctrl+Shift+W`.
+  - Fila global de modais dirty (Sair, Fechar, Fechar Todos, evicção).
+  - `edit.json` **v2** — `arquivo.abas` (sessão, toggles, cursor, fs snapshot).
+  - Restore sessão básico (paths + `content.tmp` para `NovoN`).
+  - **74 testes** unitários passando (`cargo test`).
+- **README.md v2.1** — workspace, menus Abas, atalhos e persistência v2.
 
 ### Em andamento
-- **Múltiplos arquivos / workspace:** `specs/to-do/SPEC-MULTPLOS-ARQUIVOS.md` — spec fechada para implementação (menu Abas, 10 abas, `.edit-session/`, undo persistido opcional, higiene FS). **Código ainda não iniciado.**
+- **Múltiplos arquivos — fase 2:** barra de abas visual; serialização `undo.json`/`redo.json`; modal recarregar arquivo alterado externamente.
 - **Fidelidade Turbo Vision:** `specs/to-do/SPEC-UX-FIDELIDADE-TURBO-VISION.md` (TV1–TV3 paleta/rodapé; TV7 file picker pendente).
 - Resolução das demais limitações em `specs/to-do/SPEC-LIMITACOES-PENDENTES.md`.
 

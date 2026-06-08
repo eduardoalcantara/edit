@@ -12,7 +12,7 @@ use crate::theme::ThemeId;
 use crate::view_state::{EditorBorder, EditorMargin, GuideColumn};
 
 const CONFIG_FILE: &str = "edit.json";
-const CONFIG_VERSION: u32 = 1;
+const CONFIG_VERSION: u32 = 2;
 const MAX_RECENT: usize = 10;
 
 const LEGACY_APP_DIR: &str = ".editor-linux";
@@ -32,6 +32,73 @@ pub struct EditConfig {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ArquivoConfig {
     pub recentes: Vec<String>,
+    #[serde(default)]
+    pub abas: AbasConfig,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AbasConfig {
+    #[serde(default)]
+    pub fechar_tudo_ao_sair: bool,
+    #[serde(default = "default_true")]
+    pub salvar_desfazer_recentes: bool,
+    #[serde(default)]
+    pub indice_ativo: usize,
+    #[serde(default = "default_tab_limit")]
+    pub limite: usize,
+    #[serde(default)]
+    pub sessao: Vec<SessaoTabEntry>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SessaoTabEntry {
+    pub tab_id: String,
+    #[serde(default)]
+    pub caminho: Option<String>,
+    #[serde(default)]
+    pub nome_virtual: Option<String>,
+    #[serde(default)]
+    pub temporario: bool,
+    #[serde(default)]
+    pub cursor_linha: usize,
+    #[serde(default)]
+    pub cursor_coluna: usize,
+    #[serde(default = "default_encoding_str")]
+    pub encoding: String,
+    #[serde(default = "default_tabulation_str")]
+    pub tabulacao: String,
+    #[serde(default)]
+    pub fs_mtime_ms: Option<u64>,
+    #[serde(default)]
+    pub fs_len: Option<u64>,
+}
+
+fn default_true() -> bool {
+    true
+}
+
+fn default_tab_limit() -> usize {
+    10
+}
+
+fn default_encoding_str() -> String {
+    "utf-8".to_string()
+}
+
+fn default_tabulation_str() -> String {
+    "4".to_string()
+}
+
+impl Default for AbasConfig {
+    fn default() -> Self {
+        Self {
+            fechar_tudo_ao_sair: false,
+            salvar_desfazer_recentes: true,
+            indice_ativo: 0,
+            limite: 10,
+            sessao: Vec::new(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -86,6 +153,7 @@ pub fn config_from_view(
     view: &crate::view_state::ViewState,
     encoding: FileEncoding,
     tabulation: Tabulation,
+    abas: AbasConfig,
 ) -> EditConfig {
     EditConfig {
         version: CONFIG_VERSION,
@@ -94,6 +162,7 @@ pub fn config_from_view(
                 .iter()
                 .map(|path| path.display().to_string())
                 .collect(),
+            abas,
         },
         exibir: ExibirConfig {
             zoom: view.zoom,
@@ -126,6 +195,7 @@ impl Default for EditConfig {
             version: CONFIG_VERSION,
             arquivo: ArquivoConfig {
                 recentes: Vec::new(),
+                abas: AbasConfig::default(),
             },
             exibir: ExibirConfig {
                 zoom: 1,
@@ -221,6 +291,7 @@ impl EditConfig {
     fn normalize(&mut self) {
         self.version = CONFIG_VERSION;
         self.arquivo.recentes.truncate(MAX_RECENT);
+        self.arquivo.abas.limite = self.arquivo.abas.limite.clamp(1, 10);
         self.exibir.zoom = self.exibir.zoom.clamp(1, 3);
     }
 }
@@ -377,6 +448,14 @@ fn parse_margin(value: &str) -> EditorMargin {
         "duas_linhas" | "duas linhas" => EditorMargin::TwoLines,
         _ => EditorMargin::None,
     }
+}
+
+pub fn encoding_to_config_str(encoding: FileEncoding) -> String {
+    encoding_to_str(encoding).to_string()
+}
+
+pub fn tabulation_to_config_str(tabulation: Tabulation) -> String {
+    tabulation_to_str(tabulation).to_string()
 }
 
 fn encoding_to_str(encoding: FileEncoding) -> &'static str {

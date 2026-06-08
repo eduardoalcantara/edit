@@ -2,7 +2,7 @@
 
 **Autor:** Perplexity AI  
 **Data:** 2026-06-07  
-**Versão:** 2.0
+**Versão:** 2.1
 
 Editor TUI para Linux/Windows com menus estilo **Turbo Vision**, núcleo **ropey**, UX previsível e proteção contra perda de trabalho.
 
@@ -26,14 +26,32 @@ cargo run
 - Buffer de texto **ropey** (`src/editor/`) — Insert/Replace, Enter, seleção linear (Shift+setas, mouse, Ctrl+A).
 - **Smart Word Navigation:** `Ctrl+←/→`, `Ctrl+Shift+←/→` (camelCase, separadores, dígitos).
 - Tabulação literal e por espaços (2/4/8); expansão visual de `\t`; conversão De/Para no modal.
-- Undo/redo por documento (pilha no engine).
+- Undo/redo **por aba** (pilha isolada no engine de cada aba).
 - Multi-cursor (Ctrl+clique) e seleção em bloco (Alt+arraste) — parcial.
 
-### Menus (Alt+A / E / X / F)
+### Workspace / múltiplas abas (fase 1)
+
+- Até **10 abas** abertas simultaneamente; troca via menu **Abas** (`Alt+S`), atalhos ou lista dinâmica.
+- **Recentes (Arquivo):** arquivos **fechados** (até 10). **Menu Abas:** arquivos **abertos**.
+- Documentos sem título: `Novo`, `Novo1`, `Novo2`…
+- `Ctrl+N`: noop se aba ativa pristine; senão foca `NovoN` pristine existente; senão cria nova no topo.
+- `Ctrl+W`: fecha aba ativa; última aba → uma aba pristine `Novo`.
+- `Ctrl+Shift+W`: Fechar Todos (fila de confirmação por aba dirty).
+- `Ctrl+Alt+S`: Salvar Todos; `Ctrl+Shift+S`: Salvar Como (aba ativa).
+- `Ctrl+Tab` / `Ctrl+Shift+Tab`: próxima/anterior aba (circular).
+- `Alt+1` … `Alt+0`: foco direto na posição 1–10 do menu Abas.
+- 11ª aba: evicção da aba no **final da fila** (modal se dirty).
+- Toggles Abas: **Fechar tudo ao sair**, **Salvar desfazer recentes** (modal ao desligar se houver undo no disco).
+- Submenu **Ordenar por** (nome, caminho, abertos primeiro/último, status).
+- Sessão em **`.edit-session/`** ao lado do executável (`content.tmp`, higiene por `tab_id`).
+- **`edit.json` v2** — seção `arquivo.abas` (toggles, ordem, metadados, cursor).
+
+### Menus (Alt+A / S / E / X / F)
 
 | Menu | Destaques |
 |------|-------------|
-| **Arquivo** | Novo, Abrir, **Recentes** (10 fechados), Salvar, Salvar Como, Fechar, Sair |
+| **Arquivo** | Novo, Abrir, **Recentes** (10 fechados), Salvar, Salvar Como, **Salvar Todos**, Fechar, Sair |
+| **Abas** | Lista dinâmica (até 10, radio na ativa), Fechar Todos, toggles sessão, Ordenar por |
 | **Editar** | Recortar/Copiar/Colar, clipboard 5 itens, Buscar/Substituir (modal), Selecionar tudo |
 | **Exibir** | Temas (Escuro, Claro, Azul Clássico, Matrix), zoom, word wrap, mostrar símbolos/espaços/tabs/EOL, colunas, margem, borda, painel, terminal, rodapé, **memória** |
 | **Formatar** | Codificação (UTF-8, ANSI, UTF-16…), tabulação, converter tabulação |
@@ -41,21 +59,27 @@ cargo run
 ### Interface
 
 - Compositor de camadas (`src/ui/`): menu dropdown opaco, modais `Dialog`, rodapé contextual.
-- Título do editor na borda: `[ nome ]` (asterisco se dirty).
+- Título do editor na borda: `[ nome ]` ou `[ Novo2* ]` (asterisco se dirty).
 - Rodapé: help do menu à esquerda; à direita `Tam XXX/YYY | Pos XX/YY | modo | encoding | tab | Mem NMB`.
-- Modais com mouse/hover; sair com **[Salvar] [Não Salvar] [Cancelar]**; `Ctrl+Q` / `Alt+F4` global.
+- Modais com mouse/hover; sair/fechar com **[Salvar] [Não Salvar] [Cancelar]**; `Ctrl+Q` / `Alt+F4` global.
 
 ### Persistência
 
-- **`edit.json`** ao lado do executável — seções `arquivo`, `exibir`, `formatar` (recentes, toggles, tema, formatação padrão).
+- **`edit.json`** ao lado do executável — `arquivo` (recentes + **abas**), `exibir`, `formatar`.
 - Migração automática de `.edit/recent.json` legado.
+- **`.edit-session/`** — conteúdo temporário de abas `NovoN`; purge ao fechar aba.
 
 ### Atalhos principais
 
 | Atalho | Ação |
 |--------|------|
-| `Ctrl+N/O/S/W` | Novo / Abrir / Salvar / Fechar |
+| `Ctrl+N/O/S/W` | Novo / Abrir / Salvar / Fechar aba |
 | `Ctrl+Shift+S` | Salvar Como |
+| `Ctrl+Alt+S` | Salvar Todos |
+| `Ctrl+Shift+W` | Fechar Todos |
+| `Ctrl+Tab` / `Ctrl+Shift+Tab` | Próxima / anterior aba |
+| `Alt+1` … `Alt+0` | Foco aba 1–10 |
+| `Alt+S` | Menu Abas |
 | `Ctrl+F/H` | Buscar / Substituir |
 | `Ctrl+Q`, `Alt+F4` | Sair |
 | `F10` | Menu Arquivo |
@@ -66,9 +90,9 @@ Ver `PROJECT_RULES.md` para lista completa.
 
 | Pasta | Conteúdo |
 |-------|----------|
-| `src/` | Código — `editor/`, `ui/`, `modal/`, `config.rs`, `menus.rs`… |
+| `src/` | Código — `editor/`, `workspace/`, `session/`, `ui/`, `modal/`, `config.rs`, `menus.rs`… |
 | `specs/done/` | Especificações implementadas |
-| `specs/to-do/` | Pendências (ex.: múltiplos arquivos/abas) |
+| `specs/to-do/` | Pendências (fase 2 abas, limitações) |
 | `specs/report/` | Relatórios de implementação |
 | `docs/` | Requisitos mestre e docs auxiliares |
 
@@ -81,7 +105,9 @@ Ver `PROJECT_RULES.md` para lista completa.
 
 ## Próximo marco
 
-**Múltiplos arquivos / workspace** — [`specs/to-do/SPEC-MULTPLOS-ARQUIVOS.md`](specs/to-do/SPEC-MULTPLOS-ARQUIVOS.md): até 10 abas via menu **Abas** (`Alt+S`), sessão `.edit-session/`, undo persistido opcional.
+- **Barra de abas visual** (fase 2) — [`specs/to-do/SPEC-MULTPLOS-ARQUIVOS.md`](specs/to-do/SPEC-MULTPLOS-ARQUIVOS.md)
+- Serialização completa `undo.json`/`redo.json` entre sessões
+- Detecção de alteração externa ao focar aba
 
 ## Testes
 
@@ -89,4 +115,4 @@ Ver `PROJECT_RULES.md` para lista completa.
 cargo test
 ```
 
-~70 testes unitários.
+74 testes unitários.

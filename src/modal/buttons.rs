@@ -11,6 +11,24 @@ pub const OK_CANCEL: [DialogButton; 2] = [
     ),
 ];
 
+pub const PURGE_UNDO: [DialogButton; 3] = [
+    DialogButton::new(
+        "Apagar desfazer",
+        "Remove undo.json/redo.json salvos ao lado do executável",
+        DialogButtonAction::Primary,
+    ),
+    DialogButton::new(
+        "Manter no disco",
+        "Desliga persistência sem apagar arquivos existentes",
+        DialogButtonAction::Secondary,
+    ),
+    DialogButton::new(
+        "Cancelar",
+        "Mantém o toggle ligado",
+        DialogButtonAction::Cancel,
+    ),
+];
+
 pub const QUIT_UNSAVED: [DialogButton; 3] = [
     DialogButton::new(
         "Salvar",
@@ -28,6 +46,8 @@ pub const QUIT_UNSAVED: [DialogButton; 3] = [
         DialogButtonAction::Cancel,
     ),
 ];
+
+pub const TAB_UNSAVED: [DialogButton; 3] = QUIT_UNSAVED;
 
 pub const DISCARD_NEW: [DialogButton; 2] = [
     DialogButton::new(

@@ -8,10 +8,11 @@ pub use convert_tab::ConvertTabulationModal;
 pub use dialog::{Dialog, DialogButton, DialogButtonAction, DialogKeyResult};
 
 use crate::encoding::FileEncoding;
+use crate::workspace::PromptReason;
 
 use buttons::{
     CONVERT, DISCARD_CLOSE, DISCARD_NEW, DISCARD_OPEN, FIND, FIND_REPLACE, OVERWRITE,
-    PATH_OPEN, PATH_SAVE_AS, QUIT_UNSAVED, REINTERPRET,
+    PATH_OPEN, PATH_SAVE_AS, PURGE_UNDO, QUIT_UNSAVED, REINTERPRET, TAB_UNSAVED,
 };
 
 /// Intenção de domínio associada a um diálogo de confirmação.
@@ -24,6 +25,11 @@ pub enum ConfirmKind {
     OverwriteSave { path: PathBuf },
     ChangeEncoding { encoding: FileEncoding },
     ConvertEncoding { encoding: FileEncoding },
+    TabUnsaved {
+        tab_index: usize,
+        reason: PromptReason,
+    },
+    PurgeUndoOnToggle,
 }
 
 #[derive(Debug, Clone)]
@@ -85,6 +91,32 @@ impl Modal {
         Modal::Confirm {
             dialog: Dialog::message(title, message, buttons),
             kind,
+        }
+    }
+
+    pub fn tab_unsaved(
+        filename: &str,
+        tab_index: usize,
+        reason: PromptReason,
+    ) -> Self {
+        Modal::Confirm {
+            dialog: Dialog::message(
+                "Salvar alterações",
+                format!("Salvar alterações em {filename}?"),
+                &TAB_UNSAVED,
+            ),
+            kind: ConfirmKind::TabUnsaved { tab_index, reason },
+        }
+    }
+
+    pub fn purge_undo_toggle() -> Self {
+        Modal::Confirm {
+            dialog: Dialog::message(
+                "Desfazer",
+                "Apaga os passos de desfazer salvos ao lado do executável para liberar espaço.",
+                &PURGE_UNDO,
+            ),
+            kind: ConfirmKind::PurgeUndoOnToggle,
         }
     }
 
@@ -189,5 +221,7 @@ fn confirm_buttons(kind: &ConfirmKind) -> &'static [DialogButton] {
         ConfirmKind::OverwriteSave { .. } => &OVERWRITE,
         ConfirmKind::ChangeEncoding { .. } => &REINTERPRET,
         ConfirmKind::ConvertEncoding { .. } => &CONVERT,
+        ConfirmKind::TabUnsaved { .. } => &TAB_UNSAVED,
+        ConfirmKind::PurgeUndoOnToggle => &PURGE_UNDO,
     }
 }
