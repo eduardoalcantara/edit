@@ -7,8 +7,10 @@ use ratatui::widgets::Paragraph;
 use ratatui::Frame;
 
 use super::selection::TerminalSelection;
+use super::session::TerminalSession;
 
 use crate::theme::ThemePalette;
+use crate::view_state::TerminalColorScheme;
 use crate::widgets::panel::{self, PanelBorder};
 
 use super::workspace::{
@@ -21,42 +23,52 @@ pub fn paint_terminal_panel(
     shell: Rect,
     term_outer: Rect,
     panel: TerminalPanelLayout,
-    workspace: &TerminalWorkspace,
+    workspace: &mut TerminalWorkspace,
     palette: ThemePalette,
     active_index: usize,
+    show_cursor: bool,
+    output_scheme: TerminalColorScheme,
 ) {
     let border_style = Style::default()
         .fg(palette.border)
         .bg(palette.editor_bg);
-    let text_style = Style::default()
+    let chrome_style = Style::default()
         .fg(palette.editor_fg)
         .bg(palette.editor_bg);
+    let (output_text_style, output_sel_style) = output_scheme.output_styles(palette);
 
-    panel::fill_rect(frame, panel.outer, text_style);
+    panel::fill_rect(frame, panel.outer, chrome_style);
+    panel::fill_rect(frame, panel.output, output_text_style);
 
-    if let Some(session) = workspace.sessions.get(active_index) {
-        let h = panel.output.height as usize;
-        let indexed = session.scrollback.visible_tail_indexed(
-            h,
-            session.scroll_offset,
-            session.follow_tail,
-        );
-        let sel_style = Style::default()
-            .fg(palette.editor_bg)
-            .bg(palette.editor_fg)
-            .add_modifier(Modifier::BOLD);
-        let width = panel.output.width as usize;
-        for (row, (global_line, line)) in indexed.iter().enumerate() {
+    if let Some(session) = workspace.sessions.get_mut(active_index) {
+        session.tick_cursor_blink();
+        session.apply_scrollback_view();
+
+        let h = panel.output.height;
+        let width = panel.output.width;
+
+        for row in 0..h {
+            let line = session.row_text(row, width);
             paint_terminal_output_row(
                 frame,
                 panel.output,
-                row as u16,
-                line,
-                width,
-                text_style,
-                sel_style,
+                row,
+                &line,
+                width as usize,
+                output_text_style,
+                output_sel_style,
                 workspace.selection,
-                *global_line,
+                row as usize,
+            );
+        }
+
+        if show_cursor {
+            paint_terminal_cursor(
+                frame,
+                panel.output,
+                session,
+                output_text_style,
+                output_sel_style,
             );
         }
     } else {
@@ -65,7 +77,7 @@ pub fn paint_terminal_panel(
             panel.output,
             0,
             " Nenhuma sessão — clique [n] ",
-            text_style,
+            output_text_style,
         );
     }
 
@@ -75,7 +87,7 @@ pub fn paint_terminal_panel(
         workspace,
         active_index,
         palette,
-        text_style,
+        chrome_style,
         workspace.sidebar_hover,
     );
 
@@ -93,6 +105,39 @@ pub fn paint_terminal_panel(
     }
 
     paint_terminal_side_borders(frame, shell, term_outer, border_style);
+}
+
+fn paint_terminal_cursor(
+    frame: &mut Frame,
+    area: Rect,
+    session: &TerminalSession,
+    text_style: Style,
+    sel_style: Style,
+) {
+    let Some((row, col, blink_on)) = session.cursor_display() else {
+        return;
+    };
+    if !blink_on || row >= area.height || col >= area.width {
+        return;
+    }
+
+    let screen = session.vt.screen();
+    let ch = screen
+        .cell(row, col)
+        .and_then(|cell| cell.contents().chars().next())
+        .unwrap_or(' ');
+    let display = if ch.is_whitespace() { '▁' } else { ch };
+    let cursor_style = sel_style.add_modifier(Modifier::BOLD);
+
+    frame.render_widget(
+        Paragraph::new(Span::styled(display.to_string(), cursor_style)).style(text_style),
+        Rect {
+            x: area.x.saturating_add(col),
+            y: area.y.saturating_add(row),
+            width: 1,
+            height: 1,
+        },
+    );
 }
 
 /// Reforça `│` nas laterais da shell na faixa do terminal (z-order acima do fill).
@@ -189,7 +234,7 @@ fn paint_terminal_output_row(
     text_style: Style,
     sel_style: Style,
     selection: Option<TerminalSelection>,
-    global_line: usize,
+    screen_row: usize,
 ) {
     if area.width == 0 || row_index >= area.height {
         return;
@@ -199,7 +244,7 @@ fn paint_terminal_output_row(
         let mut spans = Vec::new();
         let mut col = 0usize;
         for ch in display.chars() {
-            let style = if sel.contains(global_line, col) {
+            let style = if sel.contains(screen_row, col) {
                 sel_style
             } else {
                 text_style
@@ -256,7 +301,39 @@ fn paint_sidebar_top_row(
         x = x.saturating_add(btn_w);
     }
 
-    if width >= 12 {
+    if width >= 15 {
+        let color_x = area.x.saturating_add((width.saturating_sub(6)) as u16);
+        let color_style = if hover == Some(SidebarClick::ToggleColorScheme) {
+            palette.button_style(true)
+        } else {
+            text_style
+        };
+        frame.render_widget(
+            Paragraph::new("[c]").style(color_style),
+            Rect {
+                x: color_x,
+                y,
+                width: 3,
+                height: 1,
+            },
+        );
+
+        let close_x = area.x.saturating_add((width.saturating_sub(3)) as u16);
+        let style = if hover == Some(SidebarClick::ClosePanel) {
+            palette.button_style(true)
+        } else {
+            text_style
+        };
+        frame.render_widget(
+            Paragraph::new("[f]").style(style),
+            Rect {
+                x: close_x,
+                y,
+                width: 3,
+                height: 1,
+            },
+        );
+    } else if width >= 12 {
         let close_x = area.x.saturating_add((width.saturating_sub(3)) as u16);
         let style = if hover == Some(SidebarClick::ClosePanel) {
             palette.button_style(true)
@@ -391,21 +468,29 @@ pub fn render_terminal_bottom_row(
     );
 }
 
+/// Linhas visíveis do output PTY (sem divisor superior nem base da moldura).
 pub const TERMINAL_PANEL_ROWS_MIN: u16 = 7;
 pub const TERMINAL_PANEL_ROWS_MAX: u16 = 11;
 pub const TERMINAL_PANEL_ROWS_DEFAULT: u16 = 9;
+
+/// Divisor `├─[ cmd ]` + linha inferior `└──────┴──────┘`.
+pub const TERMINAL_PANEL_FRAME_ROWS: u16 = 2;
 
 pub fn clamp_terminal_panel_rows(rows: u16) -> u16 {
     rows.clamp(TERMINAL_PANEL_ROWS_MIN, TERMINAL_PANEL_ROWS_MAX)
 }
 
-/// Linhas reservadas na base da shell quando o terminal está visível.
-pub fn terminal_reserved_rows(shell: Rect, panel_rows: u16) -> u16 {
-    terminal_panel_outer(shell, panel_rows).height
+pub fn terminal_panel_outer_height(content_rows: u16) -> u16 {
+    clamp_terminal_panel_rows(content_rows).saturating_add(TERMINAL_PANEL_FRAME_ROWS)
 }
 
-pub fn terminal_panel_outer(shell: Rect, panel_rows: u16) -> Rect {
-    let h = clamp_terminal_panel_rows(panel_rows).min(shell.height.saturating_sub(4));
+/// Linhas reservadas na base da shell quando o terminal está visível (conteúdo + moldura).
+pub fn terminal_reserved_rows(shell: Rect, content_rows: u16) -> u16 {
+    terminal_panel_outer(shell, content_rows).height
+}
+
+pub fn terminal_panel_outer(shell: Rect, content_rows: u16) -> Rect {
+    let h = terminal_panel_outer_height(content_rows).min(shell.height.saturating_sub(4));
     Rect {
         x: shell.x,
         y: shell.y.saturating_add(shell.height.saturating_sub(h)),
@@ -465,13 +550,23 @@ mod tests {
         assert_eq!(sidebar_click(area, 0, 0, 0), Some(SidebarClick::NewSession));
         assert_eq!(sidebar_click(area, 3, 0, 0), Some(SidebarClick::GrowPanel));
         assert_eq!(sidebar_click(area, 6, 0, 0), Some(SidebarClick::ShrinkPanel));
+        assert_eq!(
+            sidebar_click(area, 10, 0, 0),
+            Some(SidebarClick::ToggleColorScheme)
+        );
         assert_eq!(sidebar_click(area, 13, 0, 0), Some(SidebarClick::ClosePanel));
     }
 
     #[test]
-    fn output_rows_exclude_frame_lines() {
+    fn output_rows_match_content_setting() {
         let shell = Rect::new(0, 0, 80, 24);
-        let term_outer = terminal_panel_outer(shell, 9);
-        assert_eq!(terminal_output_rows(term_outer), 7);
+        for content in [7, 9, 11] {
+            let term_outer = terminal_panel_outer(shell, content);
+            assert_eq!(terminal_output_rows(term_outer), content);
+            assert_eq!(
+                term_outer.height,
+                content + TERMINAL_PANEL_FRAME_ROWS
+            );
+        }
     }
 }

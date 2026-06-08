@@ -39,14 +39,19 @@ impl UiLayer for TerminalLayer {
             .terminal_panel_rows
             .unwrap_or(crate::terminal::TERMINAL_PANEL_ROWS_DEFAULT);
         let term_outer = terminal_panel_outer(layout.shell, rows);
+        let active = app.terminal.active;
+        let show_cursor = app.input_focus == InputFocus::Terminal;
+        let output_scheme = app.view.terminal_color_scheme;
         paint_terminal_panel(
             frame,
             layout.shell,
             term_outer,
             panel,
-            &app.terminal,
+            &mut app.terminal,
             palette,
-            app.terminal.active,
+            active,
+            show_cursor,
+            output_scheme,
         );
     }
 
@@ -255,6 +260,9 @@ fn handle_sidebar_action(
         SidebarClick::ClosePanel => {
             app.toggle_terminal_panel();
             app.set_status("Terminal: oculto");
+        }
+        SidebarClick::ToggleColorScheme => {
+            app.toggle_terminal_color_scheme();
         }
     }
 }

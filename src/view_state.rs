@@ -1,4 +1,7 @@
 use crate::theme::ThemeId;
+use ratatui::style::{Color, Modifier, Style};
+
+use crate::theme::ThemePalette;
 
 /// Onde o teclado principal é entregue (editor de texto vs painel terminal).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -81,6 +84,67 @@ impl GuideColumn {
     }
 }
 
+/// Cores do output PTY (área dentro da moldura, sem bordas/divisor).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum TerminalColorScheme {
+    #[default]
+    Theme,
+    Classic,
+}
+
+impl TerminalColorScheme {
+    pub fn toggle(self) -> Self {
+        match self {
+            Self::Theme => Self::Classic,
+            Self::Classic => Self::Theme,
+        }
+    }
+
+    pub fn config_key(self) -> &'static str {
+        match self {
+            Self::Theme => "tema",
+            Self::Classic => "classico",
+        }
+    }
+
+    pub fn status_label(self) -> &'static str {
+        match self {
+            Self::Theme => "cores do tema",
+            Self::Classic => "clássico (preto/cinza)",
+        }
+    }
+
+    pub fn output_styles(self, palette: ThemePalette) -> (Style, Style) {
+        match self {
+            Self::Theme => {
+                let text = Style::default()
+                    .fg(palette.editor_fg)
+                    .bg(palette.editor_bg);
+                let sel = Style::default()
+                    .fg(palette.editor_bg)
+                    .bg(palette.editor_fg)
+                    .add_modifier(Modifier::BOLD);
+                (text, sel)
+            }
+            Self::Classic => {
+                let text = Style::default().fg(Color::from_u32(0x00c0c0c0)).bg(Color::Black);
+                let sel = Style::default()
+                    .fg(Color::Black)
+                    .bg(Color::from_u32(0x00c0c0c0))
+                    .add_modifier(Modifier::BOLD);
+                (text, sel)
+            }
+        }
+    }
+}
+
+pub fn parse_terminal_color_scheme(raw: &str) -> TerminalColorScheme {
+    match raw.trim().to_lowercase().as_str() {
+        "classico" | "classic" | "preto" => TerminalColorScheme::Classic,
+        _ => TerminalColorScheme::Theme,
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ViewState {
     pub zoom: u8,
@@ -91,8 +155,10 @@ pub struct ViewState {
     pub show_eol: bool,
     pub side_panel: bool,
     pub terminal: bool,
-    /// Altura do painel terminal em linhas (7–11); persistido em `edit.json`.
+    /// Altura do painel terminal em linhas de conteúdo (7–11); persistido em `edit.json`.
     pub terminal_panel_rows: u16,
+    /// Cores do output PTY (`tema` ou `classico` em `edit.json`).
+    pub terminal_color_scheme: TerminalColorScheme,
     pub footer_visible: bool,
     pub show_memory: bool,
     pub guide_column: GuideColumn,
@@ -113,6 +179,7 @@ impl Default for ViewState {
             side_panel: false,
             terminal: false,
             terminal_panel_rows: crate::terminal::TERMINAL_PANEL_ROWS_DEFAULT,
+            terminal_color_scheme: TerminalColorScheme::default(),
             footer_visible: true,
             show_memory: true,
             guide_column: GuideColumn::Unlimited,

@@ -6,7 +6,7 @@ use ratatui::layout::Rect;
 
 use crate::clipboard::Clipboard;
 
-use super::selection::{extract_selection, TerminalSelection};
+use super::selection::TerminalSelection;
 use super::session::{shell_label_for_spawn, TerminalSession};
 
 pub const MAX_SESSIONS: usize = 10;
@@ -21,6 +21,7 @@ pub enum SidebarClick {
     FocusSession(usize),
     CloseSession(usize),
     ClosePanel,
+    ToggleColorScheme,
 }
 
 pub struct TerminalWorkspace {
@@ -164,7 +165,7 @@ impl TerminalWorkspace {
         let Some(session) = self.sessions.get(self.active) else {
             return false;
         };
-        let text = extract_selection(&session.scrollback, sel);
+        let text = session.extract_selection(sel);
         if text.is_empty() {
             return false;
         }
@@ -285,6 +286,7 @@ pub fn sidebar_button_help(action: SidebarClick) -> &'static str {
         SidebarClick::GrowPanel => "Aumentar altura do painel",
         SidebarClick::ShrinkPanel => "Diminuir altura do painel",
         SidebarClick::ClosePanel => "Fechar painel de terminal",
+        SidebarClick::ToggleColorScheme => "Alternar cores do output (tema / clássico)",
         SidebarClick::FocusSession(_) => "Selecionar sessão de terminal",
         SidebarClick::CloseSession(_) => "Fechar sessão de terminal",
     }
@@ -313,6 +315,12 @@ pub fn sidebar_click(
     if rel_y == 0 {
         if w >= 3 && rel_x as usize >= w.saturating_sub(3) {
             return Some(SidebarClick::ClosePanel);
+        }
+        if w >= 6
+            && (rel_x as usize) >= w.saturating_sub(6)
+            && (rel_x as usize) < w.saturating_sub(3)
+        {
+            return Some(SidebarClick::ToggleColorScheme);
         }
         if rel_x < 3 {
             return Some(SidebarClick::NewSession);
@@ -356,6 +364,15 @@ mod sidebar_tests {
         let area = Rect::new(0, 0, 16, 6);
         assert_eq!(sidebar_click(area, 3, 0, 0), Some(SidebarClick::GrowPanel));
         assert_eq!(sidebar_click(area, 6, 0, 0), Some(SidebarClick::ShrinkPanel));
+    }
+
+    #[test]
+    fn sidebar_click_toggle_colors_on_c_button() {
+        let area = Rect::new(0, 0, 16, 6);
+        assert_eq!(
+            sidebar_click(area, 10, 0, 0),
+            Some(SidebarClick::ToggleColorScheme)
+        );
     }
 
     #[test]

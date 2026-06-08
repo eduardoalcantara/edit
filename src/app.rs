@@ -79,6 +79,7 @@ impl App {
             side_panel: view_snapshot.side_panel,
             terminal: view_snapshot.terminal,
             terminal_panel_rows: view_snapshot.terminal_panel_rows,
+            terminal_color_scheme: view_snapshot.terminal_color_scheme,
             footer_visible: view_snapshot.footer_visible,
             show_memory: view_snapshot.show_memory,
             guide_column: view_snapshot.guide_column,
@@ -355,6 +356,15 @@ impl App {
         self.set_status(format!(
             "Terminal: {} linhas",
             self.view.terminal_panel_rows
+        ));
+    }
+
+    pub fn toggle_terminal_color_scheme(&mut self) {
+        self.view.terminal_color_scheme = self.view.terminal_color_scheme.toggle();
+        self.persist_user_config();
+        self.set_status(format!(
+            "Terminal: {}",
+            self.view.terminal_color_scheme.status_label()
         ));
     }
 

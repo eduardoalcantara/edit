@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::encoding::{FileEncoding, Tabulation};
 use crate::theme::ThemeId;
-use crate::view_state::{EditorBorder, EditorMargin, GuideColumn};
+use crate::view_state::{EditorBorder, EditorMargin, GuideColumn, TerminalColorScheme, parse_terminal_color_scheme};
 
 const CONFIG_FILE: &str = "edit.json";
 const WORKSPACE_CONFIG_FILE: &str = ".edit.workspace";
@@ -96,6 +96,10 @@ fn default_terminal_altura() -> u16 {
     crate::terminal::TERMINAL_PANEL_ROWS_DEFAULT
 }
 
+fn default_terminal_fundo() -> String {
+    "tema".to_string()
+}
+
 impl Default for AbasConfig {
     fn default() -> Self {
         Self {
@@ -117,6 +121,8 @@ pub struct ExibirConfig {
     pub terminal: bool,
     #[serde(default = "default_terminal_altura")]
     pub terminal_altura: u16,
+    #[serde(default = "default_terminal_fundo")]
+    pub terminal_fundo: String,
     pub rodape: bool,
     pub memoria: bool,
     pub tema: String,
@@ -150,6 +156,7 @@ pub struct ViewSettingsSnapshot {
     pub side_panel: bool,
     pub terminal: bool,
     pub terminal_panel_rows: u16,
+    pub terminal_color_scheme: TerminalColorScheme,
     pub footer_visible: bool,
     pub show_memory: bool,
     pub guide_column: GuideColumn,
@@ -186,6 +193,7 @@ pub fn config_from_view(
             painel_lateral: view.side_panel,
             terminal: view.terminal,
             terminal_altura: view.terminal_panel_rows,
+            terminal_fundo: view.terminal_color_scheme.config_key().to_string(),
             rodape: view.footer_visible,
             memoria: view.show_memory,
             tema: theme_to_str(view.theme).to_string(),
@@ -220,6 +228,7 @@ impl Default for EditConfig {
                 painel_lateral: false,
                 terminal: false,
                 terminal_altura: default_terminal_altura(),
+                terminal_fundo: default_terminal_fundo(),
                 rodape: true,
                 memoria: true,
                 tema: theme_to_str(ThemeId::ClassicBlue).to_string(),
@@ -286,6 +295,7 @@ impl EditConfig {
             terminal_panel_rows: crate::terminal::clamp_terminal_panel_rows(
                 self.exibir.terminal_altura,
             ),
+            terminal_color_scheme: parse_terminal_color_scheme(&self.exibir.terminal_fundo),
             footer_visible: self.exibir.rodape,
             show_memory: self.exibir.memoria,
             guide_column: parse_guide_column(&self.exibir.colunas),

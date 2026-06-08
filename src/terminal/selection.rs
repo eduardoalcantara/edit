@@ -1,9 +1,8 @@
-//! Seleção de texto no scrollback do terminal.
+//! Seleção de texto na tela do terminal (coordenadas VT100).
 
 use crossterm::event::MouseEvent;
 use ratatui::layout::Rect;
 
-use super::scrollback::Scrollback;
 use super::session::TerminalSession;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -52,7 +51,7 @@ impl TerminalSelection {
 }
 
 pub fn mouse_to_coord(
-    session: &TerminalSession,
+    _session: &TerminalSession,
     output: Rect,
     mouse: &MouseEvent,
 ) -> Option<TextCoord> {
@@ -68,40 +67,11 @@ pub fn mouse_to_coord(
     }
     let rel_row = mouse.row.saturating_sub(output.y) as usize;
     let rel_col = mouse.column.saturating_sub(output.x) as usize;
-    let h = output.height as usize;
-    let indexed = session.scrollback.visible_tail_indexed(
-        h,
-        session.scroll_offset,
-        session.follow_tail,
-    );
-    let (global_line, line_text) = indexed.get(rel_row)?;
-    let col = rel_col.min(line_text.chars().count());
-    Some(TextCoord {
-        line: *global_line,
-        col,
-    })
-}
-
-pub fn extract_selection(scrollback: &Scrollback, selection: TerminalSelection) -> String {
-    let (a, b) = selection.normalized();
-    let logical = scrollback.logical_lines();
-    let mut out = String::new();
-
-    for line_idx in a.line..=b.line {
-        let Some(text) = logical.get(line_idx) else {
-            continue;
-        };
-        let char_len = text.chars().count();
-        let from = if line_idx == a.line { a.col } else { 0 };
-        let to = if line_idx == b.line {
-            b.col.min(char_len)
-        } else {
-            char_len
-        };
-        if line_idx > a.line {
-            out.push('\n');
-        }
-        out.extend(text.chars().skip(from).take(to.saturating_sub(from)));
+    if rel_row >= output.height as usize {
+        return None;
     }
-    out
+    Some(TextCoord {
+        line: rel_row,
+        col: rel_col,
+    })
 }

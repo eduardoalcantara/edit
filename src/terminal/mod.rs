@@ -1,6 +1,5 @@
 mod input;
 mod render;
-mod scrollback;
 mod selection;
 mod session;
 mod workspace;
