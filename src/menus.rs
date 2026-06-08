@@ -222,6 +222,13 @@ pub fn focused_help(bar: &MenuBar, state: &MenuState) -> Option<&'static str> {
     }
 }
 
+fn tab_menu_shortcut(index: usize) -> Option<&'static str> {
+    const SHORTCUTS: [&str; 10] = [
+        "Alt+1", "Alt+2", "Alt+3", "Alt+4", "Alt+5", "Alt+6", "Alt+7", "Alt+8", "Alt+9", "Alt+0",
+    ];
+    SHORTCUTS.get(index).copied()
+}
+
 fn tabs_menu(workspace: &Workspace) -> Vec<MenuNode> {
     let mut nodes: Vec<MenuNode> = workspace
         .tabs
@@ -230,15 +237,11 @@ fn tabs_menu(workspace: &Workspace) -> Vec<MenuNode> {
         .map(|(i, tab)| {
             item(
                 format!(" {}", tab.menu_label()),
-                None,
+                tab_menu_shortcut(i),
                 ActionId::FocusTab(i),
                 true,
                 Some(i == workspace.active_index),
-                if i < 9 {
-                    "Foca esta aba (Alt+1…Alt+0)"
-                } else {
-                    "Foca esta aba aberta"
-                },
+                "Foca esta aba aberta",
             )
         })
         .collect();
@@ -1342,13 +1345,7 @@ enum MenuRightSlot {
 
 fn item_right_slot(node: &MenuNode) -> Option<MenuRightSlot> {
     match node {
-        MenuNode::Item { shortcut, checked, .. } => {
-            if checked.is_some() {
-                None
-            } else {
-                shortcut.map(|s| MenuRightSlot::Shortcut(s.to_string()))
-            }
-        }
+        MenuNode::Item { shortcut, .. } => shortcut.map(|s| MenuRightSlot::Shortcut(s.to_string())),
         MenuNode::SubMenu { .. } => Some(MenuRightSlot::SubmenuArrow),
         MenuNode::Separator => None,
     }
