@@ -147,13 +147,11 @@ pub fn parse_terminal_color_scheme(raw: &str) -> TerminalColorScheme {
 
 #[derive(Debug, Clone)]
 pub struct ViewState {
-    pub zoom: u8,
     pub word_wrap: bool,
     pub show_symbols: bool,
     pub show_spaces: bool,
     pub show_tabs: bool,
     pub show_eol: bool,
-    pub side_panel: bool,
     pub terminal: bool,
     /// Altura do painel terminal em linhas de conteúdo (7–11); persistido em `edit.json`.
     pub terminal_panel_rows: u16,
@@ -161,6 +159,7 @@ pub struct ViewState {
     pub terminal_color_scheme: TerminalColorScheme,
     pub footer_visible: bool,
     pub show_memory: bool,
+    pub show_line_numbers: bool,
     pub guide_column: GuideColumn,
     pub margin: EditorMargin,
     pub border: EditorBorder,
@@ -170,18 +169,17 @@ pub struct ViewState {
 impl Default for ViewState {
     fn default() -> Self {
         Self {
-            zoom: 1,
             word_wrap: false,
             show_symbols: false,
             show_spaces: false,
             show_tabs: false,
             show_eol: false,
-            side_panel: false,
             terminal: false,
             terminal_panel_rows: crate::terminal::TERMINAL_PANEL_ROWS_DEFAULT,
             terminal_color_scheme: TerminalColorScheme::default(),
             footer_visible: true,
             show_memory: true,
+            show_line_numbers: false,
             guide_column: GuideColumn::Unlimited,
             margin: EditorMargin::None,
             border: EditorBorder::Visible,
@@ -201,9 +199,8 @@ impl ViewState {
     pub fn status_flags(&self) -> String {
         let wrap = if self.word_wrap { "on" } else { "off" };
         format!(
-            "Wrap:{wrap} Col:{} Zoom:{}",
+            "Wrap:{wrap} Col:{}",
             self.guide_column.label(),
-            self.zoom
         )
     }
 }

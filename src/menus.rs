@@ -38,13 +38,10 @@ pub enum ActionId {
     ThemeLight,
     ThemeClassicBlue,
     ThemeMatrix,
-    ToggleSidePanel,
     ToggleTerminal,
     ToggleFooter,
     ShowMemoryToggle,
-    ZoomIn,
-    ZoomOut,
-    ZoomReset,
+    LineNumbersToggle,
     WordWrapToggle,
     ShowSymbols,
     ShowSpaces,
@@ -535,23 +532,44 @@ fn edit_menu(clip: &Clipboard) -> Vec<MenuNode> {
 
 fn view_menu(view: &ViewState) -> Vec<MenuNode> {
     vec![
-        submenu(
-            "Zoom",
-            "Ajusta o tamanho da fonte exibida no editor",
-            vec![
-                item("Zoom In", None, ActionId::ZoomIn, true, None, "Aumenta o zoom do editor"),
-                item("Zoom Out", None, ActionId::ZoomOut, true, None, "Diminui o zoom do editor"),
-                item("Reset Zoom", None, ActionId::ZoomReset, true, None, "Restaura o zoom padrão"),
-            ],
-        ),
         toggle_item(
-            "Word Wrap",
+            "Quebra de linha",
             ActionId::WordWrapToggle,
             view.word_wrap,
             "Alterna a quebra automática de linhas longas no editor",
         ),
+        toggle_item(
+            "Terminal",
+            ActionId::ToggleTerminal,
+            view.terminal,
+            "Mostra ou oculta o terminal integrado (Ctrl+T / Ctrl+')",
+        ),
+        toggle_item(
+            "Rodapé",
+            ActionId::ToggleFooter,
+            view.footer_visible,
+            "Mostra ou oculta a barra de status na parte inferior",
+        ),
+        toggle_item(
+            "Consumo de memória",
+            ActionId::ShowMemoryToggle,
+            view.show_memory,
+            "Exibe o consumo total de memória do aplicativo no rodapé",
+        ),
+        toggle_item(
+            "Números de linha",
+            ActionId::LineNumbersToggle,
+            view.show_line_numbers,
+            "Exibe a numeração de linhas à esquerda do texto no editor",
+        ),
+        toggle_item(
+            "Borda visível",
+            ActionId::BorderToggle,
+            view.border == EditorBorder::Visible,
+            "Alterna a borda externa do editor (┌ ─ ┐ / apenas título no topo)",
+        ),
         submenu(
-            "Mostrar",
+            "Texto",
             "Exibe ou oculta caracteres invisíveis no editor",
             vec![
                 toggle_item(
@@ -587,30 +605,6 @@ fn view_menu(view: &ViewState) -> Vec<MenuNode> {
                     "Alterna a exibição de todos os caracteres invisíveis",
                 ),
             ],
-        ),
-        toggle_item(
-            "Painel lateral",
-            ActionId::ToggleSidePanel,
-            view.side_panel,
-            "Mostra ou oculta o painel lateral do editor",
-        ),
-        toggle_item(
-            "Terminal",
-            ActionId::ToggleTerminal,
-            view.terminal,
-            "Mostra ou oculta o terminal integrado (Ctrl+T / Ctrl+')",
-        ),
-        toggle_item(
-            "Rodapé",
-            ActionId::ToggleFooter,
-            view.footer_visible,
-            "Mostra ou oculta a barra de status na parte inferior",
-        ),
-        toggle_item(
-            "Mostrar consumo de memória",
-            ActionId::ShowMemoryToggle,
-            view.show_memory,
-            "Exibe o consumo total de memória do aplicativo no rodapé",
         ),
         submenu(
             "Temas",
@@ -671,12 +665,6 @@ fn view_menu(view: &ViewState) -> Vec<MenuNode> {
                     "Remove o limite de colunas por linha",
                 ),
             ],
-        ),
-        toggle_item(
-            "Borda visível",
-            ActionId::BorderToggle,
-            view.border == EditorBorder::Visible,
-            "Alterna a borda externa do editor (┌ ─ ┐ / apenas título no topo)",
         ),
         submenu(
             "Margem",

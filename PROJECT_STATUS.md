@@ -2,7 +2,7 @@
 
 **Autor:** Perplexity AI  
 **Data:** 2026-06-08  
-**Versão:** 3.0
+**Versão:** 3.2
 
 ## Estado atual
 
@@ -64,7 +64,7 @@
   - Migração automática de `.edit/recent.json` e `.editor-linux/recent.json` na primeira execução.
 - **Configuração persistente `edit.json` (2026-06-07):**
   - Arquivo **`edit.json`** na mesma pasta de `edit` / `edit.exe`; estrutura espelha os menus **Arquivo**, **Exibir** e **Formatar**.
-  - **Arquivo → recentes**; toggles de Exibir (zoom, wrap, mostrar, painel, terminal, rodapé, memória, tema, colunas, borda, margem); codificação e tabulação padrão.
+  - **Arquivo → recentes**; toggles de Exibir (quebra de linha, terminal, rodapé, memória, números de linha, tema, colunas, borda, margem); submenu **Texto** (símbolos/espaços/tabs/EOL); codificação e tabulação padrão.
   - Gravação automática ao alterar opções, abrir/salvar arquivo e ao encerrar; `serde`/`serde_json`.
   - Módulo `src/config.rs`; `RecentFiles` deixa de gravar arquivo próprio.
 - **Smart Word Navigation (2026-06-07):**
@@ -77,10 +77,10 @@
   - Módulo `src/editor/tabs.rs`: expansão visual de `\t`, cursor e scroll por coluna visual; parada 8 para Tab literal.
   - Rodapé **Tam XXX/YYY**: XXX = soma do conteúdo completo das linhas visíveis verticalmente (sem `\n`); YYY = total no documento (com `\n`); não trava em ~153 em linhas longas.
   - Rodapé **Pos XX/YY**: linha e coluna do cursor (1-based), formato compacto (antes `Ln XX Col YY`).
-  - Exibir → Mostrar tabs: `»` onde há `\t` no texto.
+  - Exibir → **Texto** (antes Mostrar): símbolos, espaços, tabs, fim de linha.
 - **Consumo de memória no rodapé (2026-06-07):**
   - Módulo `src/memory.rs` com `sysinfo` (amostragem a cada 2s, leve).
-  - Exibir → **Mostrar consumo de memória** (toggle, ativo por padrão); segmento `Mem NMB` no rodapé quando disponível.
+  - Exibir → **Consumo de memória** (toggle, ativo por padrão); segmento `Mem NMB` no rodapé quando disponível.
 - Relatórios em `specs/report/` para as 4 fases de menu + migração ropey.
 - Specs de menu e arquitetura em `specs/done/`.
 - **PROJECT_RULES.md v2.0** — regras consolidadas (arquitetura, UI/UX, `edit.json`, compositor).
@@ -102,19 +102,27 @@
   - **74 testes** unitários passando (`cargo test`).
   - **README.md v2.2** — seção linha de comando.
 - **Terminal inferior integrado (2026-06-08):**
-  - Módulo `src/terminal/` — PTY (`portable-pty`), scrollback (strip ANSI/OSC), até 10 sessões.
-  - Moldura ASCII contínua com o editor; divisor `├─[ shell ]─┬─┤`; altura 7–11 linhas (`exibir.terminal_altura` em `edit.json`).
-  - Sidebar: `[n][+][-]…[f]` no topo; lista `*NN nome [q]`; hover estilo modal; help no rodapé à esquerda.
+  - Módulo `src/terminal/` — PTY (`portable-pty`), emulador **VT100**, até 10 sessões.
+  - Moldura ASCII contínua com o editor; divisor `├─[ shell ]─┬─┤`; altura 7–11 linhas de conteúdo (`exibir.terminal_altura` em `edit.json`).
+  - Sidebar: `[n][+][-]…[c][f]` no topo; lista `*NN nome [q]`; hover estilo modal; help no rodapé à esquerda; `[c]` alterna cores clássicas (`exibir.terminal_fundo`).
   - Spawn automático ao abrir painel; cwd do diretório do arquivo (sem `\\?\` no Windows).
   - Seleção de texto no output (arraste mouse); **Ctrl+C** copia para clipboard.
-  - `Ctrl+T` / `Ctrl+'` toggle; **F6** foco Editor ↔ Terminal; **Esc** devolve foco ao editor.
-  - PgUp/PgDn e roda do mouse rolam scrollback; `App::shutdown` mata PTYs.
+  - `Ctrl+T` / `Ctrl+'` toggle; **F6** foco Editor ↔ Terminal; **F7** envia seleção/linha ao PTY; **Esc** devolve foco ao editor.
+  - PgUp/PgDn e roda do mouse rolam histórico VT100; cursor piscante no output; `App::shutdown` mata PTYs.
   - Spec: `specs/done/SPEC-TERMINAL-INFERIOR.md`
 - **Correções terminal + workspace (2026-06-08):**
   - `sync_active_tab` passou a **copiar** editor→aba (`flush_editor_into_tab`), corrigindo README vazio ao fechar terminal/persistir.
   - Rodapé: grupo **Foco** à direita (`[Editor] Terminal Menu Diálogo`); esquerda só help contextual (não mais `Foco: EDITOR` isolado).
   - Scroll do editor com terminal aberto; filtro OSC `]0;`; persistência de cursor de aba sem drift +1.
   - Atalhos Shift+letra na sidebar **removidos** (inviáveis sem distinguir LShift/RShift).
+  - **120 testes** unitários passando (`cargo test`).
+- **Números de linha + menu Exibir reorganizado (2026-06-08):**
+  - Exibir → **Números de linha** (toggle; `exibir.numeros_linha` em `edit.json`).
+  - Coluna interna alinhada à direita (largura = última linha); cor fraca; linha do cursor em destaque.
+  - Espaço entre nº e texto: 1 / 2 / 4 conforme margem (sem / uma / duas linhas).
+  - Scroll vertical sincronizado; clique/seleção só no texto (gutter ignorado).
+  - Menu Exibir: checkboxes primeiro; submenus depois; **Texto** (ex-Mostrar); **Quebra de linha**; removidos Zoom e Painel lateral.
+  - Módulos: `src/editor/line_numbers.rs`, `src/editor/render.rs`, `src/menus.rs`, `src/config.rs`, `src/view_state.rs`
   - **120 testes** unitários passando (`cargo test`).
 
 ### Em andamento

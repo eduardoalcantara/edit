@@ -181,6 +181,14 @@ impl ThemePalette {
         Style::default().fg(self.accent).bg(self.footer_bg)
     }
 
+    pub fn line_number_style(self) -> Style {
+        Style::default().fg(self.border).bg(self.editor_bg)
+    }
+
+    pub fn line_number_active_style(self) -> Style {
+        self.editor_text_style()
+    }
+
     pub fn editor_text_style(self) -> Style {
         Style::default().fg(self.editor_fg).bg(self.editor_bg)
     }

@@ -37,7 +37,7 @@ Regras estáveis do projeto. Para estado de implementação, ver `PROJECT_STATUS
 - Help contextual do item de menu em foco aparece à **esquerda** do rodapé.
 - Estado à **direita** do rodapé, nesta ordem: `Editor | Aba XX/YY | Tam XXX/YYY | Pos XX/YY | modo | encoding | tab | Mem NMB` — o primeiro segmento é só o componente com foco (`Editor`, `Terminal`, `Menu` ou `Diálogo`); memória só se toggle ativo.
 - O tema deve ser sempre explícito e selecionável no menu Exibir → Temas.
-- Painel lateral (placeholder) e **terminal inferior integrado** (PTY real) devem poder ser alternados via menu Exibir ou `Ctrl+T` / `Ctrl+'`.
+- Painel lateral (placeholder) removido do menu; **terminal inferior integrado** (PTY real) via `Ctrl+T` / `Ctrl+'`.
 - A interface não deve esconder ações essenciais atrás de gestos obscuros.
 - Preservar legibilidade em terminais com suporte limitado; preferir UTF-8 onde o terminal suportar (`»`, `█`, `▀`, `√`).
 

@@ -70,18 +70,17 @@ impl App {
         let _tabulation = user_config.default_tabulation();
         let word_wrap = view_snapshot.word_wrap;
         let view = ViewState {
-            zoom: view_snapshot.zoom,
             word_wrap,
             show_symbols: view_snapshot.show_symbols,
             show_spaces: view_snapshot.show_spaces,
             show_tabs: view_snapshot.show_tabs,
             show_eol: view_snapshot.show_eol,
-            side_panel: view_snapshot.side_panel,
             terminal: view_snapshot.terminal,
             terminal_panel_rows: view_snapshot.terminal_panel_rows,
             terminal_color_scheme: view_snapshot.terminal_color_scheme,
             footer_visible: view_snapshot.footer_visible,
             show_memory: view_snapshot.show_memory,
+            show_line_numbers: view_snapshot.show_line_numbers,
             guide_column: view_snapshot.guide_column,
             margin: view_snapshot.margin,
             border: view_snapshot.border,
@@ -909,14 +908,6 @@ impl App {
                 self.apply_theme(ThemeId::Matrix);
                 self.set_status("Tema Matrix");
             }
-            ActionId::ToggleSidePanel => {
-                self.view.side_panel = !self.view.side_panel;
-                self.set_status(if self.view.side_panel {
-                    "Painel: visível (placeholder)"
-                } else {
-                    "Painel: oculto"
-                });
-            }
             ActionId::ToggleTerminal => self.toggle_terminal_panel(),
             ActionId::ToggleFooter => {
                 self.view.footer_visible = !self.view.footer_visible;
@@ -932,25 +923,21 @@ impl App {
                     "Consumo de memória: desativado"
                 });
             }
-            ActionId::ZoomIn => {
-                self.view.zoom = self.view.zoom.saturating_add(1).min(3);
-                self.set_status(format!("Zoom: {}", self.view.zoom));
-            }
-            ActionId::ZoomOut => {
-                self.view.zoom = self.view.zoom.saturating_sub(1).max(1);
-                self.set_status(format!("Zoom: {}", self.view.zoom));
-            }
-            ActionId::ZoomReset => {
-                self.view.zoom = 1;
-                self.set_status("Zoom: reset");
+            ActionId::LineNumbersToggle => {
+                self.view.show_line_numbers = !self.view.show_line_numbers;
+                self.set_status(if self.view.show_line_numbers {
+                    "Números de linha: ativados"
+                } else {
+                    "Números de linha: desativados"
+                });
             }
             ActionId::WordWrapToggle => {
                 self.view.word_wrap = !self.view.word_wrap;
                 self.editor.set_word_wrap(self.view.word_wrap);
                 self.set_status(if self.view.word_wrap {
-                    "Word wrap: on"
+                    "Quebra de linha: ativada"
                 } else {
-                    "Word wrap: off"
+                    "Quebra de linha: desativada"
                 });
             }
             ActionId::ShowSymbols => self.view.show_symbols = !self.view.show_symbols,
@@ -1080,13 +1067,10 @@ fn is_persistent_setting(action: ActionId) -> bool {
         action,
         ActionId::ToggleCloseAllOnExit
             | ActionId::TogglePersistUndo
-            | ActionId::ToggleSidePanel
             | ActionId::ToggleTerminal
             | ActionId::ToggleFooter
             | ActionId::ShowMemoryToggle
-            | ActionId::ZoomIn
-            | ActionId::ZoomOut
-            | ActionId::ZoomReset
+            | ActionId::LineNumbersToggle
             | ActionId::WordWrapToggle
             | ActionId::ShowSymbols
             | ActionId::ShowSpaces

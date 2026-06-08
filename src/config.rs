@@ -114,10 +114,8 @@ impl Default for AbasConfig {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ExibirConfig {
-    pub zoom: u8,
     pub word_wrap: bool,
     pub mostrar: MostrarConfig,
-    pub painel_lateral: bool,
     pub terminal: bool,
     #[serde(default = "default_terminal_altura")]
     pub terminal_altura: u16,
@@ -125,6 +123,8 @@ pub struct ExibirConfig {
     pub terminal_fundo: String,
     pub rodape: bool,
     pub memoria: bool,
+    #[serde(default)]
+    pub numeros_linha: bool,
     pub tema: String,
     pub colunas: String,
     pub borda: String,
@@ -147,18 +147,17 @@ pub struct FormatarConfig {
 
 #[derive(Debug, Clone, Copy)]
 pub struct ViewSettingsSnapshot {
-    pub zoom: u8,
     pub word_wrap: bool,
     pub show_symbols: bool,
     pub show_spaces: bool,
     pub show_tabs: bool,
     pub show_eol: bool,
-    pub side_panel: bool,
     pub terminal: bool,
     pub terminal_panel_rows: u16,
     pub terminal_color_scheme: TerminalColorScheme,
     pub footer_visible: bool,
     pub show_memory: bool,
+    pub show_line_numbers: bool,
     pub guide_column: GuideColumn,
     pub margin: EditorMargin,
     pub border: EditorBorder,
@@ -182,7 +181,6 @@ pub fn config_from_view(
             abas,
         },
         exibir: ExibirConfig {
-            zoom: view.zoom,
             word_wrap: view.word_wrap,
             mostrar: MostrarConfig {
                 simbolos: view.show_symbols,
@@ -190,12 +188,12 @@ pub fn config_from_view(
                 tabs: view.show_tabs,
                 fim_de_linha: view.show_eol,
             },
-            painel_lateral: view.side_panel,
             terminal: view.terminal,
             terminal_altura: view.terminal_panel_rows,
             terminal_fundo: view.terminal_color_scheme.config_key().to_string(),
             rodape: view.footer_visible,
             memoria: view.show_memory,
+            numeros_linha: view.show_line_numbers,
             tema: theme_to_str(view.theme).to_string(),
             colunas: guide_column_to_str(view.guide_column).to_string(),
             borda: border_to_str(view.border).to_string(),
@@ -217,7 +215,6 @@ impl Default for EditConfig {
                 abas: AbasConfig::default(),
             },
             exibir: ExibirConfig {
-                zoom: 1,
                 word_wrap: false,
                 mostrar: MostrarConfig {
                     simbolos: false,
@@ -225,12 +222,12 @@ impl Default for EditConfig {
                     tabs: false,
                     fim_de_linha: false,
                 },
-                painel_lateral: false,
                 terminal: false,
                 terminal_altura: default_terminal_altura(),
                 terminal_fundo: default_terminal_fundo(),
                 rodape: true,
                 memoria: true,
+                numeros_linha: false,
                 tema: theme_to_str(ThemeId::ClassicBlue).to_string(),
                 colunas: "ilimitado".to_string(),
                 borda: "visivel".to_string(),
@@ -284,13 +281,11 @@ impl EditConfig {
 
     pub fn view_settings(&self) -> ViewSettingsSnapshot {
         ViewSettingsSnapshot {
-            zoom: self.exibir.zoom.clamp(1, 3),
             word_wrap: self.exibir.word_wrap,
             show_symbols: self.exibir.mostrar.simbolos,
             show_spaces: self.exibir.mostrar.espacos,
             show_tabs: self.exibir.mostrar.tabs,
             show_eol: self.exibir.mostrar.fim_de_linha,
-            side_panel: self.exibir.painel_lateral,
             terminal: self.exibir.terminal,
             terminal_panel_rows: crate::terminal::clamp_terminal_panel_rows(
                 self.exibir.terminal_altura,
@@ -298,6 +293,7 @@ impl EditConfig {
             terminal_color_scheme: parse_terminal_color_scheme(&self.exibir.terminal_fundo),
             footer_visible: self.exibir.rodape,
             show_memory: self.exibir.memoria,
+            show_line_numbers: self.exibir.numeros_linha,
             guide_column: parse_guide_column(&self.exibir.colunas),
             margin: parse_margin(&self.exibir.margem),
             border: parse_border(&self.exibir.borda),
@@ -317,7 +313,6 @@ impl EditConfig {
         self.version = CONFIG_VERSION;
         self.arquivo.recentes.truncate(MAX_RECENT);
         self.arquivo.abas.limite = self.arquivo.abas.limite.clamp(1, 10);
-        self.exibir.zoom = self.exibir.zoom.clamp(1, 3);
         self.exibir.terminal_altura =
             crate::terminal::clamp_terminal_panel_rows(self.exibir.terminal_altura);
     }

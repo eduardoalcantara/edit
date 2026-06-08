@@ -2,7 +2,7 @@
 
 **Autor:** Perplexity AI  
 **Data:** 2026-06-08  
-**Versão:** 3.0
+**Versão:** 3.2
 
 ## Registro
 
@@ -123,3 +123,16 @@
   - Módulos: `src/ui/compositor.rs`, `src/ui/layers/footer.rs`
   - Testes: `footer_focus_group_*`, `footer_help_uses_status_message_without_layer_hint`
   - Docs: PROJECT_RULES/STATUS/TIMELINE **v3.0**; **120** testes (`cargo test`)
+- 2026-06-08 — **Terminal — rodapé compacto e prompt** — foco ativo como 1º segmento do rodapé direito; `[q]` só verde no hover; merge prompt/parcial no scrollback (pré-VT100).
+  - Commit: `2e28c96`
+  - Módulos: `src/ui/compositor.rs`, `src/terminal/{scrollback,render}.rs`
+- 2026-06-08 — **Terminal VT100 + cursor + altura + [c]** — emulador `vt100` (grade PTY real); remove `scrollback.rs`; cursor piscante; altura 7–11 = linhas úteis do output (+2 moldura); botão `[c]` alterna tema/clássico (`exibir.terminal_fundo` em `edit.json`).
+  - Commit: `812274f`
+  - Módulos: `src/terminal/{session,selection,render,workspace}.rs`, `src/view_state.rs`, `src/config.rs`, `Cargo.toml`
+  - Testes: **117** total (`cargo test`)
+- 2026-06-08 — **F7 editor → terminal** — envia seleção do editor (ou linha do cursor) ao PTY ativo; abre painel/sessão se necessário; foco no terminal.
+  - Commit: `abeb340`
+  - Módulos: `src/app.rs`, `src/editor/{engine,mod}.rs`, `src/ui/compositor.rs`, `PROJECT_RULES.md`
+- 2026-06-08 — **Números de linha + menu Exibir reorganizado** — coluna gutter no editor; toggle persistido (`exibir.numeros_linha`); menu: checkboxes primeiro, **Texto**, **Quebra de linha**, **Consumo de memória**; removidos Zoom e Painel lateral.
+  - Módulos: `src/editor/{line_numbers,render}.rs`, `src/menus.rs`, `src/config.rs`, `src/view_state.rs`, `src/input/mouse.rs`, `src/ui/layers/editor.rs`
+  - Testes: **120** total (`cargo test`); docs STATUS/TIMELINE **v3.2**

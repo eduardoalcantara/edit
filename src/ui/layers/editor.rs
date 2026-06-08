@@ -48,12 +48,19 @@ impl UiLayer for EditorLayer {
         );
         let (_, _, left_margin, _) = app.view.margin.insets();
         let left_inset = if border_visible { 1u16 } else { 0 };
+        let gutter_w = if app.view.show_line_numbers {
+            let line_count = app.editor.engine().text.len_lines().max(1);
+            crate::editor::line_numbers::layout(line_count, app.view.margin).total_width as u16
+        } else {
+            0
+        };
         let content = text_viewport;
         if let Some(col) = app.view.guide_column.column() {
             let guide_x = shell
                 .x
                 .saturating_add(left_inset)
                 .saturating_add(left_margin as u16)
+                .saturating_add(gutter_w)
                 .saturating_add(col as u16);
             if guide_x < shell.x.saturating_add(shell.width) {
                 frame.render_widget(
@@ -86,6 +93,7 @@ impl UiLayer for EditorLayer {
             Some(text_viewport),
             show_cursor,
             app.view.show_tabs,
+            app.view.show_line_numbers,
         );
 
         if let Some(div_y) = layout.terminal_divider_y {
@@ -214,8 +222,8 @@ impl UiLayer for EditorLayer {
         if !app.mouse_enabled {
             return InputResult::Unhandled;
         }
-        let inner = app.editor.inner_area();
-        if !mouse::is_in_editor(&mouse, inner) {
+        let content = app.editor.content_area();
+        if !mouse::is_in_editor(&mouse, content) {
             return InputResult::Unhandled;
         }
         mouse::handle_editor_mouse(app, mouse);

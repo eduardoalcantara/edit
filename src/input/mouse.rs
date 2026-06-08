@@ -37,30 +37,37 @@ pub fn viewport_to_doc(
 }
 
 pub fn handle_editor_mouse(app: &mut App, mouse: MouseEvent) {
-    let inner = app.editor.inner_area();
-    if !point_in_rect(&mouse, inner) {
+    let content = app.editor.content_area();
+    let text = app.editor.text_area();
+
+    if point_in_rect(&mouse, content) {
+        match mouse.kind {
+            MouseEventKind::ScrollUp => {
+                app.editor
+                    .execute(EditorCommand::ScrollWheel {
+                        delta: -MOUSE_WHEEL_LINES,
+                    });
+                return;
+            }
+            MouseEventKind::ScrollDown => {
+                app.editor
+                    .execute(EditorCommand::ScrollWheel {
+                        delta: MOUSE_WHEEL_LINES,
+                    });
+                return;
+            }
+            _ => {}
+        }
+    }
+
+    if !point_in_rect(&mouse, text) {
+        if point_in_rect(&mouse, content) {
+            app.input_focus = InputFocus::Editor;
+        }
         return;
     }
 
-    match mouse.kind {
-        MouseEventKind::ScrollUp => {
-            app.editor
-                .execute(EditorCommand::ScrollWheel {
-                    delta: -MOUSE_WHEEL_LINES,
-                });
-            return;
-        }
-        MouseEventKind::ScrollDown => {
-            app.editor
-                .execute(EditorCommand::ScrollWheel {
-                    delta: MOUSE_WHEEL_LINES,
-                });
-            return;
-        }
-        _ => {}
-    }
-
-    let Some((vp_line, vp_col)) = terminal_to_doc(&mouse, inner) else {
+    let Some((vp_line, vp_col)) = terminal_to_doc(&mouse, text) else {
         return;
     };
     let engine = app.editor.engine();
@@ -113,6 +120,6 @@ pub fn handle_editor_mouse(app: &mut App, mouse: MouseEvent) {
     }
 }
 
-pub fn is_in_editor(mouse: &MouseEvent, inner: Rect) -> bool {
-    point_in_rect(mouse, inner)
+pub fn is_in_editor(mouse: &MouseEvent, content: Rect) -> bool {
+    point_in_rect(mouse, content)
 }

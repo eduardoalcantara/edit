@@ -4,6 +4,7 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 use ratatui::Frame;
 
+use crate::editor::line_numbers;
 use crate::edit_mode::EditMode;
 use crate::editor::cursor::{char_idx_to_line_col, SelectionMode};
 use crate::editor::engine::EditorEngine;
@@ -57,7 +58,8 @@ pub fn draw(
     text_viewport: Option<Rect>,
     show_cursor: bool,
     show_tabs: bool,
-) -> Rect {
+    show_line_numbers: bool,
+) -> (Rect, Rect) {
     let border_style = Style::default()
         .fg(palette.border)
         .bg(palette.editor_bg);
@@ -78,25 +80,52 @@ pub fn draw(
     );
     let content = text_viewport.unwrap_or_else(|| text_area(inner, margin));
 
-    engine.viewport.update_size(content);
-    engine.ensure_visible();
+    let content = text_viewport.unwrap_or_else(|| text_area(inner, margin));
 
     panel::fill_rect(frame, inner, palette.editor_text_style());
 
+    let line_count = engine.text.len_lines().max(1);
+    let (cursor_line, _) = char_idx_to_line_col(&engine.text, engine.primary().char_idx);
+    let gutter_layout = if show_line_numbers {
+        Some(line_numbers::layout(line_count, margin))
+    } else {
+        None
+    };
+    let (gutter_area, text_rect) = if let Some(gutter) = gutter_layout {
+        line_numbers::split_text_area(content, gutter)
+    } else {
+        (Rect::default(), content)
+    };
+
+    if let Some(gutter) = gutter_layout {
+        line_numbers::paint_gutter(
+            frame,
+            gutter_area,
+            gutter,
+            engine.viewport.top_line,
+            content.height as usize,
+            line_count,
+            cursor_line,
+            palette,
+        );
+    }
+
+    engine.viewport.update_size(text_rect);
+    engine.ensure_visible();
+
     let top = engine.viewport.top_line;
     let left = engine.viewport.left_col;
-    let visible_h = content.height as usize;
-    let visible_w = content.width as usize;
-    let line_count = engine.text.len_lines().max(1);
+    let visible_h = text_rect.height as usize;
+    let visible_w = text_rect.width as usize;
 
     let text_style = palette.editor_text_style();
     let tab_width = tab_stop_width(engine.tabulation);
     for row in 0..visible_h {
         let doc_line = top + row;
         let line_area = Rect {
-            x: content.x,
-            y: content.y.saturating_add(row as u16),
-            width: content.width,
+            x: text_rect.x,
+            y: text_rect.y.saturating_add(row as u16),
+            width: text_rect.width,
             height: 1,
         };
         if doc_line >= line_count {
@@ -127,7 +156,7 @@ pub fn draw(
     draw_cursors(
         frame,
         engine,
-        content,
+        text_rect,
         top,
         left,
         tab_width,
@@ -135,7 +164,7 @@ pub fn draw(
         show_cursor,
     );
     engine.refresh_footer_size_stats(top, visible_h);
-    content
+    (text_rect, content)
 }
 
 fn styled_line(

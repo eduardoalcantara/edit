@@ -2,6 +2,7 @@ mod commands;
 mod cursor;
 mod engine;
 mod history;
+pub mod line_numbers;
 mod render;
 mod search;
 mod selection;
@@ -36,7 +37,10 @@ use crate::view_state::{EditorBorder, EditorMargin};
 
 pub struct Editor {
     engine: EditorEngine,
-    inner_area: Rect,
+    /// Área clicável do texto (sem a coluna de números).
+    text_area: Rect,
+    /// Área do conteúdo (gutter + texto) para rolagem com mouse.
+    content_area: Rect,
     select_drag_origin: Option<usize>,
 }
 
@@ -44,7 +48,8 @@ impl Editor {
     pub fn new(_palette: &ThemePalette) -> Self {
         Self {
             engine: EditorEngine::new(),
-            inner_area: Rect::default(),
+            text_area: Rect::default(),
+            content_area: Rect::default(),
             select_drag_origin: None,
         }
     }
@@ -57,8 +62,17 @@ impl Editor {
         &mut self.engine
     }
 
+    pub fn text_area(&self) -> Rect {
+        self.text_area
+    }
+
+    pub fn content_area(&self) -> Rect {
+        self.content_area
+    }
+
+    /// Compat: área de texto para hit-test de clique/seleção.
     pub fn inner_area(&self) -> Rect {
-        self.inner_area
+        self.text_area
     }
 
     pub fn apply_theme(&mut self, _palette: &ThemePalette) {}
@@ -142,8 +156,9 @@ impl Editor {
         text_viewport: Option<Rect>,
         show_cursor: bool,
         show_tabs: bool,
+        show_line_numbers: bool,
     ) {
-        self.inner_area = render::draw(
+        let (text_area, content_area) = render::draw(
             &mut self.engine,
             frame,
             area,
@@ -155,7 +170,10 @@ impl Editor {
             text_viewport,
             show_cursor,
             show_tabs,
+            show_line_numbers,
         );
+        self.text_area = text_area;
+        self.content_area = content_area;
     }
 
     pub fn viewport_to_doc(&self, vp_line: usize, vp_col: usize) -> (usize, usize) {
