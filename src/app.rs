@@ -805,9 +805,9 @@ impl App {
                 self.workspace.fechar_tudo_ao_sair = !self.workspace.fechar_tudo_ao_sair;
                 self.persist_user_config();
                 self.set_status(if self.workspace.fechar_tudo_ao_sair {
-                    "Fechar tudo ao sair: ligado"
+                    "Fechar tudo ao sair: ligado (não restaura abas)"
                 } else {
-                    "Fechar tudo ao sair: desligado"
+                    "Fechar tudo ao sair: desligado (mantém abas)"
                 });
             }
             ActionId::TogglePersistUndo => self.toggle_persist_undo(),

@@ -8,7 +8,7 @@ use crate::config::{
 };
 use crate::modal::Modal;
 use crate::modal::dialog::DialogButtonAction;
-use crate::session::{purge_orphans, purge_tab, read_content_tmp, write_content_tmp};
+use crate::session::{purge_all, purge_orphans, purge_tab, read_content_tmp, write_content_tmp};
 use crate::workspace::{
     create_tab_from_defaults, new_session_id, next_novo_counter, novo_display_name, snapshot_path,
     swap_active_with_tab, PromptReason, Tab, Workspace,
@@ -303,7 +303,7 @@ impl App {
             limite: self.workspace.max_tabs,
             sessao: Vec::new(),
         };
-        if !self.workspace.fechar_tudo_ao_sair {
+        if self.workspace.fechar_tudo_ao_sair {
             return abas;
         }
         for tab in &self.workspace.tabs {
@@ -339,14 +339,8 @@ impl App {
 
     pub(crate) fn persist_session_artifacts(&mut self) {
         self.sync_active_tab();
-        if !self.workspace.fechar_tudo_ao_sair {
-            let ids: Vec<String> = self
-                .workspace
-                .tabs
-                .iter()
-                .map(|t| t.session_id.clone())
-                .collect();
-            let _ = purge_orphans(&ids);
+        if self.workspace.fechar_tudo_ao_sair {
+            let _ = purge_all();
             return;
         }
 
@@ -477,7 +471,7 @@ pub fn workspace_from_config(
         salvar_desfazer_recentes: abas.salvar_desfazer_recentes,
     };
 
-    if abas.fechar_tudo_ao_sair && !abas.sessao.is_empty() {
+    if !abas.fechar_tudo_ao_sair && !abas.sessao.is_empty() {
         for entry in &abas.sessao {
             if let Some(path_str) = &entry.caminho {
                 let path = PathBuf::from(path_str);
@@ -578,4 +572,68 @@ pub fn workspace_from_config(
         &mut workspace.tabs[active_idx],
     );
     (workspace, editor, document)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::{AbasConfig, EditConfig, SessaoTabEntry};
+    use crate::theme::ThemeId;
+
+    fn sample_config(fechar_tudo_ao_sair: bool, sessao: Vec<SessaoTabEntry>) -> EditConfig {
+        let mut config = EditConfig::default();
+        config.arquivo.abas = AbasConfig {
+            fechar_tudo_ao_sair,
+            salvar_desfazer_recentes: true,
+            indice_ativo: 0,
+            limite: 10,
+            sessao,
+        };
+        config
+    }
+
+    #[test]
+    fn restore_virtual_name_when_fechar_tudo_desligado() {
+        let config = sample_config(
+            false,
+            vec![SessaoTabEntry {
+                tab_id: "t1".into(),
+                caminho: None,
+                nome_virtual: Some("Salvo".into()),
+                temporario: true,
+                cursor_linha: 1,
+                cursor_coluna: 1,
+                encoding: "utf-8".into(),
+                tabulacao: "4".into(),
+                fs_mtime_ms: None,
+                fs_len: None,
+            }],
+        );
+        let palette = ThemeId::ClassicBlue.palette();
+        let (ws, _, _) = workspace_from_config(&config, &palette, false);
+        assert_eq!(ws.tabs[0].display_name, "Salvo");
+    }
+
+    #[test]
+    fn skip_restore_when_fechar_tudo_ligado() {
+        let config = sample_config(
+            true,
+            vec![SessaoTabEntry {
+                tab_id: "t1".into(),
+                caminho: None,
+                nome_virtual: Some("Salvo".into()),
+                temporario: true,
+                cursor_linha: 1,
+                cursor_coluna: 1,
+                encoding: "utf-8".into(),
+                tabulacao: "4".into(),
+                fs_mtime_ms: None,
+                fs_len: None,
+            }],
+        );
+        let palette = ThemeId::ClassicBlue.palette();
+        let (ws, _, _) = workspace_from_config(&config, &palette, false);
+        assert_eq!(ws.tabs.len(), 1);
+        assert_eq!(ws.tabs[0].display_name, "Novo");
+    }
 }

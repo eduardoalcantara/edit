@@ -270,7 +270,7 @@ fn tabs_menu(workspace: &Workspace) -> Vec<MenuNode> {
         "Fechar tudo ao sair",
         ActionId::ToggleCloseAllOnExit,
         workspace.fechar_tudo_ao_sair,
-        "Persiste abas abertas ao encerrar o editor",
+        "Descarta abas ao encerrar; desligado mantém a sessão entre execuções",
     ));
     nodes.push(toggle_item(
         "Salvar desfazer recentes",

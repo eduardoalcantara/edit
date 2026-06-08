@@ -216,7 +216,7 @@ Estender o modelo existente (não substituir `exibir` / `formatar`). Nova seçã
 
 | Campo | Regra |
 |-------|--------|
-| `fechar_tudo_ao_sair` | Toggle do menu Abas. **false:** ao iniciar, uma aba vazia pristine. **true:** restaurar `sessao` + `.edit-session/`. |
+| `fechar_tudo_ao_sair` | Toggle do menu Abas. **false (padrão):** restaurar `sessao` + `.edit-session/` na próxima execução. **true:** ao sair, limpar workspace (não restaurar abas). |
 | `salvar_desfazer_recentes` | Toggle do menu Abas. **false:** não gravar `undo.json`/`redo.json`; apagar existentes no shutdown. **true:** gravar pilhas (≥ 5 passos) se “fechar tudo ao sair” ligado. Ignorado se “fechar tudo ao sair” desligado. Default sugerido: **true**. |
 | `indice_ativo` | Índice em `sessao` da aba em foco ao sair. |
 | `limite` | Máximo de abas (default **10**). |
@@ -385,7 +385,7 @@ Toda operação que encerra o ciclo de vida de uma aba ou invalida conteúdo dev
 
 **Condições para gravar no shutdown:**
 
-1. `fechar_tudo_ao_sair == true`
+1. `fechar_tudo_ao_sair == false` (sessão persistida)
 2. `salvar_desfazer_recentes == true`
 
 **Formato `undo.json` / `redo.json`:** serialização das entradas de `EditHistory` (`start`, `removed`, `inserted`, `cursor_before`, `cursor_after`) — compatível com `src/editor/history.rs`.
@@ -422,7 +422,7 @@ Módulo dedicado recomendado: **`SessionStore`** (`src/session/` ou `src/workspa
 | Fechar aba (`Ctrl+W`, evicção confirmada) | `purge_tab(tab_id)` — remove pasta |
 | **Não Salvar** em modal | `purge_tab(tab_id)` |
 | Arquivo **excluído** externamente + usuário **Fechar aba** | `purge_tab(tab_id)` + remover de `sessao` |
-| Toggle **Fechar tudo ao sair** desligado no shutdown | `purge_all()` após salvar `edit.json` |
+| Toggle **Fechar tudo ao sair** ligado no shutdown | `purge_all()` após salvar `edit.json` |
 | Toggle **Salvar desfazer recentes** desligado no shutdown | `purge_undo(tab_id)` para cada aba (mantém `content.tmp` se existir) |
 | Toggle **Salvar desfazer recentes** desligado via modal **Apagar desfazer** | `purge_all_undo()` imediato (3.2.1) |
 
@@ -443,8 +443,8 @@ Módulo dedicado recomendado: **`SessionStore`** (`src/session/` ou `src/workspa
 
 #### 8.5.4. Limpeza no startup
 
-1. Se `fechar_tudo_ao_sair` desligado → remover `.edit-session/` inteira (se existir).
-2. Se ligado → listar subpastas de `tabs/`; **remover** diretórios cujo `tab_id` **não** está em `sessao` (órfãos de crash).
+1. Se `fechar_tudo_ao_sair` **ligado** → remover `.edit-session/` inteira (se existir).
+2. Se **desligado** → listar subpastas de `tabs/`; **remover** diretórios cujo `tab_id` **não** está em `sessao` (órfãos de crash).
 3. Para cada `tab_id` em `sessao`: validar FS; aplicar 8.2 / 8.4; purgar undo inválido.
 4. Se `manifest.json` inconsistente com `edit.json`, preferir **`edit.json`** como fonte de verdade.
 

@@ -40,6 +40,7 @@ pub struct ArquivoConfig {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AbasConfig {
+    /// **true:** ao sair, descarta abas (não grava `sessao`). **false:** persiste workspace.
     #[serde(default)]
     pub fechar_tudo_ao_sair: bool,
     #[serde(default = "default_true")]
