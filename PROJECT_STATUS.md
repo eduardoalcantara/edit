@@ -1,8 +1,8 @@
 # PROJECT_STATUS — Editor Linux
 
 **Autor:** Perplexity AI  
-**Data:** 2026-06-07  
-**Versão:** 2.8
+**Data:** 2026-06-08  
+**Versão:** 3.0
 
 ## Estado atual
 
@@ -51,7 +51,7 @@
   - Exibir → Margem: Sem / Uma linha / Duas linhas; padding interno no render (topo, base, esquerda, direita).
 - **Borda do editor (2026-06-07):**
   - Exibir → Borda: Visível / Invisível; laterais e base ocultas no modo invisível; título mantido no topo (`└ [ nome ] ─┘`).
-  - Com terminal ativo: divisor `├─────┤` (borda visível) ou `─────` (invisível); layout divide área editor/terminal; camada placeholder `TerminalLayer`.
+  - Com terminal ativo: divisor `├─────┤` (borda visível) ou `─────` (invisível); layout divide área editor/terminal; **terminal PTY real** (`TerminalLayer` + `src/terminal/`).
 - **Modais reutilizáveis (`src/modal/`) (2026-06-07):**
   - Componente `Dialog` (layout, botões, mouse, teclado, rodapé com help por botão).
   - Presets em `buttons.rs`; `ModalLayer` delega pintura/input ao `Dialog`.
@@ -100,7 +100,22 @@
   - `--workspace`: `./.edit/.edit.workspace` (cópia inicial do `edit.json` global sem abas) e sessão em `./.edit/.edit-session/`.
   - Arquivos na linha de comando abertos em abas ao iniciar (`App::open_cli_files`).
   - **74 testes** unitários passando (`cargo test`).
-- **README.md v2.2** — seção linha de comando.
+  - **README.md v2.2** — seção linha de comando.
+- **Terminal inferior integrado (2026-06-08):**
+  - Módulo `src/terminal/` — PTY (`portable-pty`), scrollback (strip ANSI/OSC), até 10 sessões.
+  - Moldura ASCII contínua com o editor; divisor `├─[ shell ]─┬─┤`; altura 7–11 linhas (`exibir.terminal_altura` em `edit.json`).
+  - Sidebar: `[n][+][-]…[f]` no topo; lista `*NN nome [q]`; hover estilo modal; help no rodapé à esquerda.
+  - Spawn automático ao abrir painel; cwd do diretório do arquivo (sem `\\?\` no Windows).
+  - Seleção de texto no output (arraste mouse); **Ctrl+C** copia para clipboard.
+  - `Ctrl+T` / `Ctrl+'` toggle; **F6** foco Editor ↔ Terminal; **Esc** devolve foco ao editor.
+  - PgUp/PgDn e roda do mouse rolam scrollback; `App::shutdown` mata PTYs.
+  - Spec: `specs/done/SPEC-TERMINAL-INFERIOR.md`
+- **Correções terminal + workspace (2026-06-08):**
+  - `sync_active_tab` passou a **copiar** editor→aba (`flush_editor_into_tab`), corrigindo README vazio ao fechar terminal/persistir.
+  - Rodapé: grupo **Foco** à direita (`[Editor] Terminal Menu Diálogo`); esquerda só help contextual (não mais `Foco: EDITOR` isolado).
+  - Scroll do editor com terminal aberto; filtro OSC `]0;`; persistência de cursor de aba sem drift +1.
+  - Atalhos Shift+letra na sidebar **removidos** (inviáveis sem distinguir LShift/RShift).
+  - **120 testes** unitários passando (`cargo test`).
 
 ### Em andamento
 - **Múltiplos arquivos — fase 2:** barra de abas visual; serialização `undo.json`/`redo.json`; modal recarregar arquivo alterado externamente.

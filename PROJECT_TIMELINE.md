@@ -1,8 +1,8 @@
 # PROJECT_TIMELINE — Editor Linux
 
 **Autor:** Perplexity AI  
-**Data:** 2026-06-07  
-**Versão:** 2.8
+**Data:** 2026-06-08  
+**Versão:** 3.0
 
 ## Registro
 
@@ -108,3 +108,18 @@
   - Módulos: `src/cli.rs`, `src/main.rs`, `src/config.rs`, `src/session/store.rs`, `src/app.rs`
   - Testes: `cli::tests::*` — **77** total
   - Docs: README v2.2, STATUS/TIMELINE v2.8
+- 2026-06-08 — **Terminal inferior integrado** — PTY real, scrollback, multi-sessão, layout PO (output + coluna lateral), moldura unificada.
+  - Módulos: `src/terminal/{session,scrollback,workspace,render,input}.rs`, `src/ui/layers/terminal.rs`, `src/ui/layout.rs`, `src/app.rs`, `src/widgets/panel.rs`
+  - Spec: `specs/done/SPEC-TERMINAL-INFERIOR.md`
+  - Testes: **96** total (`cargo test`)
+  - Docs: STATUS/TIMELINE v2.9
+- 2026-06-08 — **Terminal — refinamentos UX e robustez** — sidebar `[n][+][-][f]` + `[q]` por sessão; hover/ajuda no rodapé; altura persistida (7–11); spawn automático; cwd Windows sem `\\?\`; seleção + Ctrl+C; strip OSC.
+  - Módulos: `src/terminal/{selection,scrollback,workspace,render}.rs`, `src/ui/layers/terminal.rs`, `src/ui/compositor.rs`, `src/config.rs`, `src/view_state.rs`
+  - Decisão: atalhos Shift+letra na sidebar **não** implementados (maiúsculas / sem RShift distinto).
+- 2026-06-08 — **Fix workspace `flush_active_tab`** — `sync_active_tab` deixa de fazer `mem::swap` (evita esvaziar editor ao persistir/fechar terminal).
+  - Módulos: `src/workspace/workspace.rs`, `src/app_workspace.rs`
+  - Teste: `sync_active_tab_preserves_app_editor_content`
+- 2026-06-08 — **Rodapé grupo Foco** — `[Editor] Terminal Menu Diálogo` no segmento direito; help à esquerda só contextual (menu/modal/terminal/sidebar).
+  - Módulos: `src/ui/compositor.rs`, `src/ui/layers/footer.rs`
+  - Testes: `footer_focus_group_*`, `footer_help_uses_status_message_without_layer_hint`
+  - Docs: PROJECT_RULES/STATUS/TIMELINE **v3.0**; **120** testes (`cargo test`)

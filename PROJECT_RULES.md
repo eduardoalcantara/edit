@@ -1,8 +1,8 @@
 # PROJECT_RULES — Editor Linux (`edit`)
 
 **Autor:** Perplexity AI  
-**Data:** 2026-06-07  
-**Versão:** 2.0
+**Data:** 2026-06-08  
+**Versão:** 3.0
 
 Regras estáveis do projeto. Para estado de implementação, ver `PROJECT_STATUS.md`; para histórico, `PROJECT_TIMELINE.md`; para detalhes de feature, specs em `specs/done/`.
 
@@ -35,9 +35,9 @@ Regras estáveis do projeto. Para estado de implementação, ver `PROJECT_STATUS
 - Menus devem ser visíveis e interativos (pull-down estilo Turbo Vision).
 - Rodapé dedicado a **contexto e estado** do editor — não lista principal de F-keys.
 - Help contextual do item de menu em foco aparece à **esquerda** do rodapé.
-- Estado à **direita** do rodapé, nesta ordem: `Aba XX/YY | Tam XXX/YYY | Pos XX/YY | modo | encoding | tab | Mem NMB` (memória só se toggle ativo).
+- Estado à **direita** do rodapé, nesta ordem: `Aba XX/YY | Tam XXX/YYY | Pos XX/YY | modo | encoding | tab | Foco [Editor] Terminal Menu Diálogo | Mem NMB` (memória só se toggle ativo). O item ativo do grupo **Foco** aparece entre colchetes.
 - O tema deve ser sempre explícito e selecionável no menu Exibir → Temas.
-- Painel lateral e terminal inferior devem poder ser alternados (placeholders permitidos até implementação completa).
+- Painel lateral (placeholder) e **terminal inferior integrado** (PTY real) devem poder ser alternados via menu Exibir ou `Ctrl+T` / `Ctrl+'`.
 - A interface não deve esconder ações essenciais atrás de gestos obscuros.
 - Preservar legibilidade em terminais com suporte limitado; preferir UTF-8 onde o terminal suportar (`»`, `█`, `▀`, `√`).
 
@@ -95,7 +95,34 @@ Menu Arquivo: **`Alt+A`** (mnemônico). *`F10` deixou de abrir o menu — reserv
 | **`F6`** | Foco Editor ↔ Terminal (painel terminal visível) |
 | **`F10`** | **Salvar** aba ativa (`Ctrl+S` equivalente) |
 
-Detalhes do terminal integrado: `specs/to-do/SPEC-TERMINAL-INFERIOR.md`.
+Detalhes do terminal integrado: `specs/done/SPEC-TERMINAL-INFERIOR.md`.
+
+## Regras de UX — terminal inferior
+
+| Atalho / ação | Comportamento |
+|---------------|---------------|
+| `Ctrl+T` / `Ctrl+'` | Mostrar / ocultar painel terminal |
+| **F6** | Foco Editor ↔ Terminal (com painel visível) |
+| **Esc** | Devolve foco ao editor |
+| **PgUp / PgDn** | Rola scrollback (foco no terminal) |
+| **Ctrl+C** | Copia seleção do scrollback (se houver; senão envia ao PTY) |
+| Mouse | Arraste no output seleciona texto; roda do mouse rola scrollback |
+
+**Sidebar de sessões** (coluna direita do painel):
+
+| Botão | Ação |
+|-------|------|
+| `[n]` | Nova sessão |
+| `[+]` | Aumentar altura do painel (7–11 linhas, persistido em `edit.json` → `exibir.terminal_altura`) |
+| `[-]` | Diminuir altura do painel |
+| `[f]` | Fechar painel terminal |
+| `[q]` | Fechar sessão da linha |
+| Clique na linha | Focar sessão |
+
+- Botões da sidebar: hover com estilo de botão de modal; help contextual no rodapé **à esquerda**.
+- Ao exibir o painel, deve existir **pelo menos uma** sessão PTY (spawn automático se vazio).
+- **Cwd** da nova sessão: diretório do arquivo da aba ativa; sem `canonicalize` com prefixo `\\?\` no Windows (incompatível com `cmd.exe`).
+- Atalhos **Shift+letra** na sidebar **não** são usados (Shift produz maiúsculas; terminal não distingue LShift/RShift).
 
 ## Regras de UX — abas de edição
 
@@ -183,7 +210,7 @@ Codificação e tabulação persistidas em `formatar` são **padrão** para novo
 ### Compositor de camadas (`src/ui/`)
 
 - Trait **`UiLayer`**: pintura bottom→top, input top→bottom.
-- Camadas: Desktop, Editor, Footer, MenuBar, MenuDropdown (overlay), Modal, Terminal (placeholder).
+- Camadas: Desktop, Editor, **Terminal**, Footer, MenuBar, MenuDropdown (overlay), Modal.
 - Compositor unifica dispatch de paint e input; respeita `captures_input` por camada.
 
 ### Módulos principais
@@ -198,6 +225,8 @@ Codificação e tabulação persistidas em `formatar` são **padrão** para novo
 | `src/memory.rs` | Monitor RSS/working set (`sysinfo`) |
 | `src/editor/tabs.rs` | Tab visual, conversão De/Para |
 | `src/editor/word_boundary.rs` | Navegação por palavra (camelCase, separadores, dígitos) |
+| `src/terminal/` | PTY (`portable-pty`), scrollback, sessões, sidebar, seleção |
+| `src/workspace/` | Abas; `flush_editor_into_tab` copia editor→aba (sem swap destrutivo) |
 
 ### Separação de concerns
 
