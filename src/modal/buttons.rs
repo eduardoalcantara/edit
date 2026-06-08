@@ -166,6 +166,19 @@ pub const PATH_SAVE_AS: [DialogButton; 2] = [
     ),
 ];
 
+pub const PATH_RENAME: [DialogButton; 2] = [
+    DialogButton::new(
+        "OK",
+        "Renomeia o arquivo no disco",
+        DialogButtonAction::Primary,
+    ),
+    DialogButton::new(
+        "Cancelar",
+        "Fecha o diálogo sem renomear",
+        DialogButtonAction::Cancel,
+    ),
+];
+
 pub const FIND: [DialogButton; 2] = [
     DialogButton::new(
         "OK",

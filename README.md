@@ -96,6 +96,8 @@ edit --workspace -- main.rs tests/mod.rs
 | Atalho | Ação |
 |--------|------|
 | `Ctrl+N/O/S/W` | Novo / Abrir / Salvar / Fechar aba |
+| **`F10`** | Salvar aba ativa |
+| **`F2`** | Renomear arquivo no FS (aba com path) |
 | `Ctrl+Shift+S` | Salvar Como |
 | `Ctrl+Alt+S` | Salvar Todos |
 | `Ctrl+Shift+W` | Fechar Todos |
@@ -104,7 +106,9 @@ edit --workspace -- main.rs tests/mod.rs
 | `Alt+S` | Menu Abas |
 | `Ctrl+F/H` | Buscar / Substituir |
 | `Ctrl+Q`, `Alt+F4` | Sair |
-| `F10` | Menu Arquivo |
+| `Alt+A` | Menu Arquivo |
+| **`F6`** | Foco Editor ↔ Terminal |
+| **`F4`** / **`Shift+F4`** | Próxima / anterior aba (Windows-safe) |
 
 Ver `PROJECT_RULES.md` para lista completa.
 

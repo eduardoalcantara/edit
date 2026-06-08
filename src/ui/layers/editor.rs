@@ -80,21 +80,8 @@ impl UiLayer for EditorLayer {
         if app.menu_state.is_open() || app.modal.is_active() {
             return InputResult::Unhandled;
         }
-        if key.code == crossterm::event::KeyCode::F(1) {
-            app.set_status("Ajuda: em breve");
-            return InputResult::Consumed;
-        }
-        if key.code == crossterm::event::KeyCode::F(2) {
-            app.request_save();
-            return InputResult::Consumed;
-        }
-        if key.code == crossterm::event::KeyCode::F(3) {
-            if key.modifiers.contains(crossterm::event::KeyModifiers::SHIFT) {
-                app.find_prev();
-            } else {
-                app.find_next();
-            }
-            return InputResult::Consumed;
+        if app.input_focus == crate::view_state::InputFocus::Terminal {
+            return InputResult::Unhandled;
         }
 
         let ctrl = key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL);
@@ -193,6 +180,8 @@ fn handle_ctrl_key(app: &mut crate::app::App, key: KeyEvent) -> InputResult {
         KeyCode::Char('s' | 'S') => app.request_save(),
         KeyCode::Char('o' | 'O') => app.request_open(),
         KeyCode::Char('n' | 'N') => app.request_new_document(),
+        KeyCode::Char('t' | 'T') => app.toggle_terminal_panel(),
+        KeyCode::Char('\'') => app.toggle_terminal_panel(),
         KeyCode::Char('w' | 'W') => app.request_close(),
         KeyCode::Char('z' | 'Z') => app.editor.execute(EditorCommand::Undo),
         KeyCode::Char('y' | 'Y') => app.editor.execute(EditorCommand::Redo),

@@ -12,7 +12,7 @@ use crate::workspace::PromptReason;
 
 use buttons::{
     CONVERT, DISCARD_CLOSE, DISCARD_NEW, DISCARD_OPEN, FIND, FIND_REPLACE, OVERWRITE,
-    PATH_OPEN, PATH_SAVE_AS, PURGE_UNDO, QUIT_UNSAVED, REINTERPRET, TAB_UNSAVED,
+    PATH_OPEN, PATH_RENAME, PATH_SAVE_AS, PURGE_UNDO, QUIT_UNSAVED, REINTERPRET, TAB_UNSAVED,
 };
 
 /// Intenção de domínio associada a um diálogo de confirmação.
@@ -36,6 +36,7 @@ pub enum ConfirmKind {
 pub enum PathInputKind {
     Open,
     SaveAs,
+    Rename,
 }
 
 #[derive(Debug, Clone)]
@@ -131,16 +132,22 @@ impl Modal {
         }
     }
 
-    pub fn path_input(title: impl Into<String>, prompt: impl Into<String>, kind: PathInputKind) -> Self {
+    pub fn path_input(
+        title: impl Into<String>,
+        prompt: impl Into<String>,
+        kind: PathInputKind,
+        initial: impl Into<String>,
+    ) -> Self {
+        let initial = initial.into();
         let buttons = match kind {
             PathInputKind::Open => &PATH_OPEN,
             PathInputKind::SaveAs => &PATH_SAVE_AS,
+            PathInputKind::Rename => &PATH_RENAME,
         };
-        let prompt = prompt.into();
         Modal::PathInput {
             dialog: Dialog::form(title, String::new(), buttons),
             prompt: prompt.into(),
-            input: String::new(),
+            input: initial,
             kind,
         }
     }

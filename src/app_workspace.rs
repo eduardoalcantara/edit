@@ -397,7 +397,7 @@ impl App {
                     self.save_to_path_internal(path, false);
                 }
             } else {
-                self.modal = Modal::path_input("Salvar como", "Caminho:", crate::modal::PathInputKind::SaveAs);
+                self.modal = Modal::path_input("Salvar como", "Caminho:", crate::modal::PathInputKind::SaveAs, "");
                 self.pending_save_all = true;
                 return;
             }
@@ -455,6 +455,7 @@ impl App {
                         "Salvar como",
                         "Caminho:",
                         crate::modal::PathInputKind::SaveAs,
+                        "",
                     );
                     self.pending_dirty_save = Some((tab_index, reason));
                 }

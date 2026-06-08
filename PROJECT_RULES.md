@@ -35,7 +35,7 @@ Regras estáveis do projeto. Para estado de implementação, ver `PROJECT_STATUS
 - Menus devem ser visíveis e interativos (pull-down estilo Turbo Vision).
 - Rodapé dedicado a **contexto e estado** do editor — não lista principal de F-keys.
 - Help contextual do item de menu em foco aparece à **esquerda** do rodapé.
-- Estado à **direita** do rodapé, nesta ordem: `Tam XXX/YYY | Pos XX/YY | modo | encoding | tab | Mem NMB` (memória só se toggle ativo).
+- Estado à **direita** do rodapé, nesta ordem: `Aba XX/YY | Tam XXX/YYY | Pos XX/YY | modo | encoding | tab | Mem NMB` (memória só se toggle ativo).
 - O tema deve ser sempre explícito e selecionável no menu Exibir → Temas.
 - Painel lateral e terminal inferior devem poder ser alternados (placeholders permitidos até implementação completa).
 - A interface não deve esconder ações essenciais atrás de gestos obscuros.
@@ -71,13 +71,44 @@ Regras estáveis do projeto. Para estado de implementação, ver `PROJECT_STATUS
 | `Ctrl+N` | Novo documento |
 | `Ctrl+W` | Fechar documento |
 | `Ctrl+Q` / `Alt+F4` | Sair (com confirmação se dirty; funciona mesmo com menu/modal aberto) |
-| `Ctrl+T` | Alternar terminal inferior |
+| `Ctrl+T` / **`Ctrl+'`** | Mostrar / ocultar painel terminal inferior |
+| **`F6`** | Foco Editor ↔ Terminal (painel terminal visível) |
+| **`F4`** | Próxima aba de edição (alternativa segura no Windows) |
+| **`Shift+F4`** | Aba anterior de edição (alternativa segura no Windows) |
+| `Ctrl+Tab` / `Ctrl+Shift+Tab` | Próxima / anterior aba (quando o host repassar ao app) |
 | `Ctrl+F` / `Ctrl+H` | Buscar / Substituir |
 | `Ctrl+←/→` | Navegação inteligente por palavra |
 | `Ctrl+Shift+←/→` | Seleção por palavra |
 | `Alt` + arraste | Seleção retangular (bloco) |
 | `Ctrl` + clique | Adicionar cursor (multi-cursor) |
-| `F10` | Abrir menu Arquivo |
+
+Menu Arquivo: **`Alt+A`** (mnemônico). *`F10` deixou de abrir o menu — reservado para Salvar (ver teclas Fn abaixo).*
+
+## Regras de UX — teclas de função (editor)
+
+| Tecla | Ação |
+|-------|------|
+| **`F1`** | Ajuda (placeholder) |
+| **`F2`** | **Renomear** arquivo no FS (aba ativa com path; modal; `std::fs::rename`) |
+| **`F3`** | Próxima ocorrência de busca (`Shift+F3` = anterior) |
+| **`F4`** | Próxima aba de edição |
+| **`F6`** | Foco Editor ↔ Terminal (painel terminal visível) |
+| **`F10`** | **Salvar** aba ativa (`Ctrl+S` equivalente) |
+
+Detalhes do terminal integrado: `specs/to-do/SPEC-TERMINAL-INFERIOR.md`.
+
+## Regras de UX — abas de edição
+
+| Atalho | Ação |
+|--------|------|
+| `Alt+1` … `Alt+0` | Focar aba na posição 1–10 (menu Abas) |
+| `Alt+S` | Abrir menu Abas |
+| `Ctrl+W` | Fechar aba ativa |
+| `Ctrl+Shift+W` | Fechar todas as abas |
+| `Ctrl+Tab` / `Ctrl+Shift+Tab` | Próxima / anterior aba |
+| **`F4`** / **`Shift+F4`** | Próxima / anterior aba (Windows-safe) |
+
+Ver também `specs/to-do/SPEC-MULTPLOS-ARQUIVOS.md` §6.7 e §10.
 
 ## Regras de UX — barra de menu
 

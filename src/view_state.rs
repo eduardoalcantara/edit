@@ -1,5 +1,13 @@
 use crate::theme::ThemeId;
 
+/// Onde o teclado principal é entregue (editor de texto vs painel terminal).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum InputFocus {
+    #[default]
+    Editor,
+    Terminal,
+}
+
 /// Visibilidade da borda externa do editor de texto.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum EditorBorder {

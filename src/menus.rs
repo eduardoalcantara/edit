@@ -21,6 +21,7 @@ pub enum ActionId {
     Recent,
     Save,
     SaveAs,
+    Rename,
     SaveAll,
     Close,
     CloseAll,
@@ -380,7 +381,7 @@ fn file_menu(recent: &RecentFiles) -> Vec<MenuNode> {
         MenuNode::Separator,
         item(
             "Salvar",
-            Some("Ctrl+S"),
+            Some("Ctrl+S / F10"),
             ActionId::Save,
             true,
             None,
@@ -393,6 +394,14 @@ fn file_menu(recent: &RecentFiles) -> Vec<MenuNode> {
             true,
             None,
             "Salva o documento com um novo nome ou caminho",
+        ),
+        item(
+            "Renomear",
+            Some("F2"),
+            ActionId::Rename,
+            true,
+            None,
+            "Renomeia o arquivo atual no disco",
         ),
         item(
             "Salvar Todos",
@@ -589,7 +598,7 @@ fn view_menu(view: &ViewState) -> Vec<MenuNode> {
             "Terminal",
             ActionId::ToggleTerminal,
             view.terminal,
-            "Mostra ou oculta o terminal integrado",
+            "Mostra ou oculta o terminal integrado (Ctrl+T / Ctrl+')",
         ),
         toggle_item(
             "Rodapé",
@@ -858,10 +867,6 @@ pub fn handle_key(bar: &MenuBar, state: &mut MenuState, key: KeyEvent) -> MenuEv
     }
 
     if !state.is_open() {
-        if key.code == KeyCode::F(10) {
-            state.open_top_menu(0, bar);
-            return MenuEventResult::Consumed;
-        }
         if key.modifiers.contains(KeyModifiers::ALT) {
             if let KeyCode::Char(c) = key.code {
                 if let Some(idx) = bar.top_index_by_mnemonic(c) {

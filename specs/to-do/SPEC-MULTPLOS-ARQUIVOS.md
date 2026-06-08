@@ -281,10 +281,17 @@ Ordem de decisão:
 Fechar aba com `filepath` → path vai para **topo** de `arquivo.recentes`.  
 **Limpeza FS:** remover `.edit-session/tabs/{tab_id}/` da aba fechada (seção 8.5).
 
-### 6.4. Ctrl+S / Salvar
+### 6.4. Ctrl+S / F10 / Salvar
 
-- Salva **somente a aba ativa**.
+- **`Ctrl+S`** e **`F10`:** salvar **somente a aba ativa**.
 - Sem path → abrir fluxo **Salvar Como** (modal path).
+
+### 6.4b. F2 / Renomear
+
+- **`F2`** e menu **Arquivo → Renomear** (quando existir): renomear no filesystem a aba ativa **com path**.
+- Modal pede novo nome; default = nome atual; diretório permanece o mesmo salvo path explícito.
+- Após sucesso: atualizar `document.path`, título na borda, `fs_snapshot`, entrada em recentes se aplicável.
+- Aba sem path ou dirty com conflito → modal de erro ou fluxo Salvar Como antes (implementação fase 1: exigir path salvo).
 
 ### 6.5. Salvar Todos (novo)
 
@@ -298,10 +305,13 @@ Fechar aba com `filepath` → path vai para **topo** de `arquivo.recentes`.
 - Percorre abas dirty na **ordem do menu** (topo → fim), um modal por aba (seção 7.2).
 - Ao concluir (ou se não houver dirty), fecha todas as abas e deixa **uma** aba pristine `Sem Título`.
 
-### 6.7. Trocar aba (menu, Alt+1…0, Ctrl+Tab)
+### 6.7. Trocar aba (menu, Alt+1…0, Ctrl+Tab, F4)
 
-- **Ctrl+Tab:** próxima aba (circular).
-- **Ctrl+Shift+Tab:** aba anterior (circular).
+- **Ctrl+Tab:** próxima aba (circular). *Pode ser interceptado pelo emulador host (ex.: Windows Terminal); o app deve implementar mesmo assim.*
+- **Ctrl+Shift+Tab:** aba anterior (circular). *Mesma ressalva.*
+- **`F4`:** próxima aba (circular) — alternativa segura no Windows.
+- **`Shift+F4`:** aba anterior (circular).
+- **`F6`:** alternar foco **Editor ↔ Terminal** quando o painel terminal estiver visível (`SPEC-TERMINAL-INFERIOR.md` §4).
 - **Alt+1 … Alt+0:** foco direto na posição 1–10.
 - Ao focar aba com `filepath`:
   - Comparar `fs_snapshot` (`modified`, `len`) com FS.
@@ -478,11 +488,15 @@ Estender `ConfirmKind` (ou equivalente) com contexto `{ tab_index, workspace_act
 | `Ctrl+N` | Nova aba, reuso de `NovoN` pristine, ou noop se ativa pristine vazia (6.2) |
 | `Ctrl+W` | Fechar aba ativa |
 | `Ctrl+Shift+W` | Fechar todas as abas |
-| `Ctrl+S` | Salvar aba ativa |
+| `Ctrl+S` / **`F10`** | Salvar aba ativa |
+| **`F2`** | Renomear arquivo no FS (aba com path) |
 | `Ctrl+Shift+S` | Salvar Como (aba ativa) |
 | `Ctrl+Alt+S` | Salvar Todos |
-| `Ctrl+Tab` | Próxima aba |
-| `Ctrl+Shift+Tab` | Aba anterior |
+| `Ctrl+Tab` | Próxima aba (se o host repassar) |
+| `Ctrl+Shift+Tab` | Aba anterior (se o host repassar) |
+| **`F4`** | Próxima aba (alternativa segura no Windows) |
+| **`Shift+F4`** | Aba anterior (alternativa segura no Windows) |
+| **`F6`** | Foco Editor ↔ Terminal (painel terminal visível) |
 | `Alt+1` … `Alt+0` | Focar aba 1–10 |
 | `Alt+S` | Abrir menu Abas |
 
@@ -507,7 +521,9 @@ Barra de menu (existente): `Alt+A` Arquivo, `Alt+E` Editar, `Alt+X` Exibir, `Alt
 
 | Tópico | Decisão |
 |--------|---------|
-| Salvar Todos | `Ctrl+Alt+S`; Salvar Como mantém `Ctrl+Shift+S` |
+| Salvar Todos | `Ctrl+Alt+S`; Salvar Como mantém `Ctrl+Shift+S`; Salvar também **`F10`** |
+| Renomear | **`F2`** (aba com path) |
+| Menu Arquivo | **`Alt+A`** (substitui `F10` da spec menu shell) |
 | Fechar Todos | `Ctrl+Shift+W` + menu Abas |
 | 11ª aba | Remove aba no **final da fila**; dirty → modal na aba evictada |
 | Menu Abas | `Alt+S` |
@@ -527,3 +543,4 @@ Barra de menu (existente): `Alt+A` Arquivo, `Alt+E` Editar, `Alt+X` Exibir, `Alt
 | 2026-06-07 | Revisão: menu Abas fase 1; Recentes = fechados; 10 abas; `edit.json`; NovoN; Notepad++ FS. |
 | 2026-06-07 | Decisões: evicção final da fila; `Ctrl+Alt+S`; `Ctrl+Shift+W`; `Alt+S`; Ctrl+N reuso NovoN; temps fase 1. |
 | 2026-06-07 | Modal ao desmarcar **Salvar desfazer recentes** (Apagar / Manter / Cancelar). |
+| 2026-06-08 | **F2** renomear no FS; **F10** salvar; menu Arquivo via **Alt+A**. |

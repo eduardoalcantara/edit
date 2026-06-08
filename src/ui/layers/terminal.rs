@@ -1,7 +1,9 @@
+use crossterm::event::{KeyCode, KeyEvent, MouseEvent};
 use ratatui::style::Style;
 use ratatui::widgets::Paragraph;
 
 use crate::theme::ThemePalette;
+use crate::view_state::InputFocus;
 use crate::ui::layer::{InputResult, LayerId, UiLayer};
 use crate::ui::layout::UiLayout;
 
@@ -16,8 +18,8 @@ impl UiLayer for TerminalLayer {
         app.view.terminal
     }
 
-    fn captures_input(&self, _: &crate::app::App) -> bool {
-        false
+    fn captures_input(&self, app: &crate::app::App) -> bool {
+        app.view.terminal && app.input_focus == InputFocus::Terminal
     }
 
     fn paint(
@@ -44,7 +46,7 @@ impl UiLayer for TerminalLayer {
                 },
             );
         }
-        let hint = " Terminal (em breve) ";
+        let hint = " Terminal (em breve) — F6 alterna foco ";
         let x = area.x.saturating_add(1);
         if x < area.x.saturating_add(area.width) {
             frame.render_widget(
@@ -59,21 +61,28 @@ impl UiLayer for TerminalLayer {
         }
     }
 
-    fn on_key(
-        &self,
-        _: crossterm::event::KeyEvent,
-        _: &mut crate::app::App,
-        _: UiLayout,
-    ) -> InputResult {
-        InputResult::Unhandled
+    fn on_key(&self, key: KeyEvent, app: &mut crate::app::App, _: UiLayout) -> InputResult {
+        if !self.captures_input(app) {
+            return InputResult::Unhandled;
+        }
+        if key.code == KeyCode::Esc {
+            app.input_focus = InputFocus::Editor;
+            app.set_status("Editor: foco");
+            return InputResult::Consumed;
+        }
+        InputResult::Consumed
     }
 
     fn on_mouse(
         &self,
-        _: crossterm::event::MouseEvent,
-        _: &mut crate::app::App,
+        _: MouseEvent,
+        app: &mut crate::app::App,
         _: UiLayout,
     ) -> InputResult {
-        InputResult::Unhandled
+        if !app.view.terminal {
+            return InputResult::Unhandled;
+        }
+        app.input_focus = InputFocus::Terminal;
+        InputResult::Consumed
     }
 }

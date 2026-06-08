@@ -66,6 +66,12 @@ impl Compositor {
             return;
         }
 
+        if !app.menu_state.is_open() && !app.modal.is_active() {
+            if handle_global_function_keys(app, key) {
+                return;
+            }
+        }
+
         let mut layers: Vec<&dyn UiLayer> = all_layers()
             .into_iter()
             .filter(|layer| layer.is_visible(app))
@@ -175,6 +181,52 @@ pub fn footer_inner(area: ratatui::layout::Rect) -> ratatui::layout::Rect {
         y: area.y,
         width: area.width.saturating_sub(2),
         height: area.height,
+    }
+}
+
+fn handle_global_function_keys(app: &mut App, key: KeyEvent) -> bool {
+    use KeyCode;
+
+    if key.modifiers.contains(KeyModifiers::CONTROL)
+        || key.modifiers.contains(KeyModifiers::ALT)
+    {
+        return false;
+    }
+
+    match key.code {
+        KeyCode::F(1) => {
+            app.set_status("Ajuda: em breve");
+            true
+        }
+        KeyCode::F(2) => {
+            app.request_rename();
+            true
+        }
+        KeyCode::F(3) => {
+            if key.modifiers.contains(KeyModifiers::SHIFT) {
+                app.find_prev();
+            } else {
+                app.find_next();
+            }
+            true
+        }
+        KeyCode::F(4) => {
+            if key.modifiers.contains(KeyModifiers::SHIFT) {
+                app.focus_tab_relative(-1);
+            } else {
+                app.focus_tab_relative(1);
+            }
+            true
+        }
+        KeyCode::F(6) => {
+            app.toggle_input_focus();
+            true
+        }
+        KeyCode::F(10) => {
+            app.request_save();
+            true
+        }
+        _ => false,
     }
 }
 

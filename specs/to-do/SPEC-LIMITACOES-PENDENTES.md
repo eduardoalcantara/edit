@@ -79,7 +79,7 @@ Registrar limitações conhecidas da implementação atual como **pontos a resol
 | **Estado** | Toggles em `view_state.rs` / menu Exibir; **sem widget funcional** |
 | **Impacto** | Status bar indica "on" mas não há painel/terminal real |
 | **Referência** | `PROJECT_RULES.md` (`Ctrl+T`), `app.rs` mensagens "placeholder" |
-| **Resolução esperada** | Layout split; terminal inferior integrado (PTY ou stub documentado) |
+| **Resolução esperada** | Ver `specs/to-do/SPEC-TERMINAL-INFERIOR.md` — layout PO, PTY, multi-sessão, atalhos |
 
 ### L8 — Mostrar símbolos, espaços, tabs e EOL
 

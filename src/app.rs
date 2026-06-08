@@ -22,7 +22,7 @@ use crate::recent::RecentFiles;
 use crate::theme::ThemeId;
 use crate::ui;
 use crate::session::has_any_undo_files;
-use crate::view_state::{EditorBorder, EditorMargin, GuideColumn, ViewState};
+use crate::view_state::{EditorBorder, EditorMargin, GuideColumn, InputFocus, ViewState};
 use crate::workspace::{PromptReason, TabSortStrategy, Workspace};
 
 pub struct App {
@@ -30,6 +30,7 @@ pub struct App {
     pub document: Document,
     pub theme: ThemeId,
     pub view: ViewState,
+    pub input_focus: InputFocus,
     pub recent: RecentFiles,
     pub clipboard: Clipboard,
     pub menu_bar: MenuBar,
@@ -94,6 +95,7 @@ impl App {
             document,
             theme,
             view,
+            input_focus: InputFocus::Editor,
             recent,
             clipboard: Clipboard::default(),
             menu_bar: MenuBar::build(
@@ -270,19 +272,115 @@ impl App {
             );
             return;
         }
-        self.modal = Modal::path_input("Abrir arquivo", "Caminho:", PathInputKind::Open);
+        self.modal = Modal::path_input("Abrir arquivo", "Caminho:", PathInputKind::Open, "");
     }
 
     pub fn request_save(&mut self) {
         if let Some(path) = self.document.path().map(Path::to_path_buf) {
             self.save_to_path(path, false);
         } else {
-            self.modal = Modal::path_input("Salvar como", "Caminho:", PathInputKind::SaveAs);
+            self.modal = Modal::path_input("Salvar como", "Caminho:", PathInputKind::SaveAs, "");
         }
     }
 
     pub fn request_save_as(&mut self) {
-        self.modal = Modal::path_input("Salvar como", "Caminho:", PathInputKind::SaveAs);
+        self.modal = Modal::path_input("Salvar como", "Caminho:", PathInputKind::SaveAs, "");
+    }
+
+    pub fn request_rename(&mut self) {
+        let Some(path) = self.document.path().map(Path::to_path_buf) else {
+            self.set_status("Salve o documento antes de renomear");
+            return;
+        };
+        let default = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("")
+            .to_string();
+        self.modal = Modal::path_input("Renomear", "Novo nome:", PathInputKind::Rename, default);
+    }
+
+    pub fn toggle_terminal_panel(&mut self) {
+        self.view.terminal = !self.view.terminal;
+        if !self.view.terminal {
+            self.input_focus = InputFocus::Editor;
+        }
+        self.set_status(if self.view.terminal {
+            "Terminal: visível"
+        } else {
+            "Terminal: oculto"
+        });
+    }
+
+    pub fn toggle_input_focus(&mut self) {
+        if !self.view.terminal {
+            self.view.terminal = true;
+            self.input_focus = InputFocus::Terminal;
+            self.set_status("Terminal: foco");
+            return;
+        }
+        self.input_focus = match self.input_focus {
+            InputFocus::Editor => InputFocus::Terminal,
+            InputFocus::Terminal => InputFocus::Editor,
+        };
+        self.set_status(match self.input_focus {
+            InputFocus::Editor => "Editor: foco",
+            InputFocus::Terminal => "Terminal: foco",
+        });
+    }
+
+    pub(crate) fn rename_file_to(&mut self, name_input: &str) {
+        let Some(old) = self.document.path().map(Path::to_path_buf) else {
+            self.set_status("Nenhum arquivo para renomear");
+            return;
+        };
+        let trimmed = name_input.trim();
+        if trimmed.is_empty() {
+            self.set_status("Nome inválido");
+            return;
+        }
+        let new_path = if Path::new(trimmed).is_absolute() {
+            PathBuf::from(trimmed)
+        } else if let Some(parent) = old.parent() {
+            parent.join(trimmed)
+        } else {
+            PathBuf::from(trimmed)
+        };
+        if file_io::same_file_path(&old, &new_path) {
+            self.set_status("Nome inalterado");
+            return;
+        }
+        if new_path.exists() {
+            self.set_status("Arquivo destino já existe");
+            return;
+        }
+        match std::fs::rename(&old, &new_path) {
+            Ok(()) => {
+                self.sync_active_tab();
+                let normalized = file_io::normalize_open_path(&new_path);
+                let content = self.editor.content_string();
+                self.document.mark_saved(content, normalized.clone());
+                let idx = self.workspace.active_index;
+                if let Some(tab) = self.workspace.tabs.get_mut(idx) {
+                    tab.document = self.document.clone();
+                    tab.display_name = normalized
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or("?")
+                        .to_string();
+                    tab.fs_snapshot =
+                        crate::workspace::snapshot_path(&normalized).ok();
+                }
+                self.recent.remove_path(&old);
+                self.recent.push(normalized.clone());
+                self.persist_user_config();
+                self.refresh_menu();
+                self.set_status(format!("Renomeado: {}", normalized.display()));
+            }
+            Err(error) => {
+                self.set_status(format!("Erro ao renomear: {error}"));
+            }
+        }
     }
 
     pub fn request_close(&mut self) {
@@ -416,7 +514,7 @@ impl App {
                     }
                 } else {
                     self.modal =
-                        Modal::path_input("Salvar como", "Caminho:", PathInputKind::SaveAs);
+                        Modal::path_input("Salvar como", "Caminho:", PathInputKind::SaveAs, "");
                 }
             }
             (ConfirmKind::QuitUnsaved, DialogButtonAction::Secondary) => self.should_quit = true,
@@ -427,7 +525,7 @@ impl App {
                 if let Some(path) = self.pending_open_path.take() {
                     self.open_path(path);
                 } else {
-                    self.modal = Modal::path_input("Abrir arquivo", "Caminho:", PathInputKind::Open);
+                    self.modal = Modal::path_input("Abrir arquivo", "Caminho:", PathInputKind::Open, "");
                 }
             }
             (ConfirmKind::OverwriteSave { path }, DialogButtonAction::Primary) => {
@@ -470,11 +568,17 @@ impl App {
     }
 
     pub fn submit_path_input(&mut self) {
-        let Some((path, kind)) = self.take_path_input() else {
+        let Some((path_str, kind)) = self.take_path_input() else {
             return;
         };
 
-        let path = PathBuf::from(path.trim());
+        if matches!(kind, PathInputKind::Rename) {
+            self.rename_file_to(&path_str);
+            self.modal = Modal::None;
+            return;
+        }
+
+        let path = PathBuf::from(path_str.trim());
         if path.as_os_str().is_empty() {
             self.set_status("Caminho inválido");
             self.modal = Modal::None;
@@ -484,6 +588,7 @@ impl App {
         match kind {
             PathInputKind::Open => self.open_path(path),
             PathInputKind::SaveAs => self.save_to_path(path, false),
+            PathInputKind::Rename => {}
         }
         self.modal = Modal::None;
     }
@@ -635,6 +740,7 @@ impl App {
             ActionId::Open => self.request_open(),
             ActionId::Save => self.request_save(),
             ActionId::SaveAs => self.request_save_as(),
+            ActionId::Rename => self.request_rename(),
             ActionId::SaveAll => self.save_all_dirty(),
             ActionId::Close => self.request_close(),
             ActionId::CloseAll => self.request_close_all(),
@@ -699,14 +805,7 @@ impl App {
                     "Painel: oculto"
                 });
             }
-            ActionId::ToggleTerminal => {
-                self.view.terminal = !self.view.terminal;
-                self.set_status(if self.view.terminal {
-                    "Terminal: visível (placeholder)"
-                } else {
-                    "Terminal: oculto"
-                });
-            }
+            ActionId::ToggleTerminal => self.toggle_terminal_panel(),
             ActionId::ToggleFooter => {
                 self.view.footer_visible = !self.view.footer_visible;
             }
