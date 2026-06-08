@@ -73,6 +73,7 @@ Regras estáveis do projeto. Para estado de implementação, ver `PROJECT_STATUS
 | `Ctrl+Q` / `Alt+F4` | Sair (com confirmação se dirty; funciona mesmo com menu/modal aberto) |
 | `Ctrl+T` / **`Ctrl+'`** | Mostrar / ocultar painel terminal inferior |
 | **`F6`** | Foco Editor ↔ Terminal (painel terminal visível) |
+| **`F7`** | Envia seleção do editor (ou linha atual) ao terminal e foca o PTY |
 | **`F4`** | Próxima aba de edição (alternativa segura no Windows) |
 | **`Shift+F4`** | Aba anterior de edição (alternativa segura no Windows) |
 | `Ctrl+Tab` / `Ctrl+Shift+Tab` | Próxima / anterior aba (quando o host repassar ao app) |
@@ -93,6 +94,7 @@ Menu Arquivo: **`Alt+A`** (mnemônico). *`F10` deixou de abrir o menu — reserv
 | **`F3`** | Próxima ocorrência de busca (`Shift+F3` = anterior) |
 | **`F4`** | Próxima aba de edição |
 | **`F6`** | Foco Editor ↔ Terminal (painel terminal visível) |
+| **`F7`** | Envia seleção do editor (ou linha atual) ao terminal |
 | **`F10`** | **Salvar** aba ativa (`Ctrl+S` equivalente) |
 
 Detalhes do terminal integrado: `specs/done/SPEC-TERMINAL-INFERIOR.md`.
@@ -103,6 +105,7 @@ Detalhes do terminal integrado: `specs/done/SPEC-TERMINAL-INFERIOR.md`.
 |---------------|---------------|
 | `Ctrl+T` / `Ctrl+'` | Mostrar / ocultar painel terminal |
 | **F6** | Foco Editor ↔ Terminal (com painel visível) |
+| **F7** | Envia seleção do editor (ou linha atual) ao PTY; abre terminal se fechado |
 | **Esc** | Devolve foco ao editor |
 | **PgUp / PgDn** | Rola scrollback (foco no terminal) |
 | **Ctrl+C** | Copia seleção do scrollback (se houver; senão envia ao PTY) |

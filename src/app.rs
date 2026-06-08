@@ -368,6 +368,26 @@ impl App {
         ));
     }
 
+    /// Envia seleção do editor (ou linha atual) ao PTY ativo e foca o terminal.
+    pub fn send_editor_text_to_terminal(&mut self) {
+        let text = self.editor.text_for_terminal_insert();
+        if !self.view.terminal {
+            self.view.terminal = true;
+            self.persist_user_config();
+        }
+        self.ensure_terminal_session();
+        self.sync_terminal_pty_size();
+        if !text.is_empty() {
+            self.terminal.write_active(text.as_bytes());
+        }
+        self.input_focus = InputFocus::Terminal;
+        self.set_status(if text.is_empty() {
+            "Terminal: foco".to_string()
+        } else {
+            format!("Terminal: {} caractere(s) enviado(s)", text.chars().count())
+        });
+    }
+
     pub fn toggle_input_focus(&mut self) {
         if !self.view.terminal {
             self.view.terminal = true;

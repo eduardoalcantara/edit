@@ -278,6 +278,10 @@ fn handle_global_function_keys(app: &mut App, key: KeyEvent) -> bool {
             app.toggle_input_focus();
             true
         }
+        KeyCode::F(7) => {
+            app.send_editor_text_to_terminal();
+            true
+        }
         KeyCode::F(10) => {
             app.request_save();
             true

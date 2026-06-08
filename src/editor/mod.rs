@@ -288,6 +288,10 @@ impl Editor {
         false
     }
 
+    pub fn text_for_terminal_insert(&self) -> String {
+        self.engine.text_for_terminal_insert()
+    }
+
     pub fn cut_selection(&mut self, clipboard: &mut Clipboard) -> bool {
         if let Some(text) = self.engine.cut_selection() {
             if !text.is_empty() {

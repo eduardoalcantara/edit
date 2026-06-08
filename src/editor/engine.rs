@@ -702,6 +702,22 @@ impl EditorEngine {
         None
     }
 
+    /// Texto da linha do cursor primário (sem `\n`).
+    pub fn current_line_text(&self) -> String {
+        if self.text.len_lines() == 0 {
+            return String::new();
+        }
+        let (line, _) = char_idx_to_line_col(&self.text, self.primary().char_idx);
+        let line = line.min(self.text.len_lines().saturating_sub(1));
+        self.text.line(line).to_string()
+    }
+
+    /// Seleção ativa ou, se não houver, a linha do cursor.
+    pub fn text_for_terminal_insert(&self) -> String {
+        self.copy_text()
+            .unwrap_or_else(|| self.current_line_text())
+    }
+
     fn delete_selection(&mut self) -> bool {
         match self.selection_mode {
             SelectionMode::Block => {
@@ -887,6 +903,25 @@ mod tests {
         e.move_right(true);
         let text = e.copy_text().unwrap();
         assert_eq!(text, "hello");
+    }
+
+    #[test]
+    fn text_for_terminal_insert_prefers_selection_over_current_line() {
+        let mut e = EditorEngine::new();
+        e.load_text("alpha beta");
+        e.set_cursor_line_col(0, 0);
+        for _ in 0..5 {
+            e.move_right(true);
+        }
+        assert_eq!(e.text_for_terminal_insert(), "alpha");
+    }
+
+    #[test]
+    fn text_for_terminal_insert_uses_current_line_without_selection() {
+        let mut e = EditorEngine::new();
+        e.load_text("one\ntwo");
+        e.set_cursor_line_col(1, 1);
+        assert_eq!(e.text_for_terminal_insert(), "two");
     }
 
     #[test]
