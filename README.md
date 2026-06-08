@@ -107,6 +107,7 @@ edit --workspace -- main.rs tests/mod.rs
 | `Ctrl+F/H` | Buscar / Substituir |
 | `Ctrl+Q`, `Alt+F4` | Sair |
 | `Alt+A` | Menu Arquivo |
+| `Ctrl+T` / `Ctrl+'` | Mostrar / ocultar terminal inferior |
 | **`F6`** | Foco Editor ↔ Terminal |
 | **`F4`** / **`Shift+F4`** | Próxima / anterior aba (Windows-safe) |
 
@@ -116,7 +117,7 @@ Ver `PROJECT_RULES.md` para lista completa.
 
 | Pasta | Conteúdo |
 |-------|----------|
-| `src/` | Código — `editor/`, `workspace/`, `session/`, `ui/`, `modal/`, `config.rs`, `menus.rs`… |
+| `src/` | Código — `editor/`, `workspace/`, `session/`, `terminal/`, `ui/`, `modal/`, `config.rs`, `menus.rs`… |
 | `specs/done/` | Especificações implementadas |
 | `specs/to-do/` | Pendências (fase 2 abas, limitações) |
 | `specs/report/` | Relatórios de implementação |

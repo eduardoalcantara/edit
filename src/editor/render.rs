@@ -12,8 +12,8 @@ use crate::theme::ThemePalette;
 use crate::view_state::{EditorBorder, EditorMargin};
 use crate::widgets::panel;
 
-pub fn inner_area(outer: Rect, border: EditorBorder, terminal_below: bool) -> Rect {
-    panel::editor_content_rect(outer, border == EditorBorder::Visible, terminal_below)
+pub fn inner_area(outer: Rect, border: EditorBorder, terminal_block: Option<u16>) -> Rect {
+    panel::editor_content_rect(outer, border == EditorBorder::Visible, terminal_block)
 }
 
 /// Área útil para texto após aplicar margens internas.
@@ -31,6 +31,20 @@ pub fn text_area(inner: Rect, margin: EditorMargin) -> Rect {
     }
 }
 
+pub fn editor_viewport_rect(
+    shell: Rect,
+    border: EditorBorder,
+    terminal_block: Option<u16>,
+    margin: EditorMargin,
+) -> Rect {
+    let inner = panel::editor_content_rect(
+        shell,
+        border == EditorBorder::Visible,
+        terminal_block,
+    );
+    text_area(inner, margin)
+}
+
 pub fn draw(
     engine: &mut EditorEngine,
     frame: &mut Frame,
@@ -39,7 +53,8 @@ pub fn draw(
     palette: ThemePalette,
     margin: EditorMargin,
     border: EditorBorder,
-    terminal_below: bool,
+    terminal_block: Option<u16>,
+    text_viewport: Option<Rect>,
     show_cursor: bool,
     show_tabs: bool,
 ) -> Rect {
@@ -59,9 +74,9 @@ pub fn draw(
         border_style,
         title_style,
         border == EditorBorder::Visible,
-        terminal_below,
+        terminal_block,
     );
-    let content = text_area(inner, margin);
+    let content = text_viewport.unwrap_or_else(|| text_area(inner, margin));
 
     engine.viewport.update_size(content);
     engine.ensure_visible();

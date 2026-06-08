@@ -1,7 +1,8 @@
 # SPEC — Terminal inferior integrado
 
-**Status:** to-do  
+**Status:** done  
 **Data:** 2026-06-08  
+**Implementado:** 2026-06-08  
 **Relacionado:** `PROJECT_RULES.md`, `SPEC-MULTPLOS-ARQUIVOS.md`, `docs/EDITOR_LINUX_MASTER_REQUIREMENTS.md`, `src/ui/layers/terminal.rs`, `src/widgets/panel.rs`
 
 ---
@@ -163,14 +164,14 @@ Ver **`SPEC-MULTPLOS-ARQUIVOS.md` §6.7** e **`PROJECT_RULES.md`**.
 
 ## 10. Critérios de aceite
 
-- [ ] Painel com layout conforme §2 (mock ASCII aprovado pelo PO).
-- [ ] Shell interativo (`cd`, `ls`, programas não-fullscreen) funcional.
-- [ ] Scrollback com PgUp/PgDn no foco terminal.
-- [ ] `Ctrl+T` e `Ctrl+'` equivalentes.
-- [ ] `F6` alterna foco Editor ↔ Terminal com painel visível.
-- [ ] `F4`/`Shift+F4` trocam abas conforme §5.
-- [ ] Fechar sessão / sair do app não deixa processos zumbis.
-- [ ] Múltiplas sessões na coluna direita (fase 2).
+- [x] Painel com layout conforme §2 (mock ASCII aprovado pelo PO).
+- [x] Shell interativo (`cd`, `ls`, programas não-fullscreen) funcional.
+- [x] Scrollback com PgUp/PgDn no foco terminal.
+- [x] `Ctrl+T` e `Ctrl+'` equivalentes.
+- [x] `F6` alterna foco Editor ↔ Terminal com painel visível.
+- [x] `F4`/`Shift+F4` trocam abas conforme §5.
+- [x] Fechar sessão / sair do app não deixa processos zumbis.
+- [x] Múltiplas sessões na coluna direita (fase 2).
 
 ---
 
@@ -180,3 +181,4 @@ Ver **`SPEC-MULTPLOS-ARQUIVOS.md` §6.7** e **`PROJECT_RULES.md`**.
 |------|------|
 | 2026-06-08 | Spec inicial: layout PO com coluna de sessões; atalhos F6 foco terminal, F4/Shift+F4 abas, Ctrl+'. |
 | 2026-06-08 | **F2** renomear; **F10** salvar (menu Arquivo → **Alt+A**). |
+| 2026-06-08 | Implementação MVP+fase 2: `src/terminal/` (PTY, scrollback, multi-sessão), moldura unificada, coluna `[+]`/`[-]`. |

@@ -11,6 +11,12 @@ pub enum EditorCommand {
     MoveDown { extend: bool },
     Home { extend: bool },
     End { extend: bool },
+    DocumentStart { extend: bool },
+    DocumentEnd { extend: bool },
+    PageUp,
+    PageDown,
+    /// Roda do mouse: negativo = subir, positivo = descer (em linhas).
+    ScrollWheel { delta: i32 },
     SelectAll,
     CancelSelection,
     Undo,

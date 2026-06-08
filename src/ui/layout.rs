@@ -1,13 +1,21 @@
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 
 use crate::app::App;
+use crate::terminal::{
+    editor_content_in_shell, layout_terminal_panel, terminal_panel_outer,
+    terminal_reserved_rows, TerminalPanelLayout,
+};
 
-/// Retângulos estáveis da shell (menu, editor, terminal, rodapé).
+/// Retângulos estáveis da shell (menu, editor+terminal, rodapé).
 #[derive(Debug, Clone, Copy)]
 pub struct UiLayout {
     pub menu_bar: Rect,
-    pub editor: Rect,
-    pub terminal: Option<Rect>,
+    /// Área unificada do editor (e terminal, se visível).
+    pub shell: Rect,
+    pub editor_content: Rect,
+    pub terminal_divider_y: Option<u16>,
+    pub terminal_panel_rows: Option<u16>,
+    pub terminal: Option<TerminalPanelLayout>,
     pub footer: Option<Rect>,
 }
 
@@ -22,27 +30,47 @@ impl UiLayout {
             .constraints(constraints)
             .split(frame);
 
-        let (main, footer) = if app.view.footer_visible {
+        let (shell, footer) = if app.view.footer_visible {
             (chunks[1], Some(chunks[2]))
         } else {
             (chunks[1], None)
         };
 
-        let (editor, terminal) = if app.view.terminal {
-            let split = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([Constraint::Min(3), Constraint::Length(6)])
-                .split(main);
-            (split[0], Some(split[1]))
-        } else {
-            (main, None)
-        };
+        let border_visible = app.view.border == crate::view_state::EditorBorder::Visible;
 
-        Self {
-            menu_bar: chunks[0],
-            editor,
-            terminal,
-            footer,
+        if app.view.terminal {
+            let panel_rows = app.view.terminal_panel_rows;
+            let reserve = terminal_reserved_rows(shell, panel_rows);
+            let term_outer = terminal_panel_outer(shell, panel_rows);
+            let panel = layout_terminal_panel(shell, term_outer, border_visible);
+            let editor_content =
+                editor_content_in_shell(shell, reserve, border_visible);
+            Self {
+                menu_bar: chunks[0],
+                shell,
+                editor_content,
+                terminal_divider_y: Some(term_outer.y),
+                terminal_panel_rows: Some(panel_rows),
+                terminal: Some(panel),
+                footer,
+            }
+        } else {
+            let editor_content =
+                editor_content_in_shell(shell, 0, border_visible);
+            Self {
+                menu_bar: chunks[0],
+                shell,
+                editor_content,
+                terminal_divider_y: None,
+                terminal_panel_rows: None,
+                terminal: None,
+                footer,
+            }
         }
+    }
+
+    /// Compat: área externa do editor (shell).
+    pub fn editor(&self) -> Rect {
+        self.shell
     }
 }

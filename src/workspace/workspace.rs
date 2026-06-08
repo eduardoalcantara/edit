@@ -221,10 +221,19 @@ impl Workspace {
     }
 }
 
-/// Troca conteúdo ativo (`App`) com a aba no índice dado.
-pub fn swap_active_with_tab(app_editor: &mut Editor, app_document: &mut Document, tab: &mut Tab) {
-    std::mem::swap(app_editor, &mut tab.editor);
-    std::mem::swap(app_document, &mut tab.document);
+/// Copia editor/documento ativos da `App` para a aba, sem alterar o que o usuário vê.
+pub fn flush_editor_into_tab(
+    app_editor: &Editor,
+    app_document: &Document,
+    tab: &mut Tab,
+    word_wrap: bool,
+) {
+    tab.document = app_document.clone();
+    tab.editor.replace_content(&app_editor.content_string());
+    tab.editor.set_tabulation(app_document.tabulation);
+    tab.editor.set_word_wrap(word_wrap);
+    let (line, col) = app_editor.cursor_line_col();
+    tab.editor.set_cursor(line.saturating_sub(1), col.saturating_sub(1));
 }
 
 #[cfg(test)]

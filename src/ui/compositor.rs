@@ -2,8 +2,9 @@ use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, Mou
 use ratatui::Frame;
 
 use crate::app::App;
+use crate::view_state::InputFocus;
 
-use super::layer::{InputResult, UiLayer};
+use super::layer::{InputResult, LayerId, UiLayer};
 use super::layout::UiLayout;
 use super::layers::all_layers;
 
@@ -51,6 +52,7 @@ impl Compositor {
             Event::Resize(w, h) => {
                 app.last_frame_width = w;
                 app.last_frame_height = h;
+                app.sync_terminal_pty_size();
             }
             _ => {}
         }
@@ -67,29 +69,15 @@ impl Compositor {
         }
 
         if !app.menu_state.is_open() && !app.modal.is_active() {
+            if handle_global_chords(app, key) {
+                return;
+            }
             if handle_global_function_keys(app, key) {
                 return;
             }
         }
 
-        let mut layers: Vec<&dyn UiLayer> = all_layers()
-            .into_iter()
-            .filter(|layer| layer.is_visible(app))
-            .collect();
-        layers.sort_by_key(|layer| std::cmp::Reverse(layer.id().z()));
-
-        let input_modal = layers.iter().any(|layer| layer.captures_input(app));
-        for layer in layers {
-            if input_modal && !layer.captures_input(app) {
-                continue;
-            }
-            if layer.on_key(key, app, layout) == InputResult::Consumed {
-                return;
-            }
-        }
-        if input_modal {
-            return;
-        }
+        dispatch_key_to_layers(app, key, layout);
     }
 
     fn dispatch_mouse(app: &mut App, mouse: MouseEvent, layout: UiLayout) {
@@ -99,16 +87,53 @@ impl Compositor {
             .collect();
         layers.sort_by_key(|layer| std::cmp::Reverse(layer.id().z()));
 
-        let input_modal = layers.iter().any(|layer| layer.captures_input(app));
+        // Mouse usa hit-test por camada; foco do teclado não bloqueia clique no editor.
+        let block_background = app.modal.is_active();
         for layer in layers {
-            if input_modal && !layer.captures_input(app) {
+            if block_background && !layer.captures_input(app) {
                 continue;
             }
             if layer.on_mouse(mouse, app, layout) == InputResult::Consumed {
                 return;
             }
         }
-        if input_modal {
+    }
+}
+
+fn dispatch_key_to_layers(app: &mut App, key: KeyEvent, layout: UiLayout) {
+    let mut layers: Vec<&dyn UiLayer> = all_layers()
+        .into_iter()
+        .filter(|layer| layer.is_visible(app))
+        .collect();
+    layers.sort_by_key(|layer| std::cmp::Reverse(layer.id().z()));
+
+    for layer in &layers {
+        if layer.id() == LayerId::Modal && layer.on_key(key, app, layout) == InputResult::Consumed {
+            return;
+        }
+    }
+    if app.menu_state.is_open() {
+        for layer in &layers {
+            if layer.id() == LayerId::MenuDropdown
+                && layer.on_key(key, app, layout) == InputResult::Consumed
+            {
+                return;
+            }
+        }
+    }
+    for layer in &layers {
+        if layer.id() == LayerId::MenuBar && layer.on_key(key, app, layout) == InputResult::Consumed {
+            return;
+        }
+    }
+
+    let focus_id = if app.view.terminal && app.input_focus == InputFocus::Terminal {
+        LayerId::Terminal
+    } else {
+        LayerId::Editor
+    };
+    for layer in &layers {
+        if layer.id() == focus_id && layer.on_key(key, app, layout) == InputResult::Consumed {
             return;
         }
     }
@@ -130,6 +155,34 @@ pub fn footer_help_left(app: &App) -> String {
     app.status_message.clone()
 }
 
+fn footer_active_focus(app: &App) -> &'static str {
+    if app.modal.is_active() {
+        "Diálogo"
+    } else if app.menu_state.is_open() {
+        "Menu"
+    } else if app.view.terminal && app.input_focus == InputFocus::Terminal {
+        "Terminal"
+    } else {
+        "Editor"
+    }
+}
+
+pub fn footer_focus_group(app: &App) -> String {
+    let active = footer_active_focus(app);
+    let items = ["Editor", "Terminal", "Menu", "Diálogo"];
+    let parts: Vec<String> = items
+        .iter()
+        .map(|item| {
+            if *item == active {
+                format!("[{item}]")
+            } else {
+                (*item).to_string()
+            }
+        })
+        .collect();
+    format!("Foco {}", parts.join(" "))
+}
+
 /// Grupos de estado alinhados à direita (tamanho, linha/coluna, aba, modo, encoding, tab, memória).
 pub fn footer_status_right(app: &App) -> String {
     let (ln, col) = app.editor.cursor_line_col();
@@ -149,6 +202,7 @@ pub fn footer_status_right(app: &App) -> String {
         app.document.encoding.label().to_string(),
         app.document.tabulation.footer_label().to_string(),
     ];
+    segments.push(footer_focus_group(app));
     if app.view.show_memory {
         if let Some(label) = app.memory.display_label() {
             segments.push(label);
@@ -181,6 +235,20 @@ pub fn footer_inner(area: ratatui::layout::Rect) -> ratatui::layout::Rect {
         y: area.y,
         width: area.width.saturating_sub(2),
         height: area.height,
+    }
+}
+
+/// Atalhos globais que funcionam mesmo com foco no terminal.
+fn handle_global_chords(app: &mut App, key: KeyEvent) -> bool {
+    if !key.modifiers.contains(KeyModifiers::CONTROL) {
+        return false;
+    }
+    match key.code {
+        KeyCode::Char('t' | 'T' | '\'') => {
+            app.toggle_terminal_panel();
+            true
+        }
+        _ => false,
     }
 }
 
@@ -270,5 +338,32 @@ mod tests {
 
         let status = footer_status_right(&app);
         assert!(!status.contains("Mem"));
+    }
+
+    #[test]
+    fn footer_focus_group_highlights_terminal() {
+        let mut app = App::new(false);
+        app.view.terminal = true;
+        app.input_focus = InputFocus::Terminal;
+        let status = footer_status_right(&app);
+        assert!(status.contains("Foco"));
+        assert!(status.contains("[Terminal]"));
+    }
+
+    #[test]
+    fn footer_focus_group_highlights_editor_by_default() {
+        let app = App::new(false);
+        let status = footer_status_right(&app);
+        assert!(status.contains("[Editor]"));
+    }
+
+    #[test]
+    fn footer_help_uses_status_message_without_layer_hint() {
+        let mut app = App::new(false);
+        app.view.terminal = true;
+        app.input_focus = InputFocus::Terminal;
+        app.set_status("Pronto");
+        let help = footer_help_left(&app);
+        assert_eq!(help, "Pronto");
     }
 }

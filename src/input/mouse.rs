@@ -3,13 +3,23 @@ use ratatui::layout::Rect;
 
 use crate::app::App;
 use crate::editor::EditorCommand;
+use crate::view_state::InputFocus;
+
+/// Linhas por notch da roda do mouse no editor.
+pub const MOUSE_WHEEL_LINES: i32 = 3;
+
+/// Linhas por notch da roda no scrollback do terminal.
+pub const TERMINAL_WHEEL_LINES: isize = 3;
+
+pub fn point_in_rect(mouse: &MouseEvent, area: Rect) -> bool {
+    mouse.column >= area.x
+        && mouse.column < area.x.saturating_add(area.width)
+        && mouse.row >= area.y
+        && mouse.row < area.y.saturating_add(area.height)
+}
 
 pub fn terminal_to_doc(mouse: &MouseEvent, inner: Rect) -> Option<(usize, usize)> {
-    if mouse.column < inner.x
-        || mouse.column >= inner.x.saturating_add(inner.width)
-        || mouse.row < inner.y
-        || mouse.row >= inner.y.saturating_add(inner.height)
-    {
+    if !point_in_rect(mouse, inner) {
         return None;
     }
     let line = (mouse.row - inner.y) as usize;
@@ -28,6 +38,28 @@ pub fn viewport_to_doc(
 
 pub fn handle_editor_mouse(app: &mut App, mouse: MouseEvent) {
     let inner = app.editor.inner_area();
+    if !point_in_rect(&mouse, inner) {
+        return;
+    }
+
+    match mouse.kind {
+        MouseEventKind::ScrollUp => {
+            app.editor
+                .execute(EditorCommand::ScrollWheel {
+                    delta: -MOUSE_WHEEL_LINES,
+                });
+            return;
+        }
+        MouseEventKind::ScrollDown => {
+            app.editor
+                .execute(EditorCommand::ScrollWheel {
+                    delta: MOUSE_WHEEL_LINES,
+                });
+            return;
+        }
+        _ => {}
+    }
+
     let Some((vp_line, vp_col)) = terminal_to_doc(&mouse, inner) else {
         return;
     };
@@ -39,6 +71,7 @@ pub fn handle_editor_mouse(app: &mut App, mouse: MouseEvent) {
 
     match mouse.kind {
         MouseEventKind::Down(MouseButton::Left) => {
+            app.input_focus = InputFocus::Editor;
             if mouse.modifiers.contains(KeyModifiers::ALT) {
                 app.editor
                     .execute(EditorCommand::StartBlockSelect {
@@ -81,5 +114,5 @@ pub fn handle_editor_mouse(app: &mut App, mouse: MouseEvent) {
 }
 
 pub fn is_in_editor(mouse: &MouseEvent, inner: Rect) -> bool {
-    terminal_to_doc(mouse, inner).is_some()
+    point_in_rect(mouse, inner)
 }

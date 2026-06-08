@@ -213,10 +213,12 @@ impl EditorEngine {
     }
 
     pub fn ensure_visible(&mut self) {
+        let line_count = self.text.len_lines().max(1);
         let (line, col) = char_idx_to_line_col(&self.text, self.primary().char_idx);
         let line_str = self.text.line(line).to_string();
         let vis_col = visual_col_in_line(&line_str, col, tab_stop_width(self.tabulation));
-        self.viewport.ensure_cursor_visible(line, vis_col);
+        self.viewport
+            .ensure_cursor_visible(line, vis_col, line_count);
     }
 
     fn record(&mut self, start: usize, removed: String, inserted: String, before: usize, after: usize) {
@@ -505,7 +507,7 @@ impl EditorEngine {
         let char_col = char_col_from_visual(&line_str, vcol, tab_stop_width(self.tabulation));
         let idx = line_col_to_char_idx(&self.text, target_line, char_col);
         self.primary_mut().char_idx = idx;
-        self.primary_mut().virtual_col = vcol;
+        self.sync_primary_virtual();
         self.ensure_visible();
     }
 
@@ -521,7 +523,83 @@ impl EditorEngine {
         let char_col = char_col_from_visual(&line_str, vcol, tab_stop_width(self.tabulation));
         let idx = line_col_to_char_idx(&self.text, target_line, char_col);
         self.primary_mut().char_idx = idx;
-        self.primary_mut().virtual_col = vcol;
+        self.sync_primary_virtual();
+        self.ensure_visible();
+    }
+
+    pub fn scroll_page_up(&mut self) {
+        let h = self.viewport.height as usize;
+        if h <= 1 {
+            return;
+        }
+        let (line, _) = char_idx_to_line_col(&self.text, self.primary().char_idx);
+        let step = h.saturating_sub(1).max(1);
+        let target = line.saturating_sub(step);
+        let line_str = self.text.line(target).to_string();
+        let vcol = self.primary().virtual_col;
+        let char_col = char_col_from_visual(&line_str, vcol, tab_stop_width(self.tabulation));
+        let idx = line_col_to_char_idx(&self.text, target, char_col);
+        self.primary_mut().char_idx = idx;
+        self.sync_primary_virtual();
+        self.ensure_visible();
+    }
+
+    pub fn scroll_page_down(&mut self) {
+        let h = self.viewport.height as usize;
+        if h <= 1 {
+            return;
+        }
+        let (line, _) = char_idx_to_line_col(&self.text, self.primary().char_idx);
+        let step = h.saturating_sub(1).max(1);
+        let last_line = self.text.len_lines().saturating_sub(1);
+        let target = (line + step).min(last_line);
+        let line_str = self.text.line(target).to_string();
+        let vcol = self.primary().virtual_col;
+        let char_col = char_col_from_visual(&line_str, vcol, tab_stop_width(self.tabulation));
+        let idx = line_col_to_char_idx(&self.text, target, char_col);
+        self.primary_mut().char_idx = idx;
+        self.sync_primary_virtual();
+        self.ensure_visible();
+    }
+
+    /// Roda do mouse: `delta` negativo sobe, positivo desce (número de linhas).
+    pub fn scroll_wheel_lines(&mut self, delta: i32) {
+        if delta == 0 {
+            return;
+        }
+        let (line, _) = char_idx_to_line_col(&self.text, self.primary().char_idx);
+        let last_line = self.text.len_lines().saturating_sub(1);
+        let step = delta.unsigned_abs() as usize;
+        let target = if delta < 0 {
+            line.saturating_sub(step)
+        } else {
+            (line + step).min(last_line)
+        };
+        if target == line {
+            return;
+        }
+        let line_str = self.text.line(target).to_string();
+        let vcol = self.primary().virtual_col;
+        let char_col = char_col_from_visual(&line_str, vcol, tab_stop_width(self.tabulation));
+        let idx = line_col_to_char_idx(&self.text, target, char_col);
+        self.primary_mut().char_idx = idx;
+        self.sync_primary_virtual();
+        self.ensure_visible();
+    }
+
+    pub fn move_to_document_start(&mut self, extend: bool) {
+        self.prepare_move(extend);
+        self.primary_mut().char_idx = 0;
+        self.sync_primary_virtual();
+        self.viewport.top_line = 0;
+        self.viewport.left_col = 0;
+        self.ensure_visible();
+    }
+
+    pub fn move_to_document_end(&mut self, extend: bool) {
+        self.prepare_move(extend);
+        self.primary_mut().char_idx = self.text.len_chars();
+        self.sync_primary_virtual();
         self.ensure_visible();
     }
 
@@ -986,5 +1064,45 @@ mod tests {
             visual_col_in_line(&line, col, tab_stop_width(Tabulation::TabLiteral)),
             16
         );
+    }
+
+    #[test]
+    fn move_up_from_readme_table_reaches_document_start() {
+        let content = std::fs::read_to_string("README.md").expect("readme");
+        let mut e = EditorEngine::new();
+        e.load_text(&content);
+        e.viewport.height = 15;
+        e.set_cursor_line_col(72, 0);
+        assert_eq!(e.cursor_line_col().0, 73);
+        for _ in 0..72 {
+            e.move_up(false);
+        }
+        let (line, _) = char_idx_to_line_col(&e.text, e.primary().char_idx);
+        assert_eq!(line, 0);
+        assert_eq!(e.viewport.top_line, 0);
+    }
+
+    #[test]
+    fn scroll_page_up_moves_viewport_on_long_document() {
+        let mut e = EditorEngine::new();
+        e.load_text(&"line\n".repeat(80));
+        e.viewport.height = 10;
+        e.set_cursor_line_col(70, 0);
+        e.scroll_page_up();
+        let (line, _) = char_idx_to_line_col(&e.text, e.primary().char_idx);
+        assert_eq!(line, 61);
+    }
+
+    #[test]
+    fn scroll_wheel_lines_moves_cursor() {
+        let mut e = EditorEngine::new();
+        e.load_text("a\nb\nc\nd\ne\nf\ng\n");
+        e.set_cursor_line_col(4, 0);
+        e.scroll_wheel_lines(-3);
+        let (line, _) = char_idx_to_line_col(&e.text, e.primary().char_idx);
+        assert_eq!(line, 1);
+        e.scroll_wheel_lines(2);
+        let (line, _) = char_idx_to_line_col(&e.text, e.primary().char_idx);
+        assert_eq!(line, 3);
     }
 }

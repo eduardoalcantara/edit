@@ -34,19 +34,19 @@ pub enum PanelBorder {
     Double,
 }
 
-struct BoxChars {
-    tl: char,
-    tr: char,
-    bl: char,
-    br: char,
-    h: char,
-    v: char,
-    sep_l: char,
-    sep_r: char,
+pub(crate) struct BoxChars {
+    pub tl: char,
+    pub tr: char,
+    pub bl: char,
+    pub br: char,
+    pub h: char,
+    pub v: char,
+    pub sep_l: char,
+    pub sep_r: char,
 }
 
 impl PanelBorder {
-    fn chars(self) -> BoxChars {
+    pub(crate) fn chars(self) -> BoxChars {
         match self {
             PanelBorder::Plain => BoxChars {
                 tl: '┌',
@@ -83,17 +83,16 @@ pub fn inner_rect(outer: Rect) -> Rect {
 }
 
 /// Área de texto do editor após borda externa (antes das margens internas).
-pub fn editor_content_rect(outer: Rect, border_visible: bool, terminal_below: bool) -> Rect {
+/// `terminal_block`: linhas reservadas na base da shell (bloco terminal unificado).
+pub fn editor_content_rect(outer: Rect, border_visible: bool, terminal_block: Option<u16>) -> Rect {
     if outer.width == 0 || outer.height == 0 {
         return outer;
     }
 
     let top = 1u16;
-    let bottom = match (border_visible, terminal_below) {
-        (true, true) => 1,
-        (true, false) => 1,
-        (false, true) => 1,
-        (false, false) => 0,
+    let bottom = match terminal_block {
+        Some(n) => n,
+        None => u16::from(border_visible),
     };
     let left = if border_visible { 1 } else { 0 };
     let right = if border_visible { 1 } else { 0 };
@@ -115,7 +114,7 @@ pub fn render_editor_frame(
     border_style: Style,
     title_style: Style,
     border_visible: bool,
-    terminal_below: bool,
+    terminal_block: Option<u16>,
 ) -> Rect {
     if outer.width == 0 || outer.height == 0 {
         return outer;
@@ -153,15 +152,7 @@ pub fn render_editor_frame(
             );
         }
 
-        if terminal_below {
-            render_separator_row(
-                frame,
-                outer,
-                outer.y.saturating_add(outer.height.saturating_sub(1)),
-                PanelBorder::Plain,
-                border_style,
-            );
-        } else if outer.height >= 2 {
+        if terminal_block.is_none() && outer.height >= 2 {
             render_hline(
                 frame,
                 outer.x,
@@ -188,20 +179,9 @@ pub fn render_editor_frame(
             false,
             true,
         );
-
-        if terminal_below && outer.height >= 2 {
-            render_plain_hline(
-                frame,
-                outer.x,
-                outer.y.saturating_add(outer.height.saturating_sub(1)),
-                outer.width as usize,
-                c.h,
-                border_style,
-            );
-        }
     }
 
-    editor_content_rect(outer, border_visible, terminal_below)
+    editor_content_rect(outer, border_visible, terminal_block)
 }
 
 /// Tamanho externo dado largura de conteúdo e número de linhas internas.
@@ -381,16 +361,28 @@ pub fn render_content_row(
     style: Style,
 ) {
     let inner = inner_rect(outer);
-    let row_y = inner.y.saturating_add(row_index);
-    if row_y >= inner.y.saturating_add(inner.height) {
+    render_plain_row(frame, inner, row_index, text, style);
+}
+
+/// Linha de texto sem margem interna (área já é a região útil).
+pub fn render_plain_row(
+    frame: &mut Frame,
+    area: Rect,
+    row_index: u16,
+    text: &str,
+    style: Style,
+) {
+    if area.width == 0 || area.height == 0 || row_index >= area.height {
         return;
     }
+    let w = area.width as usize;
+    let display: String = text.chars().take(w).collect();
     frame.render_widget(
-        Paragraph::new(Span::styled(text.to_string(), style)).style(style),
+        Paragraph::new(Span::styled(display, style)).style(style),
         Rect {
-            x: inner.x,
-            y: row_y,
-            width: inner.width,
+            x: area.x,
+            y: area.y.saturating_add(row_index),
+            width: area.width,
             height: 1,
         },
     );
@@ -576,7 +568,7 @@ fn render_hline(
     );
 }
 
-fn render_cell(frame: &mut Frame, x: u16, y: u16, ch: char, style: Style) {
+pub(crate) fn render_cell(frame: &mut Frame, x: u16, y: u16, ch: char, style: Style) {
     frame.render_widget(
         Paragraph::new(Span::styled(ch.to_string(), style)).style(style),
         Rect {
@@ -596,22 +588,22 @@ mod tests {
     #[test]
     fn editor_content_rect_visible_full() {
         let outer = Rect::new(0, 0, 10, 5);
-        let inner = editor_content_rect(outer, true, false);
+        let inner = editor_content_rect(outer, true, None);
         assert_eq!(inner, Rect::new(1, 1, 8, 3));
     }
 
     #[test]
     fn editor_content_rect_hidden_no_terminal() {
         let outer = Rect::new(0, 0, 10, 5);
-        let inner = editor_content_rect(outer, false, false);
+        let inner = editor_content_rect(outer, false, None);
         assert_eq!(inner, Rect::new(0, 1, 10, 4));
     }
 
     #[test]
-    fn editor_content_rect_hidden_with_terminal() {
-        let outer = Rect::new(0, 0, 10, 5);
-        let inner = editor_content_rect(outer, false, true);
-        assert_eq!(inner, Rect::new(0, 1, 10, 3));
+    fn editor_content_rect_with_terminal_block() {
+        let outer = Rect::new(0, 0, 10, 12);
+        let inner = editor_content_rect(outer, true, Some(6));
+        assert_eq!(inner, Rect::new(1, 1, 8, 5));
     }
 
     #[test]

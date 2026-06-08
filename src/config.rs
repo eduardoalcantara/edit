@@ -92,6 +92,10 @@ fn default_tabulation_str() -> String {
     "4".to_string()
 }
 
+fn default_terminal_altura() -> u16 {
+    crate::terminal::TERMINAL_PANEL_ROWS_DEFAULT
+}
+
 impl Default for AbasConfig {
     fn default() -> Self {
         Self {
@@ -111,6 +115,8 @@ pub struct ExibirConfig {
     pub mostrar: MostrarConfig,
     pub painel_lateral: bool,
     pub terminal: bool,
+    #[serde(default = "default_terminal_altura")]
+    pub terminal_altura: u16,
     pub rodape: bool,
     pub memoria: bool,
     pub tema: String,
@@ -143,6 +149,7 @@ pub struct ViewSettingsSnapshot {
     pub show_eol: bool,
     pub side_panel: bool,
     pub terminal: bool,
+    pub terminal_panel_rows: u16,
     pub footer_visible: bool,
     pub show_memory: bool,
     pub guide_column: GuideColumn,
@@ -178,6 +185,7 @@ pub fn config_from_view(
             },
             painel_lateral: view.side_panel,
             terminal: view.terminal,
+            terminal_altura: view.terminal_panel_rows,
             rodape: view.footer_visible,
             memoria: view.show_memory,
             tema: theme_to_str(view.theme).to_string(),
@@ -211,6 +219,7 @@ impl Default for EditConfig {
                 },
                 painel_lateral: false,
                 terminal: false,
+                terminal_altura: default_terminal_altura(),
                 rodape: true,
                 memoria: true,
                 tema: theme_to_str(ThemeId::ClassicBlue).to_string(),
@@ -274,6 +283,9 @@ impl EditConfig {
             show_eol: self.exibir.mostrar.fim_de_linha,
             side_panel: self.exibir.painel_lateral,
             terminal: self.exibir.terminal,
+            terminal_panel_rows: crate::terminal::clamp_terminal_panel_rows(
+                self.exibir.terminal_altura,
+            ),
             footer_visible: self.exibir.rodape,
             show_memory: self.exibir.memoria,
             guide_column: parse_guide_column(&self.exibir.colunas),
@@ -296,6 +308,8 @@ impl EditConfig {
         self.arquivo.recentes.truncate(MAX_RECENT);
         self.arquivo.abas.limite = self.arquivo.abas.limite.clamp(1, 10);
         self.exibir.zoom = self.exibir.zoom.clamp(1, 3);
+        self.exibir.terminal_altura =
+            crate::terminal::clamp_terminal_panel_rows(self.exibir.terminal_altura);
     }
 
     /// Remove abas persistidas — equivalente a iniciar sem sessão de workspace.

@@ -91,6 +91,8 @@ pub struct ViewState {
     pub show_eol: bool,
     pub side_panel: bool,
     pub terminal: bool,
+    /// Altura do painel terminal em linhas (7–11); persistido em `edit.json`.
+    pub terminal_panel_rows: u16,
     pub footer_visible: bool,
     pub show_memory: bool,
     pub guide_column: GuideColumn,
@@ -110,6 +112,7 @@ impl Default for ViewState {
             show_eol: false,
             side_panel: false,
             terminal: false,
+            terminal_panel_rows: crate::terminal::TERMINAL_PANEL_ROWS_DEFAULT,
             footer_visible: true,
             show_memory: true,
             guide_column: GuideColumn::Unlimited,

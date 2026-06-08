@@ -15,6 +15,7 @@ mod menus;
 mod modal;
 mod recent;
 mod session;
+mod terminal;
 mod theme;
 mod workspace;
 mod ui;

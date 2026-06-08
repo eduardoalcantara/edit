@@ -7,7 +7,13 @@ pub fn key_to_command(key: KeyEvent) -> Option<EditorCommand> {
     let extend = key.modifiers.contains(KeyModifiers::SHIFT);
 
     if ctrl {
-        return None;
+        match key.code {
+            KeyCode::Home => {
+                return Some(EditorCommand::DocumentStart { extend });
+            }
+            KeyCode::End => return Some(EditorCommand::DocumentEnd { extend }),
+            _ => return None,
+        }
     }
 
     match key.code {

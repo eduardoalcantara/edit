@@ -22,6 +22,7 @@ use crate::recent::RecentFiles;
 use crate::theme::ThemeId;
 use crate::ui;
 use crate::session::has_any_undo_files;
+use crate::terminal::TerminalWorkspace;
 use crate::view_state::{EditorBorder, EditorMargin, GuideColumn, InputFocus, ViewState};
 use crate::workspace::{PromptReason, TabSortStrategy, Workspace};
 
@@ -46,6 +47,7 @@ pub struct App {
     pub last_frame_height: u16,
     pub memory: MemoryMonitor,
     pub workspace: Workspace,
+    pub terminal: TerminalWorkspace,
     pub dirty_flow: Option<DirtyFlow>,
     pub pending_dirty_save: Option<(usize, PromptReason)>,
     pub pending_save_all: bool,
@@ -76,6 +78,7 @@ impl App {
             show_eol: view_snapshot.show_eol,
             side_panel: view_snapshot.side_panel,
             terminal: view_snapshot.terminal,
+            terminal_panel_rows: view_snapshot.terminal_panel_rows,
             footer_visible: view_snapshot.footer_visible,
             show_memory: view_snapshot.show_memory,
             guide_column: view_snapshot.guide_column,
@@ -118,6 +121,7 @@ impl App {
             last_frame_height: 24,
             memory: MemoryMonitor::new(),
             workspace,
+            terminal: TerminalWorkspace::default(),
             dirty_flow: None,
             pending_dirty_save: None,
             pending_save_all: false,
@@ -125,6 +129,9 @@ impl App {
             user_config,
         };
         app.refresh_menu();
+        if app.view.terminal {
+            app.ensure_terminal_session();
+        }
         app
     }
 
@@ -208,6 +215,8 @@ impl App {
     pub fn run(&mut self, terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>) -> io::Result<()> {
         while !self.should_quit {
             self.memory.refresh_if_due();
+            self.terminal.drain_all();
+            self.sync_terminal_pty_size();
             self.refresh_menu();
             terminal.draw(|frame| ui::draw(frame, self))?;
 
@@ -221,6 +230,7 @@ impl App {
     }
 
     pub fn shutdown(&mut self) {
+        self.terminal.shutdown();
         self.persist_session_artifacts();
         self.persist_user_config();
     }
@@ -304,7 +314,11 @@ impl App {
         self.view.terminal = !self.view.terminal;
         if !self.view.terminal {
             self.input_focus = InputFocus::Editor;
+            self.terminal.sidebar_hover = None;
+        } else {
+            self.ensure_terminal_session();
         }
+        self.persist_user_config();
         self.set_status(if self.view.terminal {
             "Terminal: visível"
         } else {
@@ -312,9 +326,43 @@ impl App {
         });
     }
 
+    pub fn grow_terminal_panel(&mut self) {
+        use crate::terminal::{clamp_terminal_panel_rows, TERMINAL_PANEL_ROWS_MAX};
+        let next = self.view.terminal_panel_rows.saturating_add(1);
+        if next > TERMINAL_PANEL_ROWS_MAX {
+            self.set_status("Terminal: altura máxima");
+            return;
+        }
+        self.view.terminal_panel_rows = clamp_terminal_panel_rows(next);
+        self.persist_user_config();
+        self.sync_terminal_pty_size();
+        self.set_status(format!(
+            "Terminal: {} linhas",
+            self.view.terminal_panel_rows
+        ));
+    }
+
+    pub fn shrink_terminal_panel(&mut self) {
+        use crate::terminal::{clamp_terminal_panel_rows, TERMINAL_PANEL_ROWS_MIN};
+        if self.view.terminal_panel_rows <= TERMINAL_PANEL_ROWS_MIN {
+            self.set_status("Terminal: altura mínima");
+            return;
+        }
+        self.view.terminal_panel_rows =
+            clamp_terminal_panel_rows(self.view.terminal_panel_rows.saturating_sub(1));
+        self.persist_user_config();
+        self.sync_terminal_pty_size();
+        self.set_status(format!(
+            "Terminal: {} linhas",
+            self.view.terminal_panel_rows
+        ));
+    }
+
     pub fn toggle_input_focus(&mut self) {
         if !self.view.terminal {
             self.view.terminal = true;
+            self.ensure_terminal_session();
+            self.persist_user_config();
             self.input_focus = InputFocus::Terminal;
             self.set_status("Terminal: foco");
             return;
@@ -327,6 +375,40 @@ impl App {
             InputFocus::Editor => "Editor: foco",
             InputFocus::Terminal => "Terminal: foco",
         });
+    }
+
+    fn terminal_pty_size(&self) -> (u16, u16) {
+        let layout = ui::UiLayout::compute(
+            ratatui::layout::Rect {
+                x: 0,
+                y: 0,
+                width: self.last_frame_width,
+                height: self.last_frame_height,
+            },
+            self,
+        );
+        layout
+            .terminal
+            .map(|panel| (panel.output.width.max(1), panel.output.height.max(1)))
+            .unwrap_or((80, 24))
+    }
+
+    pub(crate) fn sync_terminal_pty_size(&mut self) {
+        if !self.view.terminal {
+            return;
+        }
+        let (cols, rows) = self.terminal_pty_size();
+        self.terminal.resize_active(cols, rows);
+    }
+
+    pub(crate) fn ensure_terminal_session(&mut self) {
+        if !self.view.terminal {
+            return;
+        }
+        let cwd = crate::terminal::default_spawn_cwd(self.document.path());
+        let (cols, rows) = self.terminal_pty_size();
+        self.terminal.ensure_session(cwd, cols, rows);
+        self.sync_terminal_pty_size();
     }
 
     pub(crate) fn rename_file_to(&mut self, name_input: &str) {

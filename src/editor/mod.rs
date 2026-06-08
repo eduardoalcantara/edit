@@ -14,6 +14,16 @@ pub use cursor::SelectionMode;
 pub use engine::{EditorEngine, EMPTY_DOCUMENT_TEXT};
 pub use tabs::convert_tabulation_between;
 
+/// Área de texto do editor (inner + margens) para viewport e hit-test.
+pub fn editor_viewport_rect(
+    shell: Rect,
+    border: EditorBorder,
+    terminal_block: Option<u16>,
+    margin: EditorMargin,
+) -> Rect {
+    render::editor_viewport_rect(shell, border, terminal_block, margin)
+}
+
 use ratatui::layout::Rect;
 use ratatui::Frame;
 
@@ -90,6 +100,11 @@ impl Editor {
             EditorCommand::MoveDown { extend } => self.engine.move_down(extend),
             EditorCommand::Home { extend } => self.engine.move_home(extend),
             EditorCommand::End { extend } => self.engine.move_end(extend),
+            EditorCommand::DocumentStart { extend } => self.engine.move_to_document_start(extend),
+            EditorCommand::DocumentEnd { extend } => self.engine.move_to_document_end(extend),
+            EditorCommand::PageUp => self.engine.scroll_page_up(),
+            EditorCommand::PageDown => self.engine.scroll_page_down(),
+            EditorCommand::ScrollWheel { delta } => self.engine.scroll_wheel_lines(delta),
             EditorCommand::SelectAll => self.engine.select_all(),
             EditorCommand::CancelSelection => self.engine.cancel_selection(),
             EditorCommand::Undo => self.engine.undo(),
@@ -123,7 +138,8 @@ impl Editor {
         palette: ThemePalette,
         margin: EditorMargin,
         border: EditorBorder,
-        terminal_below: bool,
+        terminal_block: Option<u16>,
+        text_viewport: Option<Rect>,
         show_cursor: bool,
         show_tabs: bool,
     ) {
@@ -135,7 +151,8 @@ impl Editor {
             palette,
             margin,
             border,
-            terminal_below,
+            terminal_block,
+            text_viewport,
             show_cursor,
             show_tabs,
         );
@@ -303,7 +320,11 @@ impl Editor {
 
     pub fn replace_content(&mut self, content: &str) {
         let (line, col) = self.engine.cursor_raw();
+        let top_line = self.engine.viewport.top_line;
+        let left_col = self.engine.viewport.left_col;
         self.engine.load_text(content);
+        self.engine.viewport.top_line = top_line;
+        self.engine.viewport.left_col = left_col;
         self.engine.set_caret_line_col(line, col, true);
     }
 }

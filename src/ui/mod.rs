@@ -2,7 +2,7 @@
 
 mod compositor;
 mod layer;
-mod layout;
+pub mod layout;
 mod layers;
 
 use ratatui::Frame;
@@ -10,6 +10,7 @@ use ratatui::Frame;
 use crate::app::App;
 
 pub use compositor::Compositor;
+pub use layout::UiLayout;
 
 pub fn draw(frame: &mut Frame, app: &mut App) {
     app.last_frame_width = frame.area().width;

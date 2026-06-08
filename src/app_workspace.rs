@@ -11,7 +11,7 @@ use crate::modal::dialog::DialogButtonAction;
 use crate::session::{purge_all, purge_orphans, purge_tab, read_content_tmp, write_content_tmp};
 use crate::workspace::{
     create_tab_from_defaults, new_session_id, next_novo_counter, novo_display_name, snapshot_path,
-    swap_active_with_tab, PromptReason, Tab, Workspace,
+    flush_editor_into_tab, PromptReason, Tab, Workspace,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -40,8 +40,9 @@ impl App {
             .workspace
             .active_index
             .min(self.workspace.tabs.len() - 1);
+        let word_wrap = self.view.word_wrap;
         let tab = &mut self.workspace.tabs[idx];
-        swap_active_with_tab(&mut self.editor, &mut self.document, tab);
+        flush_editor_into_tab(&self.editor, &self.document, tab, word_wrap);
     }
 
     pub(crate) fn focus_tab(&mut self, index: usize) {
@@ -321,6 +322,7 @@ impl App {
             return abas;
         }
         for tab in &self.workspace.tabs {
+            // `cursor_line_col` já é 1-based (ex.: linha 1 / col 1 = início do arquivo).
             let (line, col) = tab.editor.cursor_line_col();
             let entry = SessaoTabEntry {
                 tab_id: tab.session_id.clone(),
@@ -334,8 +336,8 @@ impl App {
                     None
                 },
                 temporario: tab.document.path().is_none(),
-                cursor_linha: line.saturating_add(1),
-                cursor_coluna: col.saturating_add(1),
+                cursor_linha: line,
+                cursor_coluna: col,
                 encoding: encoding_to_config_str(tab.document.encoding),
                 tabulacao: tabulation_to_config_str(tab.document.tabulation),
                 fs_mtime_ms: tab.fs_snapshot.as_ref().and_then(|s| {
@@ -580,21 +582,21 @@ pub fn workspace_from_config(
         .active_index
         .min(workspace.tabs.len().saturating_sub(1));
     let active_idx = workspace.active_index;
+    let active_tab = &workspace.tabs[active_idx];
+    let document = active_tab.document.clone();
     let mut editor = Editor::new(palette);
-    let mut document = Document::new();
-    document.encoding = user_config.default_encoding();
-    document.tabulation = user_config.default_tabulation();
-    swap_active_with_tab(
-        &mut editor,
-        &mut document,
-        &mut workspace.tabs[active_idx],
-    );
+    editor.replace_content(&active_tab.editor.content_string());
+    editor.set_tabulation(document.tabulation);
+    editor.set_word_wrap(word_wrap);
+    let (line, col) = active_tab.editor.cursor_line_col();
+    editor.set_cursor(line.saturating_sub(1), col.saturating_sub(1));
     (workspace, editor, document)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::app::App;
     use crate::config::{AbasConfig, EditConfig, SessaoTabEntry};
     use crate::theme::ThemeId;
 
@@ -630,6 +632,37 @@ mod tests {
         let palette = ThemeId::ClassicBlue.palette();
         let (ws, _, _) = workspace_from_config(&config, &palette, false);
         assert_eq!(ws.tabs[0].display_name, "Salvo");
+    }
+
+    #[test]
+    fn sync_active_tab_preserves_app_editor_content() {
+        let mut app = App::new(false);
+        app.editor.replace_content("# README\n\nConteúdo editado");
+        app.sync_active_tab();
+        assert_eq!(
+            app.editor.content_string(),
+            "# README\n\nConteúdo editado"
+        );
+        assert_eq!(
+            app.workspace.tabs[0].editor.content_string(),
+            "# README\n\nConteúdo editado"
+        );
+    }
+
+    #[test]
+    fn saved_cursor_position_roundtrips_without_drift() {
+        let mut app = App::new(false);
+        app.editor.set_cursor(0, 0);
+        app.sync_active_tab();
+
+        let abas = app.build_abas_config();
+        assert_eq!(abas.sessao[0].cursor_linha, 1);
+        assert_eq!(abas.sessao[0].cursor_coluna, 1);
+
+        let config = sample_config(false, abas.sessao);
+        let palette = ThemeId::ClassicBlue.palette();
+        let (ws, _, _) = workspace_from_config(&config, &palette, false);
+        assert_eq!(ws.tabs[0].editor.cursor_line_col(), (1, 1));
     }
 
     #[test]
