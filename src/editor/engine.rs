@@ -517,21 +517,22 @@ impl EditorEngine {
     pub fn finish_block_select(&mut self) {
         if let Some(block) = &mut self.block_selection {
             block.dragging = false;
-            let (r0, _, r1, _) = block.normalized();
-            let (_, _, _, c1) = block.normalized();
-            self.cursors = (r0..=r1)
-                .map(|row| {
-                    let idx = line_col_to_char_idx(&self.text, row, c1);
-                    Cursor {
-                        char_idx: idx,
-                        virtual_col: c1,
-                        anchor: None,
-                    }
-                })
-                .collect();
-            if !self.cursors.is_empty() {
-                self.selection_mode = SelectionMode::Multi;
+            let (r0, vc0, r1, vc1) = block.normalized();
+            if r0 == r1 && vc0 == vc1 {
+                self.block_selection = None;
+                self.selection_mode = SelectionMode::Normal;
+                return;
             }
+            self.cursors.truncate(1);
+            let line_str = self.text.line(r0).to_string();
+            let char_col = char_col_from_visual(
+                line_str.trim_end_matches('\n'),
+                vc0,
+                tab_stop_width(self.tabulation),
+            );
+            self.primary_mut().char_idx = line_col_to_char_idx(&self.text, r0, char_col);
+            self.primary_mut().anchor = None;
+            self.sync_primary_virtual();
         }
     }
 
@@ -546,9 +547,10 @@ impl EditorEngine {
 
     pub fn copy_text(&self) -> Option<String> {
         if let Some(block) = self.block_selection {
-            let (r0, c0, r1, c1) = block.normalized();
-            if r0 != r1 || c0 != c1 {
-                return Some(extract_block_text(&self.text, r0, c0, r1, c1));
+            let (r0, vc0, r1, vc1) = block.normalized();
+            if r0 != r1 || vc0 != vc1 {
+                let tw = tab_stop_width(self.tabulation);
+                return Some(extract_block_text(&self.text, r0, vc0, r1, vc1, tw));
             }
         }
         if let Some(anchor) = self.primary().anchor {
@@ -564,7 +566,7 @@ impl EditorEngine {
         match self.selection_mode {
             SelectionMode::Block => {
                 if let Some(block) = self.block_selection {
-                    delete_block(&mut self.text, &block);
+                    delete_block(&mut self.text, &block, tab_stop_width(self.tabulation));
                     self.block_selection = None;
                     self.selection_mode = SelectionMode::Normal;
                     self.cursors.truncate(1);
@@ -815,7 +817,8 @@ mod tests {
         e.start_block_select(0, 0);
         e.update_block_select(1, 1);
         e.finish_block_select();
-        assert_eq!(e.selection_mode, SelectionMode::Multi);
+        assert_eq!(e.selection_mode, SelectionMode::Block);
+        assert!(!e.block_selection.unwrap().dragging);
         let text = e.copy_text().unwrap();
         assert_eq!(text, "a\nx");
     }

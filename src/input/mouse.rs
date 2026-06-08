@@ -31,13 +31,20 @@ pub fn handle_editor_mouse(app: &mut App, mouse: MouseEvent) {
     let Some((vp_line, vp_col)) = terminal_to_doc(&mouse, inner) else {
         return;
     };
+    let engine = app.editor.engine();
+    let doc_line = (engine.viewport.top_line + vp_line)
+        .min(engine.text.len_lines().saturating_sub(1));
+    let vis_col = engine.viewport.left_col + vp_col;
     let (line, col) = app.editor.viewport_to_doc(vp_line, vp_col);
 
     match mouse.kind {
         MouseEventKind::Down(MouseButton::Left) => {
             if mouse.modifiers.contains(KeyModifiers::ALT) {
                 app.editor
-                    .execute(EditorCommand::StartBlockSelect { line, col });
+                    .execute(EditorCommand::StartBlockSelect {
+                        line: doc_line,
+                        col: vis_col,
+                    });
                 return;
             }
             if mouse.modifiers.contains(KeyModifiers::CONTROL) {
@@ -48,8 +55,10 @@ pub fn handle_editor_mouse(app: &mut App, mouse: MouseEvent) {
         }
         MouseEventKind::Drag(MouseButton::Left) => {
             if app.editor.is_block_dragging() {
-                app.editor
-                    .execute(EditorCommand::UpdateBlockSelect { line, col });
+                app.editor.execute(EditorCommand::UpdateBlockSelect {
+                    line: doc_line,
+                    col: vis_col,
+                });
                 return;
             }
             if app.editor.is_linear_dragging() {

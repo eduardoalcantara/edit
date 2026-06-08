@@ -1,6 +1,7 @@
 use ropey::Rope;
 
 use crate::editor::cursor::{char_idx_to_line_col, line_col_to_char_idx, Cursor, SelectionMode};
+use crate::editor::tabs::{char_col_from_visual, visual_slice_in_line};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BlockSelectionState {
@@ -21,18 +22,20 @@ impl BlockSelectionState {
     }
 }
 
-pub fn extract_block_text(text: &Rope, r0: usize, c0: usize, r1: usize, c1: usize) -> String {
+pub fn extract_block_text(
+    text: &Rope,
+    r0: usize,
+    vc0: usize,
+    r1: usize,
+    vc1: usize,
+    tab_width: usize,
+) -> String {
     let mut out = Vec::new();
     let lines = text.len_lines().max(1);
     for row in r0..=r1.min(lines.saturating_sub(1)) {
-        let line = text.line(row);
-        let end = c1.min(line.len_chars());
-        let start = c0.min(end);
-        let mut slice = line.slice(start..end).to_string();
-        if end < c1 {
-            slice.push_str(&" ".repeat(c1 - end));
-        }
-        out.push(slice);
+        let mut line_str = text.line(row).to_string();
+        line_str.truncate(line_str.trim_end_matches('\n').len());
+        out.push(visual_slice_in_line(&line_str, vc0, vc1, tab_width));
     }
     out.join("\n")
 }
@@ -45,17 +48,16 @@ pub fn extract_linear_text(text: &Rope, start: usize, end: usize) -> String {
     text.slice(a..b).to_string()
 }
 
-pub fn delete_block(text: &mut Rope, block: &BlockSelectionState) {
-    let (r0, c0, r1, c1) = block.normalized();
+pub fn delete_block(text: &mut Rope, block: &BlockSelectionState, tab_width: usize) {
+    let (r0, vc0, r1, vc1) = block.normalized();
     for row in (r0..=r1).rev() {
-        let line_start = text.line_to_char(row);
-        let line = text.line(row);
-        let end = c1.min(line.len_chars());
-        let start = c0.min(end);
-        let del_start = line_start + start;
-        let del_end = line_start + end;
-        if del_start < del_end {
-            text.remove(del_start..del_end);
+        let mut line_str = text.line(row).to_string();
+        line_str.truncate(line_str.trim_end_matches('\n').len());
+        let cs = char_col_from_visual(&line_str, vc0, tab_width);
+        let ce = char_col_from_visual(&line_str, vc1, tab_width);
+        if cs < ce {
+            let line_start = text.line_to_char(row);
+            text.remove(line_start + cs..line_start + ce);
         }
     }
 }
@@ -114,8 +116,8 @@ mod tests {
     #[test]
     fn extract_block_pads_short_lines() {
         let text = Rope::from_str("ab\nx");
-        let block = extract_block_text(&text, 0, 1, 1, 2);
-        assert_eq!(block, "b\n ");
+        let block = extract_block_text(&text, 0, 1, 1, 3, 4);
+        assert_eq!(block, "b \n  ");
     }
 
     #[test]

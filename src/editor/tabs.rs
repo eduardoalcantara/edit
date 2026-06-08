@@ -44,6 +44,25 @@ pub fn char_col_from_visual(line: &str, target_vis: usize, tab_width: usize) -> 
 }
 
 /// Expande `\t` para a largura visual usada na pintura e no posicionamento do cursor.
+pub fn visual_slice_in_line(line: &str, vc0: usize, vc1: usize, tab_width: usize) -> String {
+    if vc0 >= vc1 {
+        return String::new();
+    }
+    let expanded = expand_tabs(line, tab_width, false);
+    let vis_len = expanded.chars().count();
+    let mut out = String::with_capacity(vc1 - vc0);
+    for v in vc0..vc1 {
+        if v < vis_len {
+            if let Some(ch) = expanded.chars().nth(v) {
+                out.push(ch);
+            }
+        } else {
+            out.push(' ');
+        }
+    }
+    out
+}
+
 pub fn expand_tabs(line: &str, tab_width: usize, show_tabs: bool) -> String {
     if !line.contains('\t') {
         return line.to_string();

@@ -163,13 +163,13 @@ fn styled_line(
 
     if engine.selection_mode == SelectionMode::Block {
         if let Some(block) = engine.block_selection {
-            let (r0, c0, r1, c1) = block.normalized();
+            let (r0, vc0, r1, vc1) = block.normalized();
             if doc_line >= r0 && doc_line <= r1 {
-                spans = highlight_range(
+                spans = highlight_block_range(
                     display,
                     left_vis,
-                    visual_col_in_line(line_str, c0, tab_width),
-                    visual_col_in_line(line_str, c1, tab_width),
+                    vc0,
+                    vc1,
                     normal,
                     selected,
                 );
@@ -195,6 +195,43 @@ fn styled_line(
         }
     }
 
+    spans
+}
+
+fn highlight_block_range(
+    display: &str,
+    left_vis: usize,
+    vc0: usize,
+    vc1: usize,
+    normal: Style,
+    selected: Style,
+) -> Vec<Span<'static>> {
+    let chars: Vec<char> = display.chars().collect();
+    let vis_start = vc0.saturating_sub(left_vis);
+    let vis_end = vc1.saturating_sub(left_vis);
+    if vis_end <= vis_start {
+        return vec![Span::styled(display.to_string(), normal)];
+    }
+    let before: String = chars[..vis_start.min(chars.len())].iter().collect();
+    let mid: String = if vis_start < chars.len() {
+        chars[vis_start..vis_end.min(chars.len())].iter().collect()
+    } else {
+        String::new()
+    };
+    let pad_count = vis_end.saturating_sub(chars.len().max(vis_start));
+    let after: String = if vis_end < chars.len() {
+        chars[vis_end..].iter().collect()
+    } else {
+        String::new()
+    };
+    let mut spans = vec![Span::styled(before, normal)];
+    if !mid.is_empty() || pad_count > 0 {
+        spans.push(Span::styled(
+            format!("{}{}", mid, " ".repeat(pad_count)),
+            selected,
+        ));
+    }
+    spans.push(Span::styled(after, normal));
     spans
 }
 
