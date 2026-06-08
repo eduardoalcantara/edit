@@ -30,9 +30,13 @@ pub fn find_prev(text: &Rope, pattern: &str, from_char: usize) -> Option<usize> 
     content.rfind(pattern).map(|p| content[..p].chars().count())
 }
 
-pub fn replace_at(text: &mut Rope, char_idx: usize, pattern: &str, replacement: &str) -> bool {
+pub fn match_range_for_replace(
+    text: &Rope,
+    char_idx: usize,
+    pattern: &str,
+) -> Option<(usize, usize)> {
     if pattern.is_empty() {
-        return false;
+        return None;
     }
     let content = text.to_string();
     let byte_start = content
@@ -45,17 +49,22 @@ pub fn replace_at(text: &mut Rope, char_idx: usize, pattern: &str, replacement: 
         let end = start + pattern.len();
         let start_char = content[..start].chars().count();
         let end_char = content[..end].chars().count();
-        text.remove(start_char..end_char);
-        text.insert(start_char, replacement);
-        return true;
+        return Some((start_char, end_char));
     }
     if let Some(pos) = content.find(pattern) {
         let end = pos + pattern.len();
         let start_char = content[..pos].chars().count();
         let end_char = content[..end].chars().count();
-        text.remove(start_char..end_char);
-        text.insert(start_char, replacement);
-        return true;
+        return Some((start_char, end_char));
     }
-    false
+    None
+}
+
+pub fn replace_at(text: &mut Rope, char_idx: usize, pattern: &str, replacement: &str) -> bool {
+    let Some((start_char, end_char)) = match_range_for_replace(text, char_idx, pattern) else {
+        return false;
+    };
+    text.remove(start_char..end_char);
+    text.insert(start_char, replacement);
+    true
 }

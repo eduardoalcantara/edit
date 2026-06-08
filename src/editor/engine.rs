@@ -6,8 +6,8 @@ use crate::editor::cursor::{
 };
 use crate::editor::history::EditHistory;
 use crate::editor::selection::{
-    add_cursor_at, delete_block, extract_block_text, extract_linear_text, merge_cursors,
-    BlockSelectionState,
+    add_cursor_at, collect_block_delete_patches, delete_block, extract_block_text,
+    extract_linear_text, merge_cursors, BlockSelectionState,
 };
 use crate::editor::tabs::{char_col_from_visual, line_visual_len, tab_stop_width, visual_col_in_line};
 use crate::editor::word_boundary::{get_next_word_boundary, WordDirection};
@@ -224,6 +224,24 @@ impl EditorEngine {
             .record_change(start, removed, inserted, before, after);
     }
 
+    fn record_block_delete(
+        &mut self,
+        patches: Vec<crate::editor::selection::BlockDeletePatch>,
+        before: usize,
+        after: usize,
+    ) {
+        self.history.record_block_delete(patches, before, after);
+    }
+
+    fn record_multi(
+        &mut self,
+        patches: Vec<(usize, String, String)>,
+        before: usize,
+        after: usize,
+    ) {
+        self.history.record_multi_linear(patches, before, after);
+    }
+
     pub fn insert_char(&mut self, ch: char) {
         if self.selection_mode == SelectionMode::Multi {
             self.insert_char_multi(ch);
@@ -244,12 +262,25 @@ impl EditorEngine {
             self.replace_char_at(before, ch);
             return;
         }
-        self.materialize_virtual_at_primary();
+        let materialized = self.materialize_virtual_at_primary();
         let idx = self.primary().char_idx.min(self.text.len_chars());
         self.text.insert_char(idx, ch);
         self.primary_mut().char_idx = idx + 1;
         self.sync_primary_virtual();
-        self.record(idx, String::new(), ch.to_string(), before, self.primary().char_idx);
+        let (record_start, inserted) = if let Some((start, spaces)) = materialized {
+            let mut ins = spaces;
+            ins.push(ch);
+            (start, ins)
+        } else {
+            (idx, ch.to_string())
+        };
+        self.record(
+            record_start,
+            String::new(),
+            inserted,
+            before,
+            self.primary().char_idx,
+        );
         self.ensure_visible();
     }
 
@@ -272,12 +303,21 @@ impl EditorEngine {
     }
 
     fn insert_char_multi(&mut self, ch: char) {
+        let before = self.primary().char_idx;
         let mut indices: Vec<usize> = self.cursors.iter().map(|c| c.char_idx).collect();
         indices.sort_unstable_by(|a, b| b.cmp(a));
         let before_positions: Vec<usize> = indices.clone();
+        let mut patches = Vec::new();
         for idx in indices {
-            self.materialize_at(idx);
-            self.text.insert_char(idx, ch);
+            let (insert_idx, materialized) = self.materialize_at(idx);
+            let record_start = materialized
+                .as_ref()
+                .map(|(start, _)| *start)
+                .unwrap_or(insert_idx);
+            let mut inserted = materialized.map(|(_, spaces)| spaces).unwrap_or_default();
+            inserted.push(ch);
+            self.text.insert_char(insert_idx, ch);
+            patches.push((record_start, String::new(), inserted));
         }
         for c in &mut self.cursors {
             if before_positions.contains(&c.char_idx) {
@@ -285,9 +325,7 @@ impl EditorEngine {
             }
         }
         merge_cursors(&mut self.cursors);
-        if let Some(first) = before_positions.first() {
-            self.record(*first, String::new(), ch.to_string(), *first, first + 1);
-        }
+        self.record_multi(patches, before, self.primary().char_idx);
         self.ensure_visible();
     }
 
@@ -297,17 +335,21 @@ impl EditorEngine {
         }
     }
 
-    fn materialize_at(&mut self, char_idx: usize) {
+    fn materialize_at(&mut self, char_idx: usize) -> (usize, Option<(usize, String)>) {
         let (line, col) = char_idx_to_line_col(&self.text, char_idx.min(self.text.len_chars()));
         let line_start = self.text.line_to_char(line);
         let line_len = self.text.line(line).len_chars();
         if col > line_len {
             let spaces: String = " ".repeat(col - line_len);
-            self.text.insert(line_start + line_len, &spaces);
+            let insert_at = line_start + line_len;
+            self.text.insert(insert_at, &spaces);
+            let insert_idx = insert_at + spaces.chars().count();
+            return (insert_idx, Some((insert_at, spaces)));
         }
+        (char_idx, None)
     }
 
-    fn materialize_virtual_at_primary(&mut self) {
+    fn materialize_virtual_at_primary(&mut self) -> Option<(usize, String)> {
         let virtual_col = self.primary().virtual_col;
         let char_idx = self.primary().char_idx.min(self.text.len_chars());
         let (line, col) = char_idx_to_line_col(&self.text, char_idx);
@@ -318,30 +360,39 @@ impl EditorEngine {
         let line_char_len = self.text.line(line).len_chars();
 
         if virtual_col <= line_visual {
-            return;
+            return None;
         }
         if line_char_len == 0 {
             self.primary_mut().virtual_col = 0;
-            return;
+            return None;
         }
         // Caret clamped on a shorter line after ↑/↓ — não preencher com espaços.
         if col < line_char_len {
             self.primary_mut().virtual_col = line_visual;
-            return;
+            return None;
         }
         // Só materializa espaços quando o caret está no fim da linha e virtual_col avançou além.
         if virtual_col > line_visual {
             let spaces: String = " ".repeat(virtual_col - line_visual);
-            self.text.insert(line_start + line_char_len, &spaces);
-            self.primary_mut().char_idx = line_start + line_char_len + spaces.chars().count();
+            let insert_at = line_start + line_char_len;
+            self.text.insert(insert_at, &spaces);
+            self.primary_mut().char_idx = insert_at + spaces.chars().count();
+            return Some((insert_at, spaces));
         }
+        None
     }
 
     pub fn backspace(&mut self) {
         if self.selection_mode == SelectionMode::Multi {
-            for idx in self.cursors.iter().map(|c| c.char_idx).collect::<Vec<_>>() {
+            let before = self.primary().char_idx;
+            let mut indices: Vec<usize> = self.cursors.iter().map(|c| c.char_idx).collect();
+            indices.sort_unstable_by(|a, b| b.cmp(a));
+            let mut patches = Vec::new();
+            for idx in indices {
                 if idx > 0 {
+                    let removed = self.text.slice(idx - 1..idx).to_string();
                     self.text.remove(idx - 1..idx);
+                    patches.push((idx - 1, removed, String::new()));
                 }
             }
             for c in &mut self.cursors {
@@ -350,6 +401,9 @@ impl EditorEngine {
                 }
             }
             merge_cursors(&mut self.cursors);
+            if !patches.is_empty() {
+                self.record_multi(patches, before, self.primary().char_idx);
+            }
             self.ensure_visible();
             return;
         }
@@ -371,13 +425,21 @@ impl EditorEngine {
 
     pub fn delete(&mut self) {
         if self.selection_mode == SelectionMode::Multi {
-            let indices: Vec<usize> = self.cursors.iter().map(|c| c.char_idx).collect();
-            for idx in indices.into_iter().rev() {
+            let before = self.primary().char_idx;
+            let mut indices: Vec<usize> = self.cursors.iter().map(|c| c.char_idx).collect();
+            indices.sort_unstable_by(|a, b| b.cmp(a));
+            let mut patches = Vec::new();
+            for idx in indices {
                 if idx < self.text.len_chars() {
+                    let removed = self.text.slice(idx..idx + 1).to_string();
                     self.text.remove(idx..idx + 1);
+                    patches.push((idx, removed, String::new()));
                 }
             }
             merge_cursors(&mut self.cursors);
+            if !patches.is_empty() {
+                self.record_multi(patches, before, self.primary().char_idx);
+            }
             self.ensure_visible();
             return;
         }
@@ -566,11 +628,17 @@ impl EditorEngine {
         match self.selection_mode {
             SelectionMode::Block => {
                 if let Some(block) = self.block_selection {
-                    delete_block(&mut self.text, &block, tab_stop_width(self.tabulation));
+                    let before = self.primary().char_idx;
+                    let tw = tab_stop_width(self.tabulation);
+                    let patches = collect_block_delete_patches(&self.text, &block, tw);
+                    delete_block(&mut self.text, &block, tw);
                     self.block_selection = None;
                     self.selection_mode = SelectionMode::Normal;
                     self.cursors.truncate(1);
-                    self.primary_mut().char_idx = self.primary().char_idx.min(self.text.len_chars());
+                    self.primary_mut().char_idx =
+                        self.primary().char_idx.min(self.text.len_chars());
+                    let after = self.primary().char_idx;
+                    self.record_block_delete(patches, before, after);
                     return true;
                 }
             }
@@ -582,10 +650,13 @@ impl EditorEngine {
                         (self.primary().char_idx, anchor)
                     };
                     if a != b {
+                        let before = self.primary().char_idx;
+                        let removed = self.text.slice(a..b).to_string();
                         self.text.remove(a..b);
                         self.primary_mut().char_idx = a;
                         self.primary_mut().anchor = None;
                         self.sync_primary_virtual();
+                        self.record(a, removed, String::new(), before, a);
                         return true;
                     }
                 }
@@ -654,14 +725,29 @@ impl EditorEngine {
 
     pub fn replace_one(&mut self, replacement: &str) -> bool {
         let pattern = self.search_pattern.clone();
-        let idx = self.primary().char_idx;
-        if crate::editor::search::replace_at(&mut self.text, idx, &pattern, replacement) {
-            self.primary_mut().char_idx = idx;
-            self.sync_primary_virtual();
-            true
-        } else {
-            false
+        if pattern.is_empty() {
+            return false;
         }
+        let before = self.primary().char_idx;
+        let Some((start_char, end_char)) =
+            crate::editor::search::match_range_for_replace(&self.text, before, &pattern)
+        else {
+            return false;
+        };
+        let removed = self.text.slice(start_char..end_char).to_string();
+        self.text.remove(start_char..end_char);
+        self.text.insert(start_char, replacement);
+        let after = start_char + replacement.chars().count();
+        self.primary_mut().char_idx = start_char;
+        self.sync_primary_virtual();
+        self.record(
+            start_char,
+            removed,
+            replacement.to_string(),
+            before,
+            after,
+        );
+        true
     }
 
     pub fn insert_tab(&mut self) {
@@ -808,6 +894,68 @@ mod tests {
         assert_eq!(e.visible_char_count(), 10);
         e.viewport.left_col = 6;
         assert_eq!(e.visible_char_count(), 10);
+    }
+
+    #[test]
+    fn undo_block_replace_restores_deleted_block() {
+        let mut e = EditorEngine::new();
+        e.load_text("abcd\nwxyz");
+        e.start_block_select(0, 1);
+        e.update_block_select(1, 3);
+        e.finish_block_select();
+        e.insert_char('x');
+        e.insert_char('y');
+        e.undo();
+        e.undo();
+        e.undo();
+        assert_eq!(e.text.to_string(), "abcd\nwxyz");
+    }
+
+    #[test]
+    fn undo_linear_selection_delete_restores_text() {
+        let mut e = EditorEngine::new();
+        e.load_text("hello world");
+        e.primary_mut().anchor = Some(0);
+        e.primary_mut().char_idx = 5;
+        e.backspace();
+        assert_eq!(e.text.to_string(), " world");
+        e.undo();
+        assert_eq!(e.text.to_string(), "hello world");
+    }
+
+    #[test]
+    fn undo_replace_one_restores_match() {
+        let mut e = EditorEngine::new();
+        e.load_text("foo bar foo");
+        e.search_pattern = "foo".into();
+        e.set_cursor_line_col(0, 0);
+        assert!(e.replace_one("baz"));
+        assert_eq!(e.text.to_string(), "baz bar foo");
+        e.undo();
+        assert_eq!(e.text.to_string(), "foo bar foo");
+    }
+
+    #[test]
+    fn undo_multi_cursor_insert() {
+        let mut e = EditorEngine::new();
+        e.load_text("abc");
+        e.set_cursor_line_col(0, 1);
+        e.add_cursor(0, 2);
+        e.insert_char('X');
+        assert_eq!(e.text.to_string(), "aXbXc");
+        e.undo();
+        assert_eq!(e.text.to_string(), "abc");
+    }
+
+    #[test]
+    fn undo_materialize_spaces_with_typed_char() {
+        let mut e = EditorEngine::new();
+        e.load_text("hello world\nshort");
+        e.set_cursor_line_col(0, 10);
+        e.move_down(false);
+        e.insert_char('x');
+        e.undo();
+        assert_eq!(e.text.to_string(), "hello world\nshort");
     }
 
     #[test]

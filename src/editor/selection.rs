@@ -48,6 +48,38 @@ pub fn extract_linear_text(text: &Rope, start: usize, end: usize) -> String {
     text.slice(a..b).to_string()
 }
 
+#[derive(Debug, Clone)]
+pub struct BlockDeletePatch {
+    pub row: usize,
+    pub char_col: usize,
+    pub removed: String,
+}
+
+pub fn collect_block_delete_patches(
+    text: &Rope,
+    block: &BlockSelectionState,
+    tab_width: usize,
+) -> Vec<BlockDeletePatch> {
+    let (r0, vc0, r1, vc1) = block.normalized();
+    let mut patches = Vec::new();
+    let lines = text.len_lines().max(1);
+    for row in r0..=r1.min(lines.saturating_sub(1)) {
+        let mut line_str = text.line(row).to_string();
+        line_str.truncate(line_str.trim_end_matches('\n').len());
+        let cs = char_col_from_visual(&line_str, vc0, tab_width);
+        let ce = char_col_from_visual(&line_str, vc1, tab_width);
+        if cs < ce {
+            let removed = text.line(row).slice(cs..ce).to_string();
+            patches.push(BlockDeletePatch {
+                row,
+                char_col: cs,
+                removed,
+            });
+        }
+    }
+    patches
+}
+
 pub fn delete_block(text: &mut Rope, block: &BlockSelectionState, tab_width: usize) {
     let (r0, vc0, r1, vc1) = block.normalized();
     for row in (r0..=r1).rev() {
