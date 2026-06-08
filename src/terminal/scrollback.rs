@@ -112,7 +112,25 @@ impl Scrollback {
         strip_inline_ansi(self.partial.clone())
     }
 
-    /// Linhas visíveis do fim. Com `follow_tail`, a linha parcial (prompt) fica na última row.
+    /// Linhas lógicas para exibição: une prompt commitado + input parcial (cmd.exe na 1ª linha).
+    pub fn logical_lines(&self) -> Vec<String> {
+        let partial = self.partial_line();
+        let mut all = self.lines.clone();
+        if partial.is_empty() {
+            return all;
+        }
+        if let Some(last) = all.last() {
+            if should_merge_prompt_with_input(last, &partial) {
+                let merged = all.pop().expect("last exists");
+                all.push(format!("{merged}{partial}"));
+                return all;
+            }
+        }
+        all.push(partial);
+        all
+    }
+
+    /// Linhas visíveis do fim. Com `follow_tail`, ancora no prompt/input corrente.
     pub fn visible_tail(
         &self,
         height: usize,
@@ -123,22 +141,14 @@ impl Scrollback {
             return vec![];
         }
 
-        let partial = strip_inline_ansi(self.partial.clone());
+        let all = self.logical_lines();
 
         if scroll_offset == 0 && follow_tail {
-            let mut out: Vec<String> = Vec::with_capacity(height);
-            if partial.is_empty() {
-                let start = self.lines.len().saturating_sub(height);
-                out.extend_from_slice(&self.lines[start..]);
-            } else {
-                let body_rows = height.saturating_sub(1);
-                let start = self.lines.len().saturating_sub(body_rows);
-                out.extend_from_slice(&self.lines[start..]);
-                while out.len() < body_rows {
-                    out.insert(0, String::new());
-                }
-                out.push(partial);
+            if all.is_empty() {
+                return vec![String::new(); height];
             }
+            let start = all.len().saturating_sub(height);
+            let mut out: Vec<String> = all[start..].to_vec();
             while out.len() < height {
                 out.insert(0, String::new());
             }
@@ -148,10 +158,6 @@ impl Scrollback {
             return out;
         }
 
-        let mut all: Vec<String> = self.lines.clone();
-        if !partial.is_empty() {
-            all.push(partial);
-        }
         if all.is_empty() {
             return vec![String::new(); height];
         }
@@ -198,29 +204,24 @@ impl Scrollback {
         follow_tail: bool,
         row: usize,
     ) -> usize {
-        let partial = strip_inline_ansi(self.partial.clone());
+        let all = self.logical_lines();
         if scroll_offset == 0 && follow_tail {
-            if partial.is_empty() {
-                let start = self.lines.len().saturating_sub(height);
-                return start + row;
-            }
-            let body_rows = height.saturating_sub(1);
-            if row < body_rows {
-                let start = self.lines.len().saturating_sub(body_rows);
-                return start + row;
-            }
-            return self.lines.len();
+            let start = all.len().saturating_sub(height);
+            return start + row;
         }
-
-        let mut all_len = self.lines.len();
-        if !partial.is_empty() {
-            all_len += 1;
-        }
-        let end = all_len.saturating_sub(scroll_offset);
+        let end = all.len().saturating_sub(scroll_offset);
         let start = end.saturating_sub(height);
         start + row
     }
+}
 
+fn should_merge_prompt_with_input(last_line: &str, partial: &str) -> bool {
+    if partial.is_empty() {
+        return false;
+    }
+    last_line.ends_with('>')
+        || last_line.ends_with("$ ")
+        || last_line.ends_with("% ")
 }
 
 fn strip_inline_ansi(s: String) -> String {
@@ -255,6 +256,16 @@ fn strip_inline_ansi(s: String) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn merges_committed_prompt_with_partial_input() {
+        let mut sb = Scrollback::new();
+        sb.push_bytes(b"banner\n");
+        sb.push_bytes(b"D:\\proj\\edit>\n");
+        sb.push_bytes(b"dir");
+        let vis = sb.visible_tail(2, 0, true);
+        assert_eq!(vis.last().map(String::as_str), Some("D:\\proj\\edit>dir"));
+    }
 
     #[test]
     fn push_line_on_newline() {

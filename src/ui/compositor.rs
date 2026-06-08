@@ -167,23 +167,11 @@ fn footer_active_focus(app: &App) -> &'static str {
     }
 }
 
-pub fn footer_focus_group(app: &App) -> String {
-    let active = footer_active_focus(app);
-    let items = ["Editor", "Terminal", "Menu", "Diálogo"];
-    let parts: Vec<String> = items
-        .iter()
-        .map(|item| {
-            if *item == active {
-                format!("[{item}]")
-            } else {
-                (*item).to_string()
-            }
-        })
-        .collect();
-    format!("Foco {}", parts.join(" "))
+pub fn footer_focus_label(app: &App) -> String {
+    footer_active_focus(app).to_string()
 }
 
-/// Grupos de estado alinhados à direita (tamanho, linha/coluna, aba, modo, encoding, tab, memória).
+/// Grupos de estado alinhados à direita (foco, aba, tamanho, linha/coluna, modo, encoding, tab, memória).
 pub fn footer_status_right(app: &App) -> String {
     let (ln, col) = app.editor.cursor_line_col();
     let visible = app.editor.visible_char_count();
@@ -195,6 +183,7 @@ pub fn footer_status_right(app: &App) -> String {
         app.workspace.active_index + 1
     };
     let mut segments = vec![
+        footer_focus_label(app),
         format!("Aba {tab_current}/{tab_total}"),
         format!("Tam {visible}/{total}"),
         format!("Pos {ln}/{col}"),
@@ -202,7 +191,6 @@ pub fn footer_status_right(app: &App) -> String {
         app.document.encoding.label().to_string(),
         app.document.tabulation.footer_label().to_string(),
     ];
-    segments.push(footer_focus_group(app));
     if app.view.show_memory {
         if let Some(label) = app.memory.display_label() {
             segments.push(label);
@@ -341,20 +329,19 @@ mod tests {
     }
 
     #[test]
-    fn footer_focus_group_highlights_terminal() {
+    fn footer_focus_label_shows_terminal() {
         let mut app = App::new(false);
         app.view.terminal = true;
         app.input_focus = InputFocus::Terminal;
         let status = footer_status_right(&app);
-        assert!(status.contains("Foco"));
-        assert!(status.contains("[Terminal]"));
+        assert!(status.starts_with("Terminal |"));
     }
 
     #[test]
-    fn footer_focus_group_highlights_editor_by_default() {
+    fn footer_focus_label_shows_editor_by_default() {
         let app = App::new(false);
         let status = footer_status_right(&app);
-        assert!(status.contains("[Editor]"));
+        assert!(status.starts_with("Editor |"));
     }
 
     #[test]

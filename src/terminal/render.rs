@@ -160,15 +160,11 @@ fn paint_sidebar(
         panel::render_plain_row(frame, area, row, &prefix, row_style);
 
         let close_action = SidebarClick::CloseSession(i);
-        let focus_action = SidebarClick::FocusSession(i);
         let q_hovered = hover == Some(close_action);
-        let row_hovered = hover == Some(focus_action);
         let q_style = if q_hovered {
             palette.button_style(true)
-        } else if row_hovered {
-            row_style.add_modifier(Modifier::UNDERLINED)
         } else {
-            palette.button_style(false)
+            row_style
         };
         let q_x = area.x.saturating_add((w.saturating_sub(close_w)) as u16);
         frame.render_widget(

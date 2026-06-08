@@ -84,15 +84,11 @@ pub fn mouse_to_coord(
 
 pub fn extract_selection(scrollback: &Scrollback, selection: TerminalSelection) -> String {
     let (a, b) = selection.normalized();
-    let partial = scrollback.partial_line();
+    let logical = scrollback.logical_lines();
     let mut out = String::new();
 
     for line_idx in a.line..=b.line {
-        let text = if line_idx < scrollback.committed_line_count() {
-            scrollback.committed_line(line_idx)
-        } else if line_idx == scrollback.committed_line_count() && !partial.is_empty() {
-            partial.as_str()
-        } else {
+        let Some(text) = logical.get(line_idx) else {
             continue;
         };
         let char_len = text.chars().count();
