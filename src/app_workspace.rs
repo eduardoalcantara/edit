@@ -33,7 +33,13 @@ pub struct DirtyFlow {
 
 impl App {
     pub(crate) fn sync_active_tab(&mut self) {
-        let idx = self.workspace.active_index;
+        if self.workspace.tabs.is_empty() {
+            return;
+        }
+        let idx = self
+            .workspace
+            .active_index
+            .min(self.workspace.tabs.len() - 1);
         let tab = &mut self.workspace.tabs[idx];
         swap_active_with_tab(&mut self.editor, &mut self.document, tab);
     }
@@ -44,12 +50,16 @@ impl App {
         }
         if index != self.workspace.active_index {
             self.sync_active_tab();
-            self.workspace.active_index = index;
-            let tab = &mut self.workspace.tabs[index];
-            swap_active_with_tab(&mut self.editor, &mut self.document, tab);
         }
+        self.workspace.active_index = index;
+        let tab = &self.workspace.tabs[index];
+        let content = tab.editor.content_string();
+        let (line, col) = tab.editor.cursor_line_col();
+        self.document = tab.document.clone();
+        self.editor.replace_content(&content);
         self.editor.set_tabulation(self.document.tabulation);
         self.editor.set_word_wrap(self.view.word_wrap);
+        self.editor.set_cursor(line.saturating_sub(1), col.saturating_sub(1));
         let palette = self.theme.palette();
         self.editor.apply_theme(&palette);
     }
@@ -91,7 +101,7 @@ impl App {
         match after {
             AfterDirtyResolved::Quit => self.should_quit = true,
             AfterDirtyResolved::CloseAll => self.close_all_tabs_final(),
-            AfterDirtyResolved::CloseTab => self.close_active_tab_final(),
+            AfterDirtyResolved::CloseTab => self.set_status("Aba fechada"),
             AfterDirtyResolved::EvictThenOpen(path) => self.open_path_after_evict(path),
             AfterDirtyResolved::EvictThenNew => self.create_new_tab_at_top(),
             AfterDirtyResolved::SaveAll => self.save_all_remaining(),
@@ -139,7 +149,9 @@ impl App {
     }
 
     pub(crate) fn create_new_tab_at_top(&mut self) {
-        self.sync_active_tab();
+        if !self.workspace.tabs.is_empty() {
+            self.sync_active_tab();
+        }
         let session_id = new_session_id();
         let counter = next_novo_counter(&self.workspace.tabs);
         let name = novo_display_name(counter);
@@ -153,6 +165,7 @@ impl App {
         );
         self.workspace.insert_tab_at_top(tab);
         self.focus_tab(0);
+        self.refresh_menu();
         self.set_status("Novo documento");
     }
 
@@ -232,6 +245,7 @@ impl App {
     }
 
     pub(crate) fn open_path_impl(&mut self, path: PathBuf) {
+        let path = crate::file_io::normalize_open_path(&path);
         if let Some(index) = self.workspace.find_open_path(&path) {
             self.focus_tab(index);
             self.set_status(format!("Focado: {}", path.display()));
@@ -474,7 +488,10 @@ pub fn workspace_from_config(
     if !abas.fechar_tudo_ao_sair && !abas.sessao.is_empty() {
         for entry in &abas.sessao {
             if let Some(path_str) = &entry.caminho {
-                let path = PathBuf::from(path_str);
+                let path = crate::file_io::normalize_open_path(Path::new(path_str));
+                if workspace.find_open_path(&path).is_some() {
+                    continue;
+                }
                 if path.is_file() {
                     if let Ok(lines) =
                         crate::file_io::read_lines_encoded(&path, user_config.default_encoding())

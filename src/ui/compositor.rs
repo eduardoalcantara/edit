@@ -124,12 +124,19 @@ pub fn footer_help_left(app: &App) -> String {
     app.status_message.clone()
 }
 
-/// Grupos de estado alinhados à direita (tamanho, linha/coluna, modo, encoding, tab, memória).
+/// Grupos de estado alinhados à direita (tamanho, linha/coluna, aba, modo, encoding, tab, memória).
 pub fn footer_status_right(app: &App) -> String {
     let (ln, col) = app.editor.cursor_line_col();
     let visible = app.editor.visible_char_count();
     let total = app.editor.total_char_count();
+    let tab_total = app.workspace.tabs.len();
+    let tab_current = if tab_total == 0 {
+        0
+    } else {
+        app.workspace.active_index + 1
+    };
     let mut segments = vec![
+        format!("Aba {tab_current}/{tab_total}"),
         format!("Tam {visible}/{total}"),
         format!("Pos {ln}/{col}"),
         app.editor.mode().label().to_string(),
@@ -175,6 +182,13 @@ pub fn footer_inner(area: ratatui::layout::Rect) -> ratatui::layout::Rect {
 mod tests {
     use super::*;
     use crate::app::App;
+
+    #[test]
+    fn footer_includes_tab_indicator() {
+        let app = App::new(false);
+        let status = footer_status_right(&app);
+        assert!(status.contains("Aba 1/1"));
+    }
 
     #[test]
     fn footer_includes_memory_when_enabled() {

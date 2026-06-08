@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::encoding::{read_with_encoding, write_with_encoding, FileEncoding};
 
@@ -20,4 +20,90 @@ pub fn write_lines_encoded(path: &Path, lines: &[String], enc: FileEncoding) -> 
 
 pub fn path_exists(path: &Path) -> bool {
     path.exists()
+}
+
+/// Caminho absoluto para abrir arquivo; usa `canonicalize` quando o alvo existe no FS.
+pub fn normalize_open_path(path: &Path) -> PathBuf {
+    let absolute = absolute_path(path);
+    std::fs::canonicalize(&absolute).unwrap_or(absolute)
+}
+
+/// Dois caminhos referem-se ao mesmo arquivo no disco (case-insensitive no Windows).
+pub fn same_file_path(a: &Path, b: &Path) -> bool {
+    if paths_equal(a, b) {
+        return true;
+    }
+    match (std::fs::canonicalize(a), std::fs::canonicalize(b)) {
+        (Ok(ca), Ok(cb)) => paths_equal(&ca, &cb),
+        _ => paths_equal(&absolute_path(a), &absolute_path(b)),
+    }
+}
+
+fn absolute_path(path: &Path) -> PathBuf {
+    if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        std::env::current_dir()
+            .unwrap_or_else(|_| PathBuf::from("."))
+            .join(path)
+    }
+}
+
+#[cfg(windows)]
+fn paths_equal(a: &Path, b: &Path) -> bool {
+    a.as_os_str()
+        .eq_ignore_ascii_case(b.as_os_str())
+}
+
+#[cfg(not(windows))]
+fn paths_equal(a: &Path, b: &Path) -> bool {
+    a == b
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use std::io::Write;
+
+    #[test]
+    fn normalize_makes_relative_absolute() {
+        let cwd = std::env::current_dir().expect("cwd");
+        let normalized = normalize_open_path(Path::new("Cargo.toml"));
+        assert!(normalized.is_absolute());
+        assert!(normalized.ends_with("Cargo.toml") || normalized.ends_with("cargo.toml"));
+        let _ = cwd;
+    }
+
+    #[test]
+    fn same_file_path_matches_canonical_pair() {
+        let dir = std::env::temp_dir().join(format!("edit-path-test-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).expect("mkdir");
+        let file_path = dir.join("sample.txt");
+        fs::File::create(&file_path)
+            .and_then(|mut f| f.write_all(b"x"))
+            .expect("create");
+
+        let via_dir = dir.join("./sample.txt");
+        assert!(same_file_path(&file_path, &via_dir));
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn same_file_path_ignores_case_on_windows() {
+        let dir = std::env::temp_dir().join(format!("edit-case-test-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).expect("mkdir");
+        let lower = dir.join("readme.md");
+        fs::File::create(&lower)
+            .and_then(|mut f| f.write_all(b"#"))
+            .expect("create");
+        let upper = dir.join("README.MD");
+        assert!(same_file_path(&lower, &upper));
+
+        let _ = fs::remove_dir_all(&dir);
+    }
 }

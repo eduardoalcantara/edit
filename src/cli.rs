@@ -155,13 +155,7 @@ fn purge_all_at(root: &Path) -> io::Result<()> {
 }
 
 pub fn canonicalize_open_path(path: &Path) -> PathBuf {
-    if path.is_absolute() {
-        path.to_path_buf()
-    } else {
-        env::current_dir()
-            .unwrap_or_else(|_| PathBuf::from("."))
-            .join(path)
-    }
+    crate::file_io::normalize_open_path(path)
 }
 
 #[cfg(test)]

@@ -62,7 +62,7 @@ impl Workspace {
         self.tabs.iter().position(|t| {
             t.document
                 .path()
-                .is_some_and(|p| p == path)
+                .is_some_and(|p| crate::file_io::same_file_path(p, path))
         })
     }
 

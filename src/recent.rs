@@ -15,13 +15,15 @@ impl RecentFiles {
     }
 
     pub fn push(&mut self, path: PathBuf) {
-        self.paths.retain(|p| p != &path);
+        self.paths
+            .retain(|p| !crate::file_io::same_file_path(p, &path));
         self.paths.insert(0, path);
         self.paths.truncate(MAX_RECENT);
     }
 
     pub fn remove_path(&mut self, path: &Path) {
-        self.paths.retain(|p| p != path);
+        self.paths
+            .retain(|p| !crate::file_io::same_file_path(p, path));
     }
 
     pub fn paths(&self) -> &[PathBuf] {

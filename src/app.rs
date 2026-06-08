@@ -258,6 +258,7 @@ impl App {
             self.evict_tail_silent();
         }
         self.create_new_tab_at_top();
+        self.refresh_menu();
     }
 
     pub fn request_open(&mut self) {
@@ -322,7 +323,10 @@ impl App {
     }
 
     pub(crate) fn save_to_path_internal(&mut self, path: PathBuf, confirmed: bool) {
-        let is_current = self.document.path().is_some_and(|current| current == path.as_path());
+        let is_current = self
+            .document
+            .path()
+            .is_some_and(|current| crate::file_io::same_file_path(current, path.as_path()));
         if !confirmed && file_io::path_exists(&path) && !is_current {
             self.modal = Modal::confirm(
                 "Sobrescrever arquivo",
