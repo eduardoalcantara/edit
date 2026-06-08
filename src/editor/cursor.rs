@@ -33,9 +33,34 @@ pub fn char_idx_to_line_col(text: &Rope, char_idx: usize) -> (usize, usize) {
         let line_start = text.line_to_char(last_line);
         return (last_line, char_idx.saturating_sub(line_start));
     }
+    // Delimitador `\n`: ropey pode mapear para a linha seguinte (col 0); exibir no fim
+    // da linha cujo conteúdo termina nesse índice.
+    if text.char(char_idx) == '\n' {
+        for line in (0..text.len_lines()).rev() {
+            let line_start = text.line_to_char(line);
+            if char_idx >= line_start {
+                return (line, char_idx - line_start);
+            }
+        }
+        return (0, 0);
+    }
     let line = text.char_to_line(char_idx);
     let line_start = text.line_to_char(line);
     (line, char_idx.saturating_sub(line_start))
+}
+
+/// Comprimento do conteúdo visível da linha (sem delimitadores `\n`/`\r` no fim).
+pub fn line_content_len(text: &Rope, line: usize) -> usize {
+    let line_start = text.line_to_char(line);
+    let mut len = text.line(line).len_chars();
+    while len > 0 {
+        let idx = line_start + len - 1;
+        match text.char(idx) {
+            '\n' | '\r' => len -= 1,
+            _ => break,
+        }
+    }
+    len
 }
 
 pub fn line_col_to_char_idx(text: &Rope, line: usize, col: usize) -> usize {
@@ -44,7 +69,7 @@ pub fn line_col_to_char_idx(text: &Rope, line: usize, col: usize) -> usize {
     }
     let line = line.min(text.len_lines().saturating_sub(1));
     let line_start = text.line_to_char(line);
-    let line_len = text.line(line).len_chars();
+    let line_len = line_content_len(text, line);
     line_start + col.min(line_len)
 }
 
@@ -72,5 +97,13 @@ mod tests {
         let text = Rope::from_str("hello\n");
         let (line, col) = char_idx_to_line_col(&text, 6);
         assert_eq!((line, col), (1, 0));
+    }
+
+    #[test]
+    fn newline_delimiter_maps_to_end_of_previous_line() {
+        let text = Rope::from_str("hello\nworld");
+        assert_eq!(line_content_len(&text, 0), 5);
+        assert_eq!(char_idx_to_line_col(&text, 5), (0, 5));
+        assert_eq!(char_idx_to_line_col(&text, 6), (1, 0));
     }
 }

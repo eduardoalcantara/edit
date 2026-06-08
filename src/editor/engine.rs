@@ -2,7 +2,7 @@ use ropey::Rope;
 
 use crate::edit_mode::EditMode;
 use crate::editor::cursor::{
-    char_idx_to_line_col, line_col_to_char_idx, Cursor, SelectionMode,
+    char_idx_to_line_col, line_col_to_char_idx, line_content_len, Cursor, SelectionMode,
 };
 use crate::editor::history::EditHistory;
 use crate::editor::selection::{
@@ -678,7 +678,7 @@ impl EditorEngine {
         self.prepare_move(extend);
         let (line, _) = char_idx_to_line_col(&self.text, self.primary().char_idx);
         let line_start = self.text.line_to_char(line);
-        let line_len = self.text.line(line).len_chars();
+        let line_len = line_content_len(&self.text, line);
         self.primary_mut().char_idx = line_start + line_len;
         self.sync_primary_virtual();
         self.ensure_visible();
@@ -1214,5 +1214,17 @@ mod tests {
         e.scroll_wheel_lines(2);
         let (line, _) = char_idx_to_line_col(&e.text, e.primary().char_idx);
         assert_eq!(line, 3);
+    }
+
+    #[test]
+    fn move_end_stays_on_same_line() {
+        let mut e = EditorEngine::new();
+        e.load_text("hello\nworld");
+        e.set_cursor_line_col(0, 0);
+        e.move_end(false);
+        assert_eq!(e.cursor_raw(), (0, 5));
+        e.set_cursor_line_col(1, 0);
+        e.move_end(false);
+        assert_eq!(e.cursor_raw(), (1, 5));
     }
 }

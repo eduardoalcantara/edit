@@ -147,3 +147,6 @@
 - 2026-06-08 — **Spec modal navegador de arquivos** — `specs/to-do/SPEC-MODAL-ARQUIVO.md` (Abrir/Salvar/Salvar Como estilo Turbo Pascal; fecha TV7).
 - 2026-06-08 — **Atalho Esc para sair** — `Esc` com foco no editor (sem menu/modal); modal/menu mantêm Esc cancelar/fechar; terminal mantém Esc → editor.
   - Módulos: `src/ui/compositor.rs`, `src/menus.rs`, `PROJECT_RULES.md`
+- 2026-06-08 — **Correção tecla End** — cursor no fim da linha (não na seguinte); `line_content_len` ignora `\n` no comprimento ropey; `char_idx_to_line_col` normaliza delimitador.
+  - Módulos: `src/editor/{cursor,engine}.rs`
+  - Testes: **130** total (`cargo test`)
