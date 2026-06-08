@@ -1,7 +1,7 @@
 mod tab;
 mod workspace;
 
-pub use tab::{create_tab_from_defaults, next_novo_counter, novo_display_name, snapshot_path, FileSnapshot, Tab};
+pub use tab::{create_tab_from_defaults, next_novo_counter, novo_display_name, snapshot_path, Tab};
 pub use workspace::{swap_active_with_tab, PromptReason, TabSortStrategy, Workspace, WorkspaceAction};
 
 use std::sync::atomic::{AtomicU64, Ordering};

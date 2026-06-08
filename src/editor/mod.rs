@@ -10,9 +10,9 @@ mod viewport;
 mod word_boundary;
 
 pub use commands::EditorCommand;
-pub use cursor::{Cursor, SelectionMode};
+pub use cursor::SelectionMode;
 pub use engine::{EditorEngine, EMPTY_DOCUMENT_TEXT};
-pub use tabs::{convert_spaces_to_tabs, convert_tabulation_between, convert_tabs_to_spaces};
+pub use tabs::convert_tabulation_between;
 
 use ratatui::layout::Rect;
 use ratatui::Frame;

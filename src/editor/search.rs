@@ -59,12 +59,3 @@ pub fn match_range_for_replace(
     }
     None
 }
-
-pub fn replace_at(text: &mut Rope, char_idx: usize, pattern: &str, replacement: &str) -> bool {
-    let Some((start_char, end_char)) = match_range_for_replace(text, char_idx, pattern) else {
-        return false;
-    };
-    text.remove(start_char..end_char);
-    text.insert(start_char, replacement);
-    true
-}
