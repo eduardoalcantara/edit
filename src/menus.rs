@@ -440,7 +440,7 @@ fn file_menu(recent: &RecentFiles) -> Vec<MenuNode> {
         ),
         item(
             "Sair",
-            Some("Ctrl+Q / Alt+F4"),
+            Some("Ctrl+Q / Alt+F4 / Esc"),
             ActionId::Quit,
             true,
             None,

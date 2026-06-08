@@ -67,6 +67,15 @@ impl Compositor {
             app.request_quit();
             return;
         }
+        if key.code == KeyCode::Esc
+            && !key.modifiers.intersects(KeyModifiers::CONTROL | KeyModifiers::ALT)
+            && !app.modal.is_active()
+            && !app.menu_state.is_open()
+            && app.input_focus != InputFocus::Terminal
+        {
+            app.request_quit();
+            return;
+        }
 
         if !app.menu_state.is_open() && !app.modal.is_active() {
             if handle_global_chords(app, key) {

@@ -2,7 +2,7 @@
 
 **Autor:** Perplexity AI  
 **Data:** 2026-06-08  
-**Versão:** 3.2
+**Versão:** 3.4
 
 ## Registro
 
@@ -144,3 +144,6 @@
 - 2026-06-08 — **Spec editor split view** — `specs/to-do/SPEC-EDITOR-SPLIT-VIEW.md`; avaliação specs `to-do/`: nenhuma migração para `done/` (MULTPLOS fase 2 pendente).
 - 2026-06-08 — **Atalhos Ctrl+E/T/G, Ir para linha, rodapé clicável, spec Ajuda** — `Ctrl+E` editor; `Ctrl+T`/`'` abre/foca/fecha; modal go-to-line; clique Pos/encoding; `SPEC-MENU-AJUDA.md`.
   - Testes: **128** total (`cargo test`)
+- 2026-06-08 — **Spec modal navegador de arquivos** — `specs/to-do/SPEC-MODAL-ARQUIVO.md` (Abrir/Salvar/Salvar Como estilo Turbo Pascal; fecha TV7).
+- 2026-06-08 — **Atalho Esc para sair** — `Esc` com foco no editor (sem menu/modal); modal/menu mantêm Esc cancelar/fechar; terminal mantém Esc → editor.
+  - Módulos: `src/ui/compositor.rs`, `src/menus.rs`, `PROJECT_RULES.md`

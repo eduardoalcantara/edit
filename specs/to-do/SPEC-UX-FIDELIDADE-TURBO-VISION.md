@@ -89,7 +89,8 @@ Fechar a lacuna entre a UI implementada e a referência Turbo Vision / EDIT.EXE.
 | Sem navegação `..`, drives | Painel dirs + painel arquivos + máscara `*.*` |
 | Sem preview de seleção | Highlight de arquivo focado; Enter confirma |
 
-**Módulos:** novo `src/file_picker.rs`  
+**Spec detalhada:** `specs/to-do/SPEC-MODAL-ARQUIVO.md`  
+**Módulos:** novo `src/modal/file_browser.rs` (ou `src/file_browser/`)  
 **Critério de aceite:** abrir `.rs` navegando pastas sem digitar path completo.
 
 ---

@@ -71,6 +71,7 @@ Regras estáveis do projeto. Para estado de implementação, ver `PROJECT_STATUS
 | `Ctrl+N` | Novo documento |
 | `Ctrl+W` | Fechar documento |
 | `Ctrl+Q` / `Alt+F4` | Sair (com confirmação se dirty; funciona mesmo com menu/modal aberto) |
+| **`Esc`** | Sair com foco no editor e sem menu/modal aberto (modal/menu: Esc cancela/fecha; terminal: Esc devolve foco ao editor) |
 | **`Ctrl+E`** | Foco no **editor** (mesmo com terminal visível) |
 | `Ctrl+T` / **`Ctrl+'`** | Do **editor**: abre o terminal (se fechado) ou **foca** o terminal; do **terminal**: **fecha** o painel |
 | **`F6`** | Alterna foco Editor ↔ Terminal (abre terminal se estiver fechado) |

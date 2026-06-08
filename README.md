@@ -105,7 +105,8 @@ edit --workspace -- main.rs tests/mod.rs
 | `Alt+1` … `Alt+0` | Foco aba 1–10 |
 | `Alt+S` | Menu Abas |
 | `Ctrl+F/H` | Buscar / Substituir |
-| `Ctrl+Q`, `Alt+F4` | Sair |
+| `Ctrl+Q`, `Alt+F4` | Sair (global) |
+| `Esc` | Sair (editor, sem menu/modal) |
 | `Alt+A` | Menu Arquivo |
 | `Ctrl+T` / `Ctrl+'` | Do editor: abre/foca terminal; do terminal: fecha painel |
 | **`Ctrl+E`** | Foco no editor |

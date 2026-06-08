@@ -2,7 +2,7 @@
 
 **Autor:** Perplexity AI  
 **Data:** 2026-06-08  
-**Versão:** 3.3
+**Versão:** 3.4
 
 ## Estado atual
 
@@ -35,7 +35,7 @@
   - Camadas: Desktop, Editor, Footer, MenuBar, MenuDropdown (overlay), Modal.
   - Menu dropdown e modal capturam input; modal fecha menu automaticamente.
 - **Atalhos sair + mouse em modais (2026-06-07):**
-  - `Alt+F4` e `Ctrl+Q` encerram o programa globalmente (compositor), inclusive com modal/menu aberto.
+  - `Alt+F4` e `Ctrl+Q` encerram o programa globalmente (compositor), inclusive com modal/menu aberto; **`Esc`** sai com foco no editor (sem menu/modal).
   - Botões de modal respondem a clique e hover (Confirm, PathInput, Find).
 - **Baseline pristine / dirty (2026-06-07):**
   - Documento novo ou vazio não dispara confirmação de saída; baseline `saved_content` alinhada ao rope (`EMPTY_DOCUMENT_TEXT`).
@@ -135,6 +135,7 @@
   - Módulos: `src/terminal/{session,workspace}.rs`, `src/app.rs`
 - **Spec split view (2026-06-08):** `specs/to-do/SPEC-EDITOR-SPLIT-VIEW.md` — duas abas visíveis lado a lado (após barra de abas, fase 2 workspace).
 - **Spec menu Ajuda (2026-06-08):** `specs/to-do/SPEC-MENU-AJUDA.md` — Features, Atalhos, Sobre.
+- **Spec modal arquivo (2026-06-08):** `specs/to-do/SPEC-MODAL-ARQUIVO.md` — navegador Abrir/Salvar/Salvar Como estilo Turbo Pascal (TV7).
 - **Atalhos e UX (2026-06-08):** `Ctrl+E` foco editor; `Ctrl+T`/`Ctrl+'` abre/foca ou fecha conforme foco; `Ctrl+G` e **Editar → Ir para linha...**; clique **Pos** / encoding no rodapé.
   - **127 testes** unitários passando (`cargo test`).
 
