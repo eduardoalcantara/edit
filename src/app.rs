@@ -5,6 +5,7 @@ use std::time::Duration;
 use ratatui::backend::CrosstermBackend;
 use ratatui::Terminal;
 
+use crate::cli;
 use crate::clipboard::Clipboard;
 use crate::app_workspace::{workspace_from_config, AfterDirtyResolved, DirtyFlow};
 use crate::config::{config_from_view, EditConfig};
@@ -123,6 +124,39 @@ impl App {
         };
         app.refresh_menu();
         app
+    }
+
+    /// Abre arquivos passados na linha de comando (primeiro argumento = aba ativa no topo).
+    pub fn open_cli_files(&mut self, files: &[PathBuf]) {
+        if files.is_empty() {
+            return;
+        }
+
+        self.sync_active_tab();
+        if self.workspace.tabs.len() == 1 && self.workspace.tabs[0].filepath().is_none() {
+            if self.active_tab_is_pristine() {
+                let removed = self.workspace.remove_tab_at(0);
+                let _ = crate::session::purge_tab(&removed.session_id);
+            }
+        }
+
+        let mut opened = 0usize;
+        for path in files.iter().rev() {
+            let path = cli::canonicalize_open_path(path);
+            if !path.is_file() {
+                self.set_status(format!("Arquivo não encontrado: {}", path.display()));
+                continue;
+            }
+            self.open_path_impl(path);
+            opened += 1;
+        }
+
+        if opened == 0 && self.workspace.tabs.is_empty() {
+            self.create_new_tab_at_top();
+        } else if opened > 0 {
+            self.set_status(format!("{opened} arquivo(s) aberto(s)"));
+        }
+        self.refresh_menu();
     }
 
     pub(crate) fn persist_user_config(&mut self) {

@@ -7,7 +7,26 @@ use std::path::{Path, PathBuf};
 const SESSION_DIR: &str = ".edit-session";
 const TABS_DIR: &str = "tabs";
 
+static SESSION_ROOT_OVERRIDE: std::sync::Mutex<Option<PathBuf>> =
+    std::sync::Mutex::new(None);
+
+pub fn set_session_root(path: PathBuf) {
+    let mut guard = SESSION_ROOT_OVERRIDE.lock().expect("session root lock");
+    *guard = Some(path);
+}
+
+#[cfg(test)]
+pub fn clear_session_root_override() {
+    let mut guard = SESSION_ROOT_OVERRIDE.lock().expect("session root lock");
+    *guard = None;
+}
+
 pub fn session_root() -> PathBuf {
+    if let Ok(guard) = SESSION_ROOT_OVERRIDE.lock() {
+        if let Some(path) = guard.as_ref() {
+            return path.clone();
+        }
+    }
     session_root_from(
         std::env::current_exe()
             .ok()

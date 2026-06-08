@@ -2,7 +2,7 @@
 
 **Autor:** Perplexity AI  
 **Data:** 2026-06-07  
-**Versão:** 2.1
+**Versão:** 2.2
 
 Editor TUI para Linux/Windows com menus estilo **Turbo Vision**, núcleo **ropey**, UX previsível e proteção contra perda de trabalho.
 
@@ -16,7 +16,29 @@ Editor TUI para Linux/Windows com menus estilo **Turbo Vision**, núcleo **ropey
 ```bash
 cargo build
 cargo run
+cargo run -- arquivo.txt outro.rs
+cargo run -- --clean
+cargo run -- --workspace src/main.rs
 # binário: target/debug/edit
+```
+
+### Linha de comando
+
+| Parâmetro | Ação |
+|-----------|------|
+| `arquivo…` | Abre um ou mais arquivos em abas (até 10); o **primeiro** listado fica ativo no topo |
+| `--clean` | Limpa sessão (`.edit-session/`) e abas salvas no config ativo |
+| `--workspace` | Usa config local `./.edit/.edit.workspace` + sessão em `./.edit/.edit-session/` |
+| `--help` | Ajuda |
+
+Com `--workspace`, na primeira execução copia preferências do `edit.json` global **sem abas abertas**. Combine `--clean --workspace` para resetar o workspace do projeto.
+
+Exemplos:
+
+```bash
+edit README.md src/lib.rs
+edit --clean
+edit --workspace -- main.rs tests/mod.rs
 ```
 
 ## Funcionalidades
@@ -115,4 +137,4 @@ Ver `PROJECT_RULES.md` para lista completa.
 cargo test
 ```
 
-74 testes unitários.
+77 testes unitários.

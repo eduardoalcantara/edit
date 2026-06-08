@@ -2,7 +2,7 @@
 
 **Autor:** Perplexity AI  
 **Data:** 2026-06-07  
-**Versão:** 2.7
+**Versão:** 2.8
 
 ## Registro
 
@@ -102,3 +102,9 @@
   - Testes: `workspace::workspace::tests::*`, `session::store::tests::*` — **74** total
   - Pendente fase 2: barra de abas, `undo.json`/`redo.json`, reload FS externo
   - Docs: README v2.1, STATUS/TIMELINE v2.7
+- 2026-06-07 — **Atalhos Alt+1…Alt+0 no menu Abas** — shortcut visível com aba ativa marcada (`√`).
+  - Commit: `fedf405`
+- 2026-06-07 — **Parâmetros CLI** — `--clean`, `--workspace`, abrir arquivos na linha de comando.
+  - Módulos: `src/cli.rs`, `src/main.rs`, `src/config.rs`, `src/session/store.rs`, `src/app.rs`
+  - Testes: `cli::tests::*` — **77** total
+  - Docs: README v2.2, STATUS/TIMELINE v2.8

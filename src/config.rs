@@ -12,6 +12,8 @@ use crate::theme::ThemeId;
 use crate::view_state::{EditorBorder, EditorMargin, GuideColumn};
 
 const CONFIG_FILE: &str = "edit.json";
+const WORKSPACE_CONFIG_FILE: &str = ".edit.workspace";
+const LOCAL_EDIT_DIR: &str = ".edit";
 const CONFIG_VERSION: u32 = 2;
 const MAX_RECENT: usize = 10;
 
@@ -288,12 +290,39 @@ impl EditConfig {
             .collect()
     }
 
-    fn normalize(&mut self) {
+    pub(crate) fn normalize(&mut self) {
         self.version = CONFIG_VERSION;
         self.arquivo.recentes.truncate(MAX_RECENT);
         self.arquivo.abas.limite = self.arquivo.abas.limite.clamp(1, 10);
         self.exibir.zoom = self.exibir.zoom.clamp(1, 3);
     }
+
+    /// Remove abas persistidas — equivalente a iniciar sem sessão de workspace.
+    pub fn clear_workspace_state(&mut self) {
+        self.arquivo.abas.sessao.clear();
+        self.arquivo.abas.indice_ativo = 0;
+        self.arquivo.abas.fechar_tudo_ao_sair = false;
+    }
+}
+
+pub fn global_config_path() -> PathBuf {
+    std::env::current_exe()
+        .ok()
+        .and_then(|exe| exe.parent().map(|dir| dir.join(CONFIG_FILE)))
+        .unwrap_or_else(|| PathBuf::from(CONFIG_FILE))
+}
+
+pub fn local_workspace_config_path(base_dir: &Path) -> PathBuf {
+    base_dir.join(LOCAL_EDIT_DIR).join(WORKSPACE_CONFIG_FILE)
+}
+
+pub fn local_edit_dir(base_dir: &Path) -> PathBuf {
+    base_dir.join(LOCAL_EDIT_DIR)
+}
+
+pub fn set_config_path(path: PathBuf) {
+    let mut guard = CONFIG_PATH_OVERRIDE.lock().expect("config path lock");
+    *guard = Some(path);
 }
 
 pub fn config_path() -> PathBuf {
@@ -302,11 +331,7 @@ pub fn config_path() -> PathBuf {
             return path.clone();
         }
     }
-
-    std::env::current_exe()
-        .ok()
-        .and_then(|exe| exe.parent().map(|dir| dir.join(CONFIG_FILE)))
-        .unwrap_or_else(|| PathBuf::from(CONFIG_FILE))
+    global_config_path()
 }
 
 #[cfg(test)]

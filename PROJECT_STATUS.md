@@ -2,7 +2,7 @@
 
 **Autor:** Perplexity AI  
 **Data:** 2026-06-07  
-**Versão:** 2.7
+**Versão:** 2.8
 
 ## Estado atual
 
@@ -94,6 +94,13 @@
   - Restore sessão básico (paths + `content.tmp` para `NovoN`).
   - **74 testes** unitários passando (`cargo test`).
 - **README.md v2.1** — workspace, menus Abas, atalhos e persistência v2.
+- **Parâmetros CLI (2026-06-07):**
+  - `src/cli.rs`: `--clean`, `--workspace`, arquivos posicionais, `--help`.
+  - `--clean`: purge `.edit-session/` e limpa `arquivo.abas.sessao` no config ativo.
+  - `--workspace`: `./.edit/.edit.workspace` (cópia inicial do `edit.json` global sem abas) e sessão em `./.edit/.edit-session/`.
+  - Arquivos na linha de comando abertos em abas ao iniciar (`App::open_cli_files`).
+  - **74 testes** unitários passando (`cargo test`).
+- **README.md v2.2** — seção linha de comando.
 
 ### Em andamento
 - **Múltiplos arquivos — fase 2:** barra de abas visual; serialização `undo.json`/`redo.json`; modal recarregar arquivo alterado externamente.

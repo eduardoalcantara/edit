@@ -1,5 +1,6 @@
 mod app;
 mod app_workspace;
+mod cli;
 mod clipboard;
 mod config;
 mod document;
@@ -20,6 +21,7 @@ mod ui;
 mod view_state;
 mod widgets;
 
+use std::env;
 use std::io::{self, stdout, IsTerminal, Write};
 
 use crossterm::event::{DisableMouseCapture, EnableMouseCapture};
@@ -31,6 +33,7 @@ use ratatui::backend::CrosstermBackend;
 use ratatui::Terminal;
 
 use app::App;
+use cli::{CliError, LaunchOptions};
 
 struct TerminalGuard {
     mouse_enabled: bool,
@@ -68,9 +71,10 @@ impl TerminalGuard {
     }
 }
 
-fn run_app() -> io::Result<()> {
+fn run_app(opts: &LaunchOptions) -> io::Result<()> {
     let (mut terminal, guard) = TerminalGuard::enter()?;
     let mut app = App::new(guard.mouse_enabled);
+    app.open_cli_files(&opts.files);
 
     let result = app.run(&mut terminal);
     app.shutdown();
@@ -80,7 +84,29 @@ fn run_app() -> io::Result<()> {
 }
 
 fn main() {
-    if let Err(error) = run_app() {
+    let program = env::args()
+        .next()
+        .unwrap_or_else(|| "edit".to_string());
+
+    let opts = match cli::parse_args(env::args()) {
+        Ok(opts) => opts,
+        Err(CliError::HelpRequested) => {
+            cli::print_help(&program);
+            return;
+        }
+        Err(error) => {
+            eprintln!("Erro: {error}");
+            eprintln!("Use {program} --help para ajuda.");
+            std::process::exit(1);
+        }
+    };
+
+    if let Err(error) = cli::prepare_launch(&opts) {
+        eprintln!("Erro: {error}");
+        std::process::exit(1);
+    }
+
+    if let Err(error) = run_app(&opts) {
         let _ = restore_terminal_on_error();
         eprintln!("Erro: {error}");
         std::process::exit(1);
