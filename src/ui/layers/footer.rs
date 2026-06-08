@@ -1,4 +1,4 @@
-use crossterm::event::{KeyEvent, MouseEvent, MouseEventKind};
+use crossterm::event::{KeyEvent, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::widgets::Paragraph;
 
 use crate::input::mouse;
@@ -51,9 +51,6 @@ impl UiLayer for FooterLayer {
     }
 
     fn on_mouse(&self, mouse: MouseEvent, app: &mut crate::app::App, layout: UiLayout) -> InputResult {
-        if !matches!(mouse.kind, MouseEventKind::Moved) {
-            return InputResult::Unhandled;
-        }
         let Some(area) = layout.footer else {
             if app.footer_hover_help.take().is_some() {
                 return InputResult::Consumed;
@@ -61,6 +58,31 @@ impl UiLayer for FooterLayer {
             return InputResult::Unhandled;
         };
         let inner = compositor::footer_inner(area);
+
+        if matches!(mouse.kind, MouseEventKind::Down(MouseButton::Left)) {
+            if !mouse::point_in_rect(&mouse, inner) {
+                return InputResult::Unhandled;
+            }
+            let rel_col = mouse.column.saturating_sub(inner.x) as usize;
+            if let Some(click) =
+                compositor::footer_click_at(app, rel_col, inner.width as usize)
+            {
+                match click {
+                    compositor::FooterClick::GoToLine => {
+                        app.request_go_to_line();
+                    }
+                    compositor::FooterClick::OpenFormatEncoding => {
+                        app.menu_state
+                            .open_format_encoding_menu(&app.menu_bar);
+                    }
+                }
+            }
+            return InputResult::Consumed;
+        }
+
+        if !matches!(mouse.kind, MouseEventKind::Moved) {
+            return InputResult::Unhandled;
+        }
         if !mouse::point_in_rect(&mouse, inner) {
             if app.footer_hover_help.take().is_some() {
                 return InputResult::Consumed;

@@ -117,6 +117,49 @@ impl UiLayer for ModalLayer {
                 }
                 InputResult::Consumed
             }
+            Modal::GoToLine {
+                dialog,
+                line,
+                col,
+                field_line,
+            } => {
+                match dialog.handle_button_keys(key) {
+                    DialogKeyResult::Activate(_) => {
+                        app.submit_go_to_line();
+                        return InputResult::Consumed;
+                    }
+                    DialogKeyResult::Cancel => {
+                        app.cancel_modal();
+                        return InputResult::Consumed;
+                    }
+                    DialogKeyResult::Consumed => return InputResult::Consumed,
+                    DialogKeyResult::Ignored => {}
+                }
+                match key.code {
+                    KeyCode::Tab => {
+                        *field_line = !*field_line;
+                    }
+                    KeyCode::Backspace => {
+                        if *field_line {
+                            line.pop();
+                        } else {
+                            col.pop();
+                        }
+                    }
+                    KeyCode::Char(ch)
+                        if !key.modifiers.contains(KeyModifiers::CONTROL)
+                            && ch.is_ascii_digit() =>
+                    {
+                        if *field_line {
+                            line.push(ch);
+                        } else {
+                            col.push(ch);
+                        }
+                    }
+                    _ => {}
+                }
+                InputResult::Consumed
+            }
             Modal::ConvertTabulation(modal) => match modal.handle_key(key) {
                 ConvertTabKeyResult::Submit => {
                     app.submit_convert_tabulation();
@@ -233,6 +276,7 @@ fn activate_button(app: &mut crate::app::App, index: usize) {
         (_, Some(DialogButtonAction::Primary)) => match &app.modal {
             Modal::PathInput { .. } => app.submit_path_input(),
             Modal::Find { .. } => app.submit_find(),
+            Modal::GoToLine { .. } => app.submit_go_to_line(),
             _ => {}
         },
         _ => app.cancel_modal(),

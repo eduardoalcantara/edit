@@ -330,6 +330,37 @@ impl App {
         });
     }
 
+    /// `Ctrl+E` — foco no editor, mesmo com terminal visível.
+    pub fn focus_editor(&mut self) {
+        self.input_focus = InputFocus::Editor;
+        self.set_status("Editor: foco");
+    }
+
+    /// `Ctrl+T` / `Ctrl+'` — do editor: abre ou foca terminal; do terminal: fecha painel.
+    pub fn chord_terminal_toggle(&mut self) {
+        if self.view.terminal && self.input_focus == InputFocus::Terminal {
+            self.view.terminal = false;
+            self.input_focus = InputFocus::Editor;
+            self.terminal.sidebar_hover = None;
+            self.persist_user_config();
+            self.set_status("Terminal: oculto");
+            return;
+        }
+        if !self.view.terminal {
+            self.view.terminal = true;
+            self.persist_user_config();
+        }
+        self.ensure_terminal_session();
+        self.sync_terminal_pty_size();
+        self.input_focus = InputFocus::Terminal;
+        self.set_status("Terminal: foco");
+    }
+
+    pub fn request_go_to_line(&mut self) {
+        let (ln, col) = self.editor.cursor_line_col();
+        self.modal = Modal::go_to_line(ln, col);
+    }
+
     pub fn grow_terminal_panel(&mut self) {
         use crate::terminal::{clamp_terminal_panel_rows, TERMINAL_PANEL_ROWS_MAX};
         let next = self.view.terminal_panel_rows.saturating_add(1);
@@ -756,6 +787,31 @@ impl App {
         self.modal = Modal::None;
     }
 
+    pub fn submit_go_to_line(&mut self) {
+        let Some((line_text, col_text)) = self.take_go_to_line_input() else {
+            return;
+        };
+        let line_num = line_text.trim().parse::<usize>().unwrap_or(0);
+        if line_num == 0 {
+            self.set_status("Número de linha inválido");
+            return;
+        }
+        let line = line_num.saturating_sub(1);
+        let col = if col_text.trim().is_empty() {
+            let (_, c) = self.editor.cursor_line_col();
+            c.saturating_sub(1)
+        } else {
+            col_text
+                .trim()
+                .parse::<usize>()
+                .unwrap_or(1)
+                .saturating_sub(1)
+        };
+        self.editor.set_cursor(line, col);
+        self.modal = Modal::None;
+        self.set_status(format!("Linha {line_num}"));
+    }
+
     pub fn find_next(&mut self) {
         if self.find_pattern.is_empty() {
             self.set_status("Defina um padrão com Ctrl+F");
@@ -782,6 +838,16 @@ impl App {
     fn take_path_input(&mut self) -> Option<(String, PathInputKind)> {
         match std::mem::replace(&mut self.modal, Modal::None) {
             Modal::PathInput { input, kind, .. } => Some((input, kind)),
+            other => {
+                self.modal = other;
+                None
+            }
+        }
+    }
+
+    fn take_go_to_line_input(&mut self) -> Option<(String, String)> {
+        match std::mem::replace(&mut self.modal, Modal::None) {
+            Modal::GoToLine { line, col, .. } => Some((line, col)),
             other => {
                 self.modal = other;
                 None
@@ -919,6 +985,7 @@ impl App {
             ActionId::Replace => {
                 self.modal = Modal::find_replace("Substituir", &self.find_pattern, "");
             }
+            ActionId::GoToLine => self.request_go_to_line(),
             ActionId::ThemeDark => {
                 self.apply_theme(ThemeId::Dark);
                 self.set_status("Tema: Escuro");

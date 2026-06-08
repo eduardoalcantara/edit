@@ -11,7 +11,8 @@ use crate::encoding::FileEncoding;
 use crate::workspace::PromptReason;
 
 use buttons::{
-    CONVERT, DISCARD_CLOSE, DISCARD_NEW, DISCARD_OPEN, FIND, FIND_REPLACE, OVERWRITE,
+    CONVERT, DISCARD_CLOSE, DISCARD_NEW, DISCARD_OPEN, FIND, FIND_REPLACE, GO_TO_LINE,
+    OVERWRITE,
     PATH_OPEN, PATH_RENAME, PATH_SAVE_AS, PURGE_UNDO, QUIT_UNSAVED, REINTERPRET, TAB_UNSAVED,
 };
 
@@ -56,6 +57,12 @@ pub enum Modal {
         replace_mode: bool,
     },
     ConvertTabulation(ConvertTabulationModal),
+    GoToLine {
+        dialog: Dialog,
+        line: String,
+        col: String,
+        field_line: bool,
+    },
 }
 
 impl Modal {
@@ -69,6 +76,7 @@ impl Modal {
             | Modal::PathInput { dialog, .. }
             | Modal::Find { dialog, .. } => Some(dialog),
             Modal::ConvertTabulation(modal) => Some(&modal.dialog),
+            Modal::GoToLine { dialog, .. } => Some(dialog),
             Modal::None => None,
         }
     }
@@ -79,6 +87,7 @@ impl Modal {
             | Modal::PathInput { dialog, .. }
             | Modal::Find { dialog, .. } => Some(dialog),
             Modal::ConvertTabulation(modal) => Some(&mut modal.dialog),
+            Modal::GoToLine { dialog, .. } => Some(dialog),
             Modal::None => None,
         }
     }
@@ -152,6 +161,21 @@ impl Modal {
         }
     }
 
+    pub fn go_to_line(line: usize, col: usize) -> Self {
+        let line_s = line.to_string();
+        let col_s = col.to_string();
+        Modal::GoToLine {
+            dialog: Dialog::form(
+                "Ir para linha",
+                go_to_line_body(&line_s, &col_s, true),
+                &GO_TO_LINE,
+            ),
+            line: line_s,
+            col: col_s,
+            field_line: true,
+        }
+    }
+
     pub fn find(title: impl Into<String>, pattern: impl Into<String>) -> Self {
         let pattern = pattern.into();
         Modal::Find {
@@ -214,9 +238,31 @@ impl Modal {
                     format!("Texto:\n {pattern}▌")
                 };
             }
+            Modal::GoToLine {
+                dialog,
+                line,
+                col,
+                field_line,
+            } => {
+                dialog.body = go_to_line_body(line, col, *field_line);
+            }
             _ => {}
         }
     }
+}
+
+fn go_to_line_body(line: &str, col: &str, field_line: bool) -> String {
+    let line_field = if field_line {
+        format!(" {line}▌")
+    } else {
+        format!(" {line}")
+    };
+    let col_field = if field_line {
+        format!(" {col}")
+    } else {
+        format!(" {col}▌")
+    };
+    format!("Linha:\n{line_field}\n\nColuna (opcional):\n{col_field}")
 }
 
 fn confirm_buttons(kind: &ConfirmKind) -> &'static [DialogButton] {

@@ -142,3 +142,5 @@
 - 2026-06-08 — **Terminal fecha ao `exit`** — `child.try_wait()` no PTY; remove sessão encerrada; oculta painel se era a única (sem respawn, diferente de `[q]`).
   - Módulos: `src/terminal/{session,workspace}.rs`, `src/app.rs`; teste `session_reports_exited_after_kill`
 - 2026-06-08 — **Spec editor split view** — `specs/to-do/SPEC-EDITOR-SPLIT-VIEW.md`; avaliação specs `to-do/`: nenhuma migração para `done/` (MULTPLOS fase 2 pendente).
+- 2026-06-08 — **Atalhos Ctrl+E/T/G, Ir para linha, rodapé clicável, spec Ajuda** — `Ctrl+E` editor; `Ctrl+T`/`'` abre/foca/fecha; modal go-to-line; clique Pos/encoding; `SPEC-MENU-AJUDA.md`.
+  - Testes: **128** total (`cargo test`)

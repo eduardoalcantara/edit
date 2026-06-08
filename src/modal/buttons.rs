@@ -204,3 +204,16 @@ pub const FIND_REPLACE: [DialogButton; 2] = [
         DialogButtonAction::Cancel,
     ),
 ];
+
+pub const GO_TO_LINE: [DialogButton; 2] = [
+    DialogButton::new(
+        "Ir",
+        "Move o cursor para a linha e coluna informadas",
+        DialogButtonAction::Primary,
+    ),
+    DialogButton::new(
+        "Cancelar",
+        "Fecha o diálogo sem mover o cursor",
+        DialogButtonAction::Cancel,
+    ),
+];

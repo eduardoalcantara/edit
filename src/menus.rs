@@ -34,6 +34,7 @@ pub enum ActionId {
     SelectAll,
     Find,
     Replace,
+    GoToLine,
     ThemeDark,
     ThemeLight,
     ThemeClassicBlue,
@@ -159,6 +160,26 @@ impl MenuState {
             self.close();
         } else {
             self.open_top_menu(index, bar);
+        }
+    }
+
+    /// Abre **Formatar → Codificação** (ex.: clique no encoding no rodapé).
+    pub fn open_format_encoding_menu(&mut self, bar: &MenuBar) {
+        const FORMAT_TOP: usize = 4;
+        const ENCODING_SUB: usize = 0;
+        if FORMAT_TOP >= bar.tops.len() {
+            return;
+        }
+        self.open_top = Some(FORMAT_TOP);
+        self.expanded_submenus = vec![ENCODING_SUB];
+        self.focus_path = vec![ENCODING_SUB];
+        if let Some(MenuNode::SubMenu { children, .. }) =
+            bar.tops[FORMAT_TOP].children.get(ENCODING_SUB)
+        {
+            let first = first_enabled_index(children);
+            if first != usize::MAX {
+                self.focus_path.push(first);
+            }
         }
     }
 }
@@ -526,6 +547,14 @@ fn edit_menu(clip: &Clipboard) -> Vec<MenuNode> {
             true,
             None,
             "Busca e substitui texto no documento",
+        ),
+        item(
+            "Ir para linha...",
+            Some("Ctrl+G"),
+            ActionId::GoToLine,
+            true,
+            None,
+            "Move o cursor para a linha e coluna informadas",
         ),
     ]
 }

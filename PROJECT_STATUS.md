@@ -134,7 +134,9 @@
 - **Terminal — encerramento automático ao `exit` (2026-06-08):** `child.try_wait()` detecta fim do shell; remove sessão; oculta painel se era a única (sem respawn automático).
   - Módulos: `src/terminal/{session,workspace}.rs`, `src/app.rs`
 - **Spec split view (2026-06-08):** `specs/to-do/SPEC-EDITOR-SPLIT-VIEW.md` — duas abas visíveis lado a lado (após barra de abas, fase 2 workspace).
-- **Specs em `to-do/` (avaliação 2026-06-08):** nenhum documento 100% concluído para mover a `done/` — `SPEC-MULTPLOS-ARQUIVOS` fase 1 feita, fase 2 pendente; `SPEC-LIMITACOES-PENDENTES` e `SPEC-UX-FIDELIDADE-TURBO-VISION` abertos.
+- **Spec menu Ajuda (2026-06-08):** `specs/to-do/SPEC-MENU-AJUDA.md` — Features, Atalhos, Sobre.
+- **Atalhos e UX (2026-06-08):** `Ctrl+E` foco editor; `Ctrl+T`/`Ctrl+'` abre/foca ou fecha conforme foco; `Ctrl+G` e **Editar → Ir para linha...**; clique **Pos** / encoding no rodapé.
+  - **127 testes** unitários passando (`cargo test`).
 
 ### Em andamento
 - **Múltiplos arquivos — fase 2:** barra de abas visual; serialização `undo.json`/`redo.json`; modal recarregar arquivo alterado externamente.

@@ -53,7 +53,7 @@ Regra: **a mesma aba não pode ocupar os dois painéis** ao mesmo tempo.
 ### 4.1. Ativação
 
 - Menu **Exibir** → **Dividir editor** (toggle) ou submenu **Horizontal**.
-- Atalho sugerido: **`Ctrl+E`** (livre no projeto; ver `PROJECT_RULES.md`).
+- Atalho sugerido: submenu **Exibir → Dividir editor** (toggle horizontal); **`Ctrl+E` reservado para foco no editor** (ver `PROJECT_RULES.md`).
 - Ao ativar com uma aba: painel esquerdo = aba ativa; direito = próxima aba na lista ou vazio com prompt “Selecione aba…”.
 
 ### 4.2. Foco

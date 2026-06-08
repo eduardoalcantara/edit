@@ -71,13 +71,15 @@ Regras estáveis do projeto. Para estado de implementação, ver `PROJECT_STATUS
 | `Ctrl+N` | Novo documento |
 | `Ctrl+W` | Fechar documento |
 | `Ctrl+Q` / `Alt+F4` | Sair (com confirmação se dirty; funciona mesmo com menu/modal aberto) |
-| `Ctrl+T` / **`Ctrl+'`** | Mostrar / ocultar painel terminal inferior |
-| **`F6`** | Foco Editor ↔ Terminal (painel terminal visível) |
+| **`Ctrl+E`** | Foco no **editor** (mesmo com terminal visível) |
+| `Ctrl+T` / **`Ctrl+'`** | Do **editor**: abre o terminal (se fechado) ou **foca** o terminal; do **terminal**: **fecha** o painel |
+| **`F6`** | Alterna foco Editor ↔ Terminal (abre terminal se estiver fechado) |
 | **`F7`** | Envia seleção do editor (ou linha atual) ao terminal e foca o PTY |
 | **`F4`** | Próxima aba de edição (alternativa segura no Windows) |
 | **`Shift+F4`** | Aba anterior de edição (alternativa segura no Windows) |
 | `Ctrl+Tab` / `Ctrl+Shift+Tab` | Próxima / anterior aba (quando o host repassar ao app) |
 | `Ctrl+F` / `Ctrl+H` | Buscar / Substituir |
+| **`Ctrl+G`** | Ir para linha... |
 | `Ctrl+←/→` | Navegação inteligente por palavra |
 | `Ctrl+Shift+←/→` | Seleção por palavra |
 | `Alt` + arraste | Seleção retangular (bloco) |
@@ -103,8 +105,9 @@ Detalhes do terminal integrado: `specs/done/SPEC-TERMINAL-INFERIOR.md`.
 
 | Atalho / ação | Comportamento |
 |---------------|---------------|
-| `Ctrl+T` / `Ctrl+'` | Mostrar / ocultar painel terminal |
-| **F6** | Foco Editor ↔ Terminal (com painel visível) |
+| `Ctrl+T` / `Ctrl+'` | Do editor: abre ou foca terminal; do terminal: fecha painel |
+| **`Ctrl+E`** | Foco no editor |
+| **F6** | Alterna foco Editor ↔ Terminal |
 | **F7** | Envia seleção do editor (ou linha atual) ao PTY; abre terminal se fechado |
 | **Esc** | Devolve foco ao editor |
 | **PgUp / PgDn** | Rola scrollback (foco no terminal) |

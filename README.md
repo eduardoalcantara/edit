@@ -107,8 +107,10 @@ edit --workspace -- main.rs tests/mod.rs
 | `Ctrl+F/H` | Buscar / Substituir |
 | `Ctrl+Q`, `Alt+F4` | Sair |
 | `Alt+A` | Menu Arquivo |
-| `Ctrl+T` / `Ctrl+'` | Mostrar / ocultar terminal inferior |
-| **`F6`** | Foco Editor ↔ Terminal |
+| `Ctrl+T` / `Ctrl+'` | Do editor: abre/foca terminal; do terminal: fecha painel |
+| **`Ctrl+E`** | Foco no editor |
+| **`Ctrl+G`** | Ir para linha... |
+| **`F6`** | Alterna foco Editor ↔ Terminal |
 | **`F4`** / **`Shift+F4`** | Próxima / anterior aba (Windows-safe) |
 
 Ver `PROJECT_RULES.md` para lista completa.

@@ -162,9 +162,17 @@ fn footer_help_default(app: &App) -> String {
     app.status_message.clone()
 }
 
+/// Ação ao clicar em um grupo do rodapé direito.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FooterClick {
+    GoToLine,
+    OpenFormatEncoding,
+}
+
 pub struct FooterSegment {
     pub text: String,
     pub help: &'static str,
+    pub click: Option<FooterClick>,
 }
 
 fn footer_active_focus(app: &App) -> &'static str {
@@ -198,30 +206,37 @@ pub fn footer_segments(app: &App) -> Vec<FooterSegment> {
         FooterSegment {
             text: footer_focus_label(app),
             help: "Área que recebe o teclado neste momento",
+            click: None,
         },
         FooterSegment {
             text: format!("Aba {tab_current}/{tab_total}"),
             help: "Aba ativa e total de abas abertas",
+            click: None,
         },
         FooterSegment {
             text: format!("Tam {visible}/{lines}/{total}"),
             help: "Caracteres visíveis no viewport / linhas do arquivo / total de caracteres (inclui quebras de linha)",
+            click: None,
         },
         FooterSegment {
             text: format!("Pos {ln}/{col}"),
-            help: "Linha e coluna do cursor (base 1)",
+            help: "Linha e coluna do cursor (base 1); clique para ir para linha",
+            click: Some(FooterClick::GoToLine),
         },
         FooterSegment {
             text: app.editor.mode().label().to_string(),
             help: "Modo de edição atual",
+            click: None,
         },
         FooterSegment {
             text: app.document.encoding.label().to_string(),
-            help: "Codificação do arquivo",
+            help: "Codificação do arquivo; clique para abrir Formatar → Codificação",
+            click: Some(FooterClick::OpenFormatEncoding),
         },
         FooterSegment {
             text: app.document.tabulation.footer_label().to_string(),
             help: "Configuração de tabulação",
+            click: None,
         },
     ];
     if app.view.show_memory {
@@ -229,6 +244,7 @@ pub fn footer_segments(app: &App) -> Vec<FooterSegment> {
             segments.push(FooterSegment {
                 text: label,
                 help: "Consumo de memória do processo",
+                click: None,
             });
         }
     }
@@ -263,6 +279,19 @@ fn footer_right_start(left: &str, right: &str, width: usize) -> usize {
 
 /// Retorna o texto de ajuda do grupo do rodapé sob o cursor, se houver.
 pub fn footer_hover_at(app: &App, rel_col: usize, inner_width: usize) -> Option<String> {
+    footer_segment_index_at(app, rel_col, inner_width).map(|i| {
+        footer_segments(app)[i].help.to_string()
+    })
+}
+
+/// Ação de clique no grupo do rodapé sob o cursor.
+pub fn footer_click_at(app: &App, rel_col: usize, inner_width: usize) -> Option<FooterClick> {
+    footer_segment_index_at(app, rel_col, inner_width)
+        .and_then(|i| footer_segments(app)[i].click)
+}
+
+/// Retorna o índice do segmento (para testes).
+pub fn footer_segment_index_at(app: &App, rel_col: usize, inner_width: usize) -> Option<usize> {
     let left = footer_help_default(app);
     let segments = footer_segments(app);
     let right = footer_status_from_segments(&segments);
@@ -275,7 +304,7 @@ pub fn footer_hover_at(app: &App, rel_col: usize, inner_width: usize) -> Option<
     for (i, segment) in segments.iter().enumerate() {
         let len = segment.text.chars().count();
         if rel >= pos && rel < pos + len {
-            return Some(segment.help.to_string());
+            return Some(i);
         }
         pos += len;
         if i + 1 < segments.len() {
@@ -318,8 +347,16 @@ fn handle_global_chords(app: &mut App, key: KeyEvent) -> bool {
         return false;
     }
     match key.code {
+        KeyCode::Char('e' | 'E') => {
+            app.focus_editor();
+            true
+        }
         KeyCode::Char('t' | 'T' | '\'') => {
-            app.toggle_terminal_panel();
+            app.chord_terminal_toggle();
+            true
+        }
+        KeyCode::Char('g' | 'G') => {
+            app.request_go_to_line();
             true
         }
         _ => false,
@@ -409,6 +446,23 @@ mod tests {
             help.as_deref(),
             Some("Caracteres visíveis no viewport / linhas do arquivo / total de caracteres (inclui quebras de linha)")
         );
+    }
+
+    #[test]
+    fn footer_click_at_pos_opens_go_to_line() {
+        let app = App::new(false);
+        let segments = footer_segments(&app);
+        let right = footer_status_from_segments(&segments);
+        let left = footer_help_default(&app);
+        let width = left.chars().count() + right.chars().count() + 4;
+        let start = footer_right_start(&left, &right, width);
+        let pos_offset = right
+            .split(" | ")
+            .take(3)
+            .map(|part| part.chars().count() + 3)
+            .sum::<usize>();
+        let click = footer_click_at(&app, start + pos_offset, width);
+        assert_eq!(click, Some(FooterClick::GoToLine));
     }
 
     #[test]
