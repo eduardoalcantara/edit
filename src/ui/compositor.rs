@@ -139,8 +139,15 @@ fn dispatch_key_to_layers(app: &mut App, key: KeyEvent, layout: UiLayout) {
     }
 }
 
-/// Texto de ajuda à esquerda (menu/modal/ação recente).
+/// Texto de ajuda à esquerda (hover do rodapé, menu/modal ou ação recente).
 pub fn footer_help_left(app: &App) -> String {
+    if let Some(hint) = &app.footer_hover_help {
+        return hint.clone();
+    }
+    footer_help_default(app)
+}
+
+fn footer_help_default(app: &App) -> String {
     let mut layers: Vec<&dyn UiLayer> = all_layers()
         .into_iter()
         .filter(|layer| layer.is_visible(app))
@@ -153,6 +160,11 @@ pub fn footer_help_left(app: &App) -> String {
         }
     }
     app.status_message.clone()
+}
+
+pub struct FooterSegment {
+    pub text: String,
+    pub help: &'static str,
 }
 
 fn footer_active_focus(app: &App) -> &'static str {
@@ -171,10 +183,10 @@ pub fn footer_focus_label(app: &App) -> String {
     footer_active_focus(app).to_string()
 }
 
-/// Grupos de estado alinhados à direita (foco, aba, tamanho, linha/coluna, modo, encoding, tab, memória).
-pub fn footer_status_right(app: &App) -> String {
+pub fn footer_segments(app: &App) -> Vec<FooterSegment> {
     let (ln, col) = app.editor.cursor_line_col();
     let visible = app.editor.visible_char_count();
+    let lines = app.editor.line_count();
     let total = app.editor.total_char_count();
     let tab_total = app.workspace.tabs.len();
     let tab_current = if tab_total == 0 {
@@ -183,20 +195,94 @@ pub fn footer_status_right(app: &App) -> String {
         app.workspace.active_index + 1
     };
     let mut segments = vec![
-        footer_focus_label(app),
-        format!("Aba {tab_current}/{tab_total}"),
-        format!("Tam {visible}/{total}"),
-        format!("Pos {ln}/{col}"),
-        app.editor.mode().label().to_string(),
-        app.document.encoding.label().to_string(),
-        app.document.tabulation.footer_label().to_string(),
+        FooterSegment {
+            text: footer_focus_label(app),
+            help: "Área que recebe o teclado neste momento",
+        },
+        FooterSegment {
+            text: format!("Aba {tab_current}/{tab_total}"),
+            help: "Aba ativa e total de abas abertas",
+        },
+        FooterSegment {
+            text: format!("Tam {visible}/{lines}/{total}"),
+            help: "Caracteres visíveis no viewport / linhas do arquivo / total de caracteres (inclui quebras de linha)",
+        },
+        FooterSegment {
+            text: format!("Pos {ln}/{col}"),
+            help: "Linha e coluna do cursor (base 1)",
+        },
+        FooterSegment {
+            text: app.editor.mode().label().to_string(),
+            help: "Modo de edição atual",
+        },
+        FooterSegment {
+            text: app.document.encoding.label().to_string(),
+            help: "Codificação do arquivo",
+        },
+        FooterSegment {
+            text: app.document.tabulation.footer_label().to_string(),
+            help: "Configuração de tabulação",
+        },
     ];
     if app.view.show_memory {
         if let Some(label) = app.memory.display_label() {
-            segments.push(label);
+            segments.push(FooterSegment {
+                text: label,
+                help: "Consumo de memória do processo",
+            });
         }
     }
-    segments.join(" | ")
+    segments
+}
+
+fn footer_status_from_segments(segments: &[FooterSegment]) -> String {
+    segments
+        .iter()
+        .map(|segment| segment.text.as_str())
+        .collect::<Vec<_>>()
+        .join(" | ")
+}
+
+/// Grupos de estado alinhados à direita (foco, aba, tamanho, linha/coluna, modo, encoding, tab, memória).
+pub fn footer_status_right(app: &App) -> String {
+    footer_status_from_segments(&footer_segments(app))
+}
+
+fn footer_right_start(left: &str, right: &str, width: usize) -> usize {
+    let right_len = right.chars().count();
+    let left_len = left.chars().count();
+    if width <= right_len {
+        return 0;
+    }
+    if left_len + right_len >= width {
+        width.saturating_sub(right_len)
+    } else {
+        left_len + (width - left_len - right_len)
+    }
+}
+
+/// Retorna o texto de ajuda do grupo do rodapé sob o cursor, se houver.
+pub fn footer_hover_at(app: &App, rel_col: usize, inner_width: usize) -> Option<String> {
+    let left = footer_help_default(app);
+    let segments = footer_segments(app);
+    let right = footer_status_from_segments(&segments);
+    let right_start = footer_right_start(&left, &right, inner_width);
+    if rel_col < right_start {
+        return None;
+    }
+    let rel = rel_col - right_start;
+    let mut pos = 0usize;
+    for (i, segment) in segments.iter().enumerate() {
+        let len = segment.text.chars().count();
+        if rel >= pos && rel < pos + len {
+            return Some(segment.help.to_string());
+        }
+        pos += len;
+        if i + 1 < segments.len() {
+            pos += 3;
+        }
+    }
+    None
 }
 
 /// Monta linha do rodapé: ajuda à esquerda, status à direita, com espaço entre eles.
@@ -294,6 +380,36 @@ fn handle_global_function_keys(app: &mut App, key: KeyEvent) -> bool {
 mod tests {
     use super::*;
     use crate::app::App;
+
+    #[test]
+    fn footer_includes_size_with_line_count() {
+        let app = App::new(false);
+        let status = footer_status_right(&app);
+        assert!(status.contains("Tam "));
+        let tam = status.split(" | ").find(|s| s.starts_with("Tam ")).unwrap();
+        let parts: Vec<_> = tam.trim_start_matches("Tam ").split('/').collect();
+        assert_eq!(parts.len(), 3);
+    }
+
+    #[test]
+    fn footer_hover_at_finds_tam_group() {
+        let app = App::new(false);
+        let segments = footer_segments(&app);
+        let right = footer_status_from_segments(&segments);
+        let left = footer_help_default(&app);
+        let width = left.chars().count() + right.chars().count() + 4;
+        let start = footer_right_start(&left, &right, width);
+        let tam_offset = right
+            .split(" | ")
+            .take(2)
+            .map(|part| part.chars().count() + 3)
+            .sum::<usize>();
+        let help = footer_hover_at(&app, start + tam_offset, width);
+        assert_eq!(
+            help.as_deref(),
+            Some("Caracteres visíveis no viewport / linhas do arquivo / total de caracteres (inclui quebras de linha)")
+        );
+    }
 
     #[test]
     fn footer_includes_tab_indicator() {

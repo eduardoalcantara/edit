@@ -5,6 +5,7 @@ use ratatui::widgets::Paragraph;
 use ratatui::Frame;
 
 use crate::editor::line_numbers;
+use crate::editor::wrap;
 use crate::edit_mode::EditMode;
 use crate::editor::cursor::{char_idx_to_line_col, SelectionMode};
 use crate::editor::engine::EditorEngine;
@@ -80,8 +81,6 @@ pub fn draw(
     );
     let content = text_viewport.unwrap_or_else(|| text_area(inner, margin));
 
-    let content = text_viewport.unwrap_or_else(|| text_area(inner, margin));
-
     panel::fill_rect(frame, inner, palette.editor_text_style());
 
     let line_count = engine.text.len_lines().max(1);
@@ -97,73 +96,106 @@ pub fn draw(
         (Rect::default(), content)
     };
 
+    engine.viewport.update_size(text_rect);
+    engine.ensure_visible();
+
+    let visible_h = text_rect.height as usize;
+    let visible_w = text_rect.width as usize;
+    let word_wrap = engine.word_wrap && visible_w > 0;
+    let top_visual = if word_wrap {
+        engine.viewport.top_visual_row
+    } else {
+        engine.viewport.top_line
+    };
+    let left = if word_wrap { 0 } else { engine.viewport.left_col };
+
     if let Some(gutter) = gutter_layout {
         line_numbers::paint_gutter(
             frame,
             gutter_area,
             gutter,
-            engine.viewport.top_line,
-            content.height as usize,
-            line_count,
+            engine,
+            top_visual,
+            visible_h,
+            visible_w,
+            show_tabs,
             cursor_line,
             palette,
         );
     }
 
-    engine.viewport.update_size(text_rect);
-    engine.ensure_visible();
-
     let top = engine.viewport.top_line;
-    let left = engine.viewport.left_col;
-    let visible_h = text_rect.height as usize;
-    let visible_w = text_rect.width as usize;
-
     let text_style = palette.editor_text_style();
     let tab_width = tab_stop_width(engine.tabulation);
     for row in 0..visible_h {
-        let doc_line = top + row;
         let line_area = Rect {
             x: text_rect.x,
             y: text_rect.y.saturating_add(row as u16),
             width: text_rect.width,
             height: 1,
         };
-        if doc_line >= line_count {
-            frame.render_widget(Paragraph::new(" ").style(text_style), line_area);
-            continue;
-        }
-        let mut line_str = engine.text.line(doc_line).to_string();
-        line_str.truncate(line_str.trim_end_matches('\n').len());
-        let expanded = expand_tabs(&line_str, tab_width, show_tabs);
-        let display = if left < expanded.chars().count() {
-            expanded.chars().skip(left).take(visible_w).collect::<String>()
+        if word_wrap {
+            let Some(display_row) =
+                wrap::build_display_row_at(engine, top_visual + row, visible_w, show_tabs)
+            else {
+                frame.render_widget(Paragraph::new(" ").style(text_style), line_area);
+                continue;
+            };
+            let expanded = wrap::expanded_line(engine, display_row.doc_line, show_tabs);
+            let display =
+                wrap::segment_text(&expanded, display_row, visible_w, left);
+            let mut line_str = engine.text.line(display_row.doc_line).to_string();
+            line_str.truncate(line_str.trim_end_matches('\n').len());
+            let spans = styled_line(
+                engine,
+                display_row.doc_line,
+                &line_str,
+                display_row.seg_start + left,
+                &display,
+                tab_width,
+                palette,
+            );
+            frame.render_widget(Paragraph::new(Line::from(spans)), line_area);
         } else {
-            String::new()
-        };
-
-        let spans = styled_line(
-            engine,
-            doc_line,
-            &line_str,
-            left,
-            &display,
-            tab_width,
-            palette,
-        );
-        frame.render_widget(Paragraph::new(Line::from(spans)), line_area);
+            let doc_line = top + row;
+            if doc_line >= line_count {
+                frame.render_widget(Paragraph::new(" ").style(text_style), line_area);
+                continue;
+            }
+            let mut line_str = engine.text.line(doc_line).to_string();
+            line_str.truncate(line_str.trim_end_matches('\n').len());
+            let expanded = expand_tabs(&line_str, tab_width, show_tabs);
+            let display = if left < expanded.chars().count() {
+                expanded.chars().skip(left).take(visible_w).collect::<String>()
+            } else {
+                String::new()
+            };
+            let spans = styled_line(
+                engine,
+                doc_line,
+                &line_str,
+                left,
+                &display,
+                tab_width,
+                palette,
+            );
+            frame.render_widget(Paragraph::new(Line::from(spans)), line_area);
+        }
     }
 
     draw_cursors(
         frame,
         engine,
         text_rect,
-        top,
+        top_visual,
         left,
         tab_width,
         palette,
         show_cursor,
+        show_tabs,
+        word_wrap,
     );
-    engine.refresh_footer_size_stats(top, visible_h);
+    engine.refresh_footer_size_stats(top_visual, visible_h, visible_w, show_tabs);
     (text_rect, content)
 }
 
@@ -307,11 +339,13 @@ fn draw_cursors(
     frame: &mut Frame,
     engine: &EditorEngine,
     content: Rect,
-    top_line: usize,
+    top_visual: usize,
     left_vis: usize,
     tab_width: usize,
     palette: ThemePalette,
     show_cursor: bool,
+    show_tabs: bool,
+    word_wrap: bool,
 ) {
     if !show_cursor {
         return;
@@ -323,15 +357,38 @@ fn draw_cursors(
         vec![*engine.primary()]
     };
 
+    let w = content.width as usize;
+
     for (i, cursor) in cursors.iter().enumerate() {
         let (line, col) = char_idx_to_line_col(&engine.text, cursor.char_idx);
-        if line < top_line || line >= top_line + content.height as usize {
-            continue;
-        }
         let mut line_str = engine.text.line(line).to_string();
         line_str.truncate(line_str.trim_end_matches('\n').len());
-        let vis_col = visual_col_in_line(&line_str, col, tab_width).saturating_sub(left_vis);
-        if vis_col >= content.width as usize {
+        let vis_col = visual_col_in_line(&line_str, col, tab_width);
+
+        let (screen_row, x_offset) = if word_wrap && w > 0 {
+            let vrow = wrap::visual_row_for_cursor(engine, line, vis_col, w, show_tabs);
+            if vrow < top_visual || vrow >= top_visual + content.height as usize {
+                continue;
+            }
+            let display_row =
+                match wrap::build_display_row_at(engine, vrow, w, show_tabs) {
+                    Some(r) => r,
+                    None => continue,
+                };
+            let row = vrow - top_visual;
+            let x = vis_col.saturating_sub(display_row.seg_start).saturating_sub(left_vis);
+            (row, x)
+        } else {
+            let top_line = top_visual;
+            if line < top_line || line >= top_line + content.height as usize {
+                continue;
+            }
+            let row = line - top_line;
+            let x = vis_col.saturating_sub(left_vis);
+            (row, x)
+        };
+
+        if x_offset >= w {
             continue;
         }
         let style = if i == 0 {
@@ -339,8 +396,8 @@ fn draw_cursors(
         } else {
             palette.cursor_style()
         };
-        let x = content.x.saturating_add(vis_col as u16);
-        let y = content.y.saturating_add((line - top_line) as u16);
+        let x = content.x.saturating_add(x_offset as u16);
+        let y = content.y.saturating_add(screen_row as u16);
         if engine.input_mode == EditMode::Replace && i == 0 {
             if let Some(ch) = engine.text.get_char(cursor.char_idx) {
                 frame.render_widget(

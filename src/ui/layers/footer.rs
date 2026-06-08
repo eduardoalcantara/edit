@@ -1,6 +1,7 @@
-use crossterm::event::{KeyEvent, MouseEvent};
+use crossterm::event::{KeyEvent, MouseEvent, MouseEventKind};
 use ratatui::widgets::Paragraph;
 
+use crate::input::mouse;
 use crate::theme::ThemePalette;
 use crate::ui::compositor;
 use crate::ui::layer::{InputResult, LayerId, UiLayer};
@@ -49,7 +50,26 @@ impl UiLayer for FooterLayer {
         InputResult::Unhandled
     }
 
-    fn on_mouse(&self, _: MouseEvent, _: &mut crate::app::App, _: UiLayout) -> InputResult {
-        InputResult::Unhandled
+    fn on_mouse(&self, mouse: MouseEvent, app: &mut crate::app::App, layout: UiLayout) -> InputResult {
+        if !matches!(mouse.kind, MouseEventKind::Moved) {
+            return InputResult::Unhandled;
+        }
+        let Some(area) = layout.footer else {
+            if app.footer_hover_help.take().is_some() {
+                return InputResult::Consumed;
+            }
+            return InputResult::Unhandled;
+        };
+        let inner = compositor::footer_inner(area);
+        if !mouse::point_in_rect(&mouse, inner) {
+            if app.footer_hover_help.take().is_some() {
+                return InputResult::Consumed;
+            }
+            return InputResult::Unhandled;
+        }
+        let rel_col = mouse.column.saturating_sub(inner.x) as usize;
+        app.footer_hover_help =
+            compositor::footer_hover_at(app, rel_col, inner.width as usize);
+        InputResult::Consumed
     }
 }

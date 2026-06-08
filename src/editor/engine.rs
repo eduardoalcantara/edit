@@ -9,7 +9,8 @@ use crate::editor::selection::{
     add_cursor_at, collect_block_delete_patches, delete_block, extract_block_text,
     extract_linear_text, merge_cursors, BlockSelectionState,
 };
-use crate::editor::tabs::{char_col_from_visual, line_visual_len, tab_stop_width, visual_col_in_line};
+use crate::editor::tabs::{char_col_from_visual, tab_stop_width, visual_col_in_line};
+use crate::editor::wrap;
 use crate::editor::word_boundary::{get_next_word_boundary, WordDirection};
 use crate::editor::viewport::Viewport;
 use crate::encoding::Tabulation;
@@ -25,6 +26,7 @@ pub struct EditorEngine {
     pub input_mode: EditMode,
     pub viewport: Viewport,
     pub word_wrap: bool,
+    pub render_show_tabs: bool,
     pub tabulation: Tabulation,
     pub search_pattern: String,
     history: EditHistory,
@@ -49,6 +51,7 @@ impl EditorEngine {
             input_mode: EditMode::Insert,
             viewport: Viewport::default(),
             word_wrap: false,
+            render_show_tabs: false,
             tabulation: Tabulation::default(),
             search_pattern: String::new(),
             history: EditHistory::new(),
@@ -72,6 +75,7 @@ impl EditorEngine {
         self.selection_mode = SelectionMode::Normal;
         self.history.clear();
         self.viewport.top_line = 0;
+        self.viewport.top_visual_row = 0;
         self.viewport.left_col = 0;
         self.sync_primary_virtual();
     }
@@ -131,24 +135,68 @@ impl EditorEngine {
             if doc_line >= line_count {
                 break;
             }
-            count += self.line_display_len(doc_line);
+            count += self.line_logical_len(doc_line);
         }
         count
     }
 
-    fn line_display_len(&self, line_idx: usize) -> usize {
+    fn line_logical_len(&self, line_idx: usize) -> usize {
         let line = self.text.line(line_idx).to_string();
-        let line = line.trim_end_matches('\n');
-        line_visual_len(line, tab_stop_width(self.tabulation))
+        line.trim_end_matches('\n').chars().count()
     }
 
     pub fn refresh_footer_size_stats(
         &mut self,
-        top_line: usize,
+        top_visual: usize,
         visible_h: usize,
+        text_width: usize,
+        show_tabs: bool,
     ) {
         self.cached_total_chars = self.total_char_count();
-        self.cached_visible_chars = self.count_visible_chars(top_line, visible_h);
+        self.cached_visible_chars =
+            self.count_visible_chars_in_viewport(top_visual, visible_h, text_width, show_tabs);
+    }
+
+    fn count_visible_chars_in_viewport(
+        &self,
+        top_visual: usize,
+        visible_h: usize,
+        text_width: usize,
+        show_tabs: bool,
+    ) -> usize {
+        if visible_h == 0 {
+            return 0;
+        }
+        if !self.word_wrap || text_width == 0 {
+            let top_line = if self.word_wrap {
+                top_visual
+            } else {
+                self.viewport.top_line
+            };
+            return self.count_visible_chars(top_line, visible_h);
+        }
+        let mut count = 0usize;
+        for row in 0..visible_h {
+            let Some(display_row) =
+                wrap::build_display_row_at(self, top_visual + row, text_width, show_tabs)
+            else {
+                break;
+            };
+            let expanded = wrap::expanded_line(self, display_row.doc_line, show_tabs);
+            let segs = wrap::segment_starts(&expanded, text_width, true);
+            let seg_end = segs
+                .get(display_row.seg_index + 1)
+                .copied()
+                .unwrap_or_else(|| expanded.chars().count());
+            let line_str = self.text.line(display_row.doc_line).to_string();
+            let line_body = line_str.trim_end_matches('\n');
+            let tab_width = tab_stop_width(self.tabulation);
+            let char_start =
+                char_col_from_visual(line_body, display_row.seg_start, tab_width);
+            let char_end = char_col_from_visual(line_body, seg_end, tab_width);
+            count += char_end.saturating_sub(char_start);
+        }
+        count
     }
 
     pub fn cursor_line_col(&self) -> (usize, usize) {
@@ -217,8 +265,22 @@ impl EditorEngine {
         let (line, col) = char_idx_to_line_col(&self.text, self.primary().char_idx);
         let line_str = self.text.line(line).to_string();
         let vis_col = visual_col_in_line(&line_str, col, tab_stop_width(self.tabulation));
-        self.viewport
-            .ensure_cursor_visible(line, vis_col, line_count);
+        let w = self.viewport.width as usize;
+        if self.word_wrap && w > 0 {
+            let total = wrap::total_visual_rows(self, w, self.render_show_tabs);
+            let vrow = wrap::visual_row_for_cursor(self, line, vis_col, w, self.render_show_tabs);
+            self.viewport.ensure_visual_row_visible(vrow, total);
+            self.viewport.left_col = 0;
+            if let Some(dr) =
+                wrap::build_display_row_at(self, self.viewport.top_visual_row, w, self.render_show_tabs)
+            {
+                self.viewport.top_line = dr.doc_line;
+            }
+        } else {
+            self.viewport
+                .ensure_cursor_visible(line, vis_col, line_count);
+            self.viewport.top_visual_row = self.viewport.top_line;
+        }
     }
 
     fn record(&mut self, start: usize, removed: String, inserted: String, before: usize, after: usize) {
@@ -592,6 +654,7 @@ impl EditorEngine {
         self.primary_mut().char_idx = 0;
         self.sync_primary_virtual();
         self.viewport.top_line = 0;
+        self.viewport.top_visual_row = 0;
         self.viewport.left_col = 0;
         self.ensure_visible();
     }
@@ -964,9 +1027,9 @@ mod tests {
         e.viewport.width = 80;
         e.viewport.height = 24;
         assert_eq!(e.text.len_lines(), 3);
-        assert_eq!(e.line_display_len(0), 5);
-        assert_eq!(e.line_display_len(1), 5);
-        assert_eq!(e.line_display_len(2), 4);
+        assert_eq!(e.line_logical_len(0), 5);
+        assert_eq!(e.line_logical_len(1), 5);
+        assert_eq!(e.line_logical_len(2), 4);
         assert_eq!(e.total_char_count(), 16);
         assert_eq!(e.visible_char_count(), 14);
         assert_ne!(e.total_char_count(), e.visible_char_count());
@@ -1007,6 +1070,18 @@ mod tests {
         assert_eq!(e.visible_char_count(), 10);
         e.viewport.left_col = 6;
         assert_eq!(e.visible_char_count(), 10);
+    }
+
+    #[test]
+    fn visible_char_count_treats_literal_tab_as_one_char() {
+        use crate::encoding::Tabulation;
+
+        let mut e = EditorEngine::new();
+        e.tabulation = Tabulation::TabLiteral;
+        e.load_text("\tworld");
+        e.viewport.height = 1;
+        assert_eq!(e.visible_char_count(), 6);
+        assert_eq!(e.total_char_count(), 6);
     }
 
     #[test]

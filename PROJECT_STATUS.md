@@ -2,7 +2,7 @@
 
 **Autor:** Perplexity AI  
 **Data:** 2026-06-08  
-**Versão:** 3.2
+**Versão:** 3.3
 
 ## Estado atual
 
@@ -75,7 +75,7 @@
   - Marcador `√` substitutivo na margem esquerda (1 célula, sem coluna extra); atalhos de menu em cinza (`menu_shortcut_style`).
 - **Tabulação e rodapé Tam (2026-06-07):**
   - Módulo `src/editor/tabs.rs`: expansão visual de `\t`, cursor e scroll por coluna visual; parada 8 para Tab literal.
-  - Rodapé **Tam XXX/YYY**: XXX = soma do conteúdo completo das linhas visíveis verticalmente (sem `\n`); YYY = total no documento (com `\n`); não trava em ~153 em linhas longas.
+  - Rodapé **Tam XXX/NNN/YYYY**: XXX = caracteres lógicos nas linhas visíveis verticalmente (sem `\n`; tab = 1); NNN = linhas do arquivo; YYY = total no documento (com `\n`).
   - Rodapé **Pos XX/YY**: linha e coluna do cursor (1-based), formato compacto (antes `Ln XX Col YY`).
   - Exibir → **Texto** (antes Mostrar): símbolos, espaços, tabs, fim de linha.
 - **Consumo de memória no rodapé (2026-06-07):**
@@ -117,13 +117,20 @@
   - Atalhos Shift+letra na sidebar **removidos** (inviáveis sem distinguir LShift/RShift).
   - **120 testes** unitários passando (`cargo test`).
 - **Números de linha + menu Exibir reorganizado (2026-06-08):**
-  - Exibir → **Números de linha** (toggle; `exibir.numeros_linha` em `edit.json`).
-  - Coluna interna alinhada à direita (largura = última linha); cor fraca; linha do cursor em destaque.
+  - Exibir → **Texto** → **Números de linha** (toggle; `exibir.numeros_linha` em `edit.json`).
+  - Coluna interna alinhada à direita (largura = última linha); cor fraca (`menu_shortcut`); linha do cursor em destaque.
   - Espaço entre nº e texto: 1 / 2 / 4 conforme margem (sem / uma / duas linhas).
   - Scroll vertical sincronizado; clique/seleção só no texto (gutter ignorado).
-  - Menu Exibir: checkboxes primeiro; submenus depois; **Texto** (ex-Mostrar); **Quebra de linha**; removidos Zoom e Painel lateral.
+  - Menu Exibir: checkboxes primeiro; submenus depois; **Texto** com **Quebra de linha** e **Números de linha** no topo; removidos Zoom e Painel lateral.
   - Módulos: `src/editor/line_numbers.rs`, `src/editor/render.rs`, `src/menus.rs`, `src/config.rs`, `src/view_state.rs`
   - **120 testes** unitários passando (`cargo test`).
+- **Word wrap visual + rodapé aprimorado (2026-06-08):**
+  - Módulo `src/editor/wrap.rs`: quebra visual de linhas; uma linha lógica = um número no gutter (segmentos de continuação em branco).
+  - Render e cursor sincronizados com `top_visual_row`; viewport `ensure_visual_row_visible`.
+  - Rodapé **Tam XXX/NNN/YYYY** (visíveis / linhas / total); contagem de visíveis em caracteres lógicos (tab literal = 1, alinhado ao total).
+  - Hover nos grupos do rodapé direito → help contextual à esquerda (foco, aba, tam, pos, modo, encoding, tab, memória).
+  - Módulos: `src/editor/{wrap,render,engine,viewport,line_numbers}.rs`, `src/ui/{compositor,layers/footer}.rs`, `src/app.rs`, `src/theme.rs`
+  - **126 testes** unitários passando (`cargo test`).
 
 ### Em andamento
 - **Múltiplos arquivos — fase 2:** barra de abas visual; serialização `undo.json`/`redo.json`; modal recarregar arquivo alterado externamente.

@@ -4,6 +4,8 @@ use ratatui::layout::Rect;
 use ratatui::widgets::Paragraph;
 use ratatui::Frame;
 
+use crate::editor::engine::EditorEngine;
+use crate::editor::wrap;
 use crate::theme::ThemePalette;
 use crate::view_state::EditorMargin;
 
@@ -61,44 +63,45 @@ pub fn paint_gutter(
     frame: &mut Frame,
     gutter_area: Rect,
     layout: LineGutterLayout,
-    top_line: usize,
+    engine: &EditorEngine,
+    top_visual: usize,
     visible_h: usize,
-    line_count: usize,
+    text_width: usize,
+    show_tabs: bool,
     cursor_line: usize,
     palette: ThemePalette,
 ) {
     let dim = palette.line_number_style();
     let active = palette.line_number_active_style();
+    let blank = " ".repeat(layout.total_width);
     for row in 0..visible_h {
-        let doc_line = top_line + row;
         let y = gutter_area.y.saturating_add(row as u16);
-        if doc_line >= line_count {
-            frame.render_widget(
-                Paragraph::new(" ".repeat(layout.total_width)).style(dim),
-                Rect {
-                    x: gutter_area.x,
-                    y,
-                    width: gutter_area.width,
-                    height: 1,
-                },
-            );
+        let cell = Rect {
+            x: gutter_area.x,
+            y,
+            width: gutter_area.width,
+            height: 1,
+        };
+        let Some(display_row) = wrap::build_display_row_at(engine, top_visual + row, text_width, show_tabs)
+        else {
+            frame.render_widget(Paragraph::new(blank.clone()).style(dim), cell);
+            continue;
+        };
+        if display_row.seg_index != 0 {
+            frame.render_widget(Paragraph::new(blank.clone()).style(dim), cell);
             continue;
         }
-        let number = format_line_number(doc_line, layout.digits_width);
+        let number = format_line_number(display_row.doc_line, layout.digits_width);
         let mut line = number;
         if layout.gap > 0 {
             line.push_str(&" ".repeat(layout.gap));
         }
-        let style = if doc_line == cursor_line { active } else { dim };
-        frame.render_widget(
-            Paragraph::new(line).style(style),
-            Rect {
-                x: gutter_area.x,
-                y,
-                width: gutter_area.width,
-                height: 1,
-            },
-        );
+        let style = if display_row.doc_line == cursor_line {
+            active
+        } else {
+            dim
+        };
+        frame.render_widget(Paragraph::new(line).style(style), cell);
     }
 }
 

@@ -533,12 +533,6 @@ fn edit_menu(clip: &Clipboard) -> Vec<MenuNode> {
 fn view_menu(view: &ViewState) -> Vec<MenuNode> {
     vec![
         toggle_item(
-            "Quebra de linha",
-            ActionId::WordWrapToggle,
-            view.word_wrap,
-            "Alterna a quebra automática de linhas longas no editor",
-        ),
-        toggle_item(
             "Terminal",
             ActionId::ToggleTerminal,
             view.terminal,
@@ -557,12 +551,6 @@ fn view_menu(view: &ViewState) -> Vec<MenuNode> {
             "Exibe o consumo total de memória do aplicativo no rodapé",
         ),
         toggle_item(
-            "Números de linha",
-            ActionId::LineNumbersToggle,
-            view.show_line_numbers,
-            "Exibe a numeração de linhas à esquerda do texto no editor",
-        ),
-        toggle_item(
             "Borda visível",
             ActionId::BorderToggle,
             view.border == EditorBorder::Visible,
@@ -572,6 +560,18 @@ fn view_menu(view: &ViewState) -> Vec<MenuNode> {
             "Texto",
             "Exibe ou oculta caracteres invisíveis no editor",
             vec![
+                toggle_item(
+                    "Quebra de linha",
+                    ActionId::WordWrapToggle,
+                    view.word_wrap,
+                    "Alterna a quebra automática de linhas longas no editor",
+                ),
+                toggle_item(
+                    "Números de linha",
+                    ActionId::LineNumbersToggle,
+                    view.show_line_numbers,
+                    "Exibe a numeração de linhas à esquerda do texto no editor",
+                ),
                 toggle_item(
                     "Símbolos",
                     ActionId::ShowSymbols,

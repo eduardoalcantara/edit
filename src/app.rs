@@ -40,6 +40,8 @@ pub struct App {
     pub should_quit: bool,
     pub pending_quit: bool,
     pub status_message: String,
+    /// Ajuda temporária ao passar o mouse sobre um grupo do rodapé.
+    pub footer_hover_help: Option<String>,
     pub mouse_enabled: bool,
     pub modal: Modal,
     pub is_ssh_session: bool,
@@ -114,6 +116,7 @@ impl App {
             should_quit: false,
             pending_quit: false,
             status_message: "Pronto".to_string(),
+            footer_hover_help: None,
             mouse_enabled,
             modal: Modal::None,
             is_ssh_session: std::env::var("SSH_CONNECTION").is_ok(),

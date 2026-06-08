@@ -82,7 +82,7 @@ edit --workspace -- main.rs tests/mod.rs
 
 - Compositor de camadas (`src/ui/`): menu dropdown opaco, modais `Dialog`, rodapé contextual.
 - Título do editor na borda: `[ nome ]` ou `[ Novo2* ]` (asterisco se dirty).
-- Rodapé: help do menu à esquerda; à direita `Tam XXX/YYY | Pos XX/YY | modo | encoding | tab | Mem NMB`.
+- Rodapé: help do menu ou hover dos grupos à esquerda; à direita `Tam XXX/NNN/YYYY | Pos XX/YY | modo | encoding | tab | Mem NMB` (XXX = chars visíveis no viewport, NNN = linhas, YYY = total com `\n`).
 - Modais com mouse/hover; sair/fechar com **[Salvar] [Não Salvar] [Cancelar]**; `Ctrl+Q` / `Alt+F4` global.
 
 ### Persistência

@@ -9,6 +9,7 @@ mod selection;
 mod tabs;
 mod viewport;
 mod word_boundary;
+mod wrap;
 
 pub use commands::EditorCommand;
 pub use cursor::SelectionMode;
@@ -158,6 +159,7 @@ impl Editor {
         show_tabs: bool,
         show_line_numbers: bool,
     ) {
+        self.engine.render_show_tabs = show_tabs;
         let (text_area, content_area) = render::draw(
             &mut self.engine,
             frame,
@@ -277,6 +279,10 @@ impl Editor {
 
     pub fn total_char_count(&self) -> usize {
         self.engine.footer_total_chars()
+    }
+
+    pub fn line_count(&self) -> usize {
+        self.engine.text.len_lines().max(1)
     }
 
     pub fn undo(&mut self) {

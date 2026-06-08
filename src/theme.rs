@@ -182,11 +182,11 @@ impl ThemePalette {
     }
 
     pub fn line_number_style(self) -> Style {
-        Style::default().fg(self.border).bg(self.editor_bg)
+        Style::default().fg(self.menu_shortcut).bg(self.editor_bg)
     }
 
     pub fn line_number_active_style(self) -> Style {
-        self.editor_text_style()
+        self.editor_text_style().add_modifier(Modifier::BOLD)
     }
 
     pub fn editor_text_style(self) -> Style {

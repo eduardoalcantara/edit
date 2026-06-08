@@ -136,3 +136,6 @@
 - 2026-06-08 — **Números de linha + menu Exibir reorganizado** — coluna gutter no editor; toggle persistido (`exibir.numeros_linha`); menu: checkboxes primeiro, **Texto**, **Quebra de linha**, **Consumo de memória**; removidos Zoom e Painel lateral.
   - Módulos: `src/editor/{line_numbers,render}.rs`, `src/menus.rs`, `src/config.rs`, `src/view_state.rs`, `src/input/mouse.rs`, `src/ui/layers/editor.rs`
   - Testes: **120** total (`cargo test`); docs STATUS/TIMELINE **v3.2**
+- 2026-06-08 — **Word wrap visual + rodapé Tam/linhas + hover** — `src/editor/wrap.rs`; quebra visual no render; gutter com um nº por linha lógica; **Quebra de linha** e **Números de linha** em Exibir → Texto; cor cinza dos nºs; Tam `XXX/NNN/YYYY`; contagem lógica (tab=1); help ao passar mouse nos grupos do rodapé.
+  - Módulos: `src/editor/{wrap,render,engine,viewport,line_numbers}.rs`, `src/ui/{compositor,layers/footer}.rs`, `src/app.rs`, `src/theme.rs`, `src/menus.rs`
+  - Testes: **126** total (`cargo test`); docs STATUS/TIMELINE **v3.3**

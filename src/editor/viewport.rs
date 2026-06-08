@@ -2,7 +2,10 @@ use ratatui::layout::Rect;
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Viewport {
+    /// Primeira linha lógica visível (sem word wrap).
     pub top_line: usize,
+    /// Primeira linha visual visível (com word wrap).
+    pub top_visual_row: usize,
     pub left_col: usize,
     pub width: u16,
     pub height: u16,
@@ -24,6 +27,7 @@ impl Viewport {
                 self.top_line = line.saturating_add(1).saturating_sub(h);
             }
             self.clamp_top_line(line_count);
+            self.top_visual_row = self.top_line;
         }
 
         let w = self.width as usize;
@@ -34,6 +38,22 @@ impl Viewport {
             self.left_col = col;
         } else if col >= self.left_col + w {
             self.left_col = col.saturating_sub(w - 1);
+        }
+    }
+
+    pub fn ensure_visual_row_visible(&mut self, visual_row: usize, total_visual: usize) {
+        let h = self.height as usize;
+        if h == 0 {
+            return;
+        }
+        if visual_row < self.top_visual_row {
+            self.top_visual_row = visual_row;
+        } else if visual_row >= self.top_visual_row.saturating_add(h) {
+            self.top_visual_row = visual_row.saturating_add(1).saturating_sub(h);
+        }
+        let max_top = total_visual.saturating_sub(h);
+        if self.top_visual_row > max_top {
+            self.top_visual_row = max_top;
         }
     }
 
