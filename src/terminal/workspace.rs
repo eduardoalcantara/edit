@@ -68,6 +68,18 @@ impl TerminalWorkspace {
         }
     }
 
+    /// Índices das sessões cujo shell terminou (ordenados decrescente para remoção segura).
+    pub fn exited_session_indices(&mut self) -> Vec<usize> {
+        let mut exited: Vec<usize> = self
+            .sessions
+            .iter_mut()
+            .enumerate()
+            .filter_map(|(i, session)| session.has_exited().then_some(i))
+            .collect();
+        exited.sort_by(|a, b| b.cmp(a));
+        exited
+    }
+
     pub fn spawn_session(&mut self, cwd: PathBuf, cols: u16, rows: u16) -> Result<(), String> {
         if self.sessions.len() >= MAX_SESSIONS {
             return Err("Limite de sessões de terminal atingido".to_string());

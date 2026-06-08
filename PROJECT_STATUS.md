@@ -131,6 +131,10 @@
   - Hover nos grupos do rodapé direito → help contextual à esquerda (foco, aba, tam, pos, modo, encoding, tab, memória).
   - Módulos: `src/editor/{wrap,render,engine,viewport,line_numbers}.rs`, `src/ui/{compositor,layers/footer}.rs`, `src/app.rs`, `src/theme.rs`
   - **126 testes** unitários passando (`cargo test`).
+- **Terminal — encerramento automático ao `exit` (2026-06-08):** `child.try_wait()` detecta fim do shell; remove sessão; oculta painel se era a única (sem respawn automático).
+  - Módulos: `src/terminal/{session,workspace}.rs`, `src/app.rs`
+- **Spec split view (2026-06-08):** `specs/to-do/SPEC-EDITOR-SPLIT-VIEW.md` — duas abas visíveis lado a lado (após barra de abas, fase 2 workspace).
+- **Specs em `to-do/` (avaliação 2026-06-08):** nenhum documento 100% concluído para mover a `done/` — `SPEC-MULTPLOS-ARQUIVOS` fase 1 feita, fase 2 pendente; `SPEC-LIMITACOES-PENDENTES` e `SPEC-UX-FIDELIDADE-TURBO-VISION` abertos.
 
 ### Em andamento
 - **Múltiplos arquivos — fase 2:** barra de abas visual; serialização `undo.json`/`redo.json`; modal recarregar arquivo alterado externamente.

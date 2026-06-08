@@ -139,3 +139,6 @@
 - 2026-06-08 — **Word wrap visual + rodapé Tam/linhas + hover** — `src/editor/wrap.rs`; quebra visual no render; gutter com um nº por linha lógica; **Quebra de linha** e **Números de linha** em Exibir → Texto; cor cinza dos nºs; Tam `XXX/NNN/YYYY`; contagem lógica (tab=1); help ao passar mouse nos grupos do rodapé.
   - Módulos: `src/editor/{wrap,render,engine,viewport,line_numbers}.rs`, `src/ui/{compositor,layers/footer}.rs`, `src/app.rs`, `src/theme.rs`, `src/menus.rs`
   - Testes: **126** total (`cargo test`); docs STATUS/TIMELINE **v3.3**
+- 2026-06-08 — **Terminal fecha ao `exit`** — `child.try_wait()` no PTY; remove sessão encerrada; oculta painel se era a única (sem respawn, diferente de `[q]`).
+  - Módulos: `src/terminal/{session,workspace}.rs`, `src/app.rs`; teste `session_reports_exited_after_kill`
+- 2026-06-08 — **Spec editor split view** — `specs/to-do/SPEC-EDITOR-SPLIT-VIEW.md`; avaliação specs `to-do/`: nenhuma migração para `done/` (MULTPLOS fase 2 pendente).

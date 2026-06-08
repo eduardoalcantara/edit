@@ -219,6 +219,7 @@ impl App {
         while !self.should_quit {
             self.memory.refresh_if_due();
             self.terminal.drain_all();
+            self.process_terminal_session_exits();
             self.sync_terminal_pty_size();
             self.refresh_menu();
             terminal.draw(|frame| ui::draw(frame, self))?;
@@ -441,6 +442,29 @@ impl App {
         let (cols, rows) = self.terminal_pty_size();
         self.terminal.ensure_session(cwd, cols, rows);
         self.sync_terminal_pty_size();
+    }
+
+    /// Fecha sessões cujo shell terminou (`exit` / `quit`). Se era a última, oculta o painel.
+    pub(crate) fn process_terminal_session_exits(&mut self) {
+        let exited = self.terminal.exited_session_indices();
+        if exited.is_empty() {
+            return;
+        }
+        for index in exited {
+            self.terminal.close_session(index);
+        }
+        self.terminal.clear_selection();
+        if self.terminal.sessions.is_empty() {
+            self.view.terminal = false;
+            self.terminal.sidebar_hover = None;
+            if self.input_focus == InputFocus::Terminal {
+                self.input_focus = InputFocus::Editor;
+            }
+            self.set_status("Terminal: sessão encerrada");
+        } else {
+            self.sync_terminal_pty_size();
+            self.set_status("Terminal: sessão encerrada");
+        }
     }
 
     pub(crate) fn rename_file_to(&mut self, name_input: &str) {

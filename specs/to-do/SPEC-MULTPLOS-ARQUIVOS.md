@@ -1,6 +1,6 @@
 # SPEC — Múltiplos arquivos (workspace / abas)
 
-**Status:** to-do  
+**Status:** to-do (fase 1 **concluída** em 2026-06-07; fase 2 pendente)  
 **Data:** 2026-06-07  
 **Relacionado:** `PROJECT_RULES.md` v2.0, `src/config.rs` (`edit.json`), `src/app.rs`
 
@@ -544,3 +544,4 @@ Barra de menu (existente): `Alt+A` Arquivo, `Alt+E` Editar, `Alt+X` Exibir, `Alt
 | 2026-06-07 | Decisões: evicção final da fila; `Ctrl+Alt+S`; `Ctrl+Shift+W`; `Alt+S`; Ctrl+N reuso NovoN; temps fase 1. |
 | 2026-06-07 | Modal ao desmarcar **Salvar desfazer recentes** (Apagar / Manter / Cancelar). |
 | 2026-06-08 | **F2** renomear no FS; **F10** salvar; menu Arquivo via **Alt+A**. |
+| 2026-06-08 | Fase 1 implementada (workspace, menu Abas, `edit.json` v2, `.edit-session/`, 74+ testes). Spec permanece em `to-do` até fase 2 (barra de abas, undo persistido, reload FS). |

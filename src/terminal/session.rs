@@ -112,6 +112,15 @@ impl TerminalSession {
         }
     }
 
+    /// `true` quando o processo filho do PTY já terminou (ex.: `exit` no cmd/bash).
+    pub fn has_exited(&mut self) -> bool {
+        match self.child.try_wait() {
+            Ok(Some(_)) => true,
+            Ok(None) => false,
+            Err(_) => true,
+        }
+    }
+
     pub fn tick_cursor_blink(&mut self) {
         if self.last_blink.elapsed() >= Duration::from_millis(CURSOR_BLINK_MS) {
             self.cursor_blink_on = !self.cursor_blink_on;
@@ -270,6 +279,15 @@ mod tests {
             }
         }
         chars.into_iter().collect::<String>().trim_end().to_string()
+    }
+
+    #[test]
+    fn session_reports_exited_after_kill() {
+        let cwd = std::env::temp_dir();
+        let mut session =
+            TerminalSession::spawn("test-exit".into(), cwd, 40, 5).expect("spawn");
+        session.kill();
+        assert!(session.has_exited());
     }
 
     #[test]
