@@ -438,7 +438,7 @@ mod tests {
 
     #[test]
     fn footer_includes_size_with_line_count() {
-        let app = App::new(false);
+        let app = App::new(false, true);
         let status = footer_status_right(&app);
         assert!(status.contains("Tam "));
         let tam = status.split(" | ").find(|s| s.starts_with("Tam ")).unwrap();
@@ -448,7 +448,7 @@ mod tests {
 
     #[test]
     fn footer_hover_at_finds_tam_group() {
-        let app = App::new(false);
+        let app = App::new(false, true);
         let segments = footer_segments(&app);
         let right = footer_status_from_segments(&segments);
         let left = footer_help_default(&app);
@@ -468,7 +468,7 @@ mod tests {
 
     #[test]
     fn footer_click_at_pos_opens_go_to_line() {
-        let app = App::new(false);
+        let app = App::new(false, true);
         let segments = footer_segments(&app);
         let right = footer_status_from_segments(&segments);
         let left = footer_help_default(&app);
@@ -485,14 +485,14 @@ mod tests {
 
     #[test]
     fn footer_includes_tab_indicator() {
-        let app = App::new(false);
+        let app = App::new(false, true);
         let status = footer_status_right(&app);
         assert!(status.contains("Aba 1/1"));
     }
 
     #[test]
     fn footer_includes_memory_when_enabled() {
-        let mut app = App::new(false);
+        let mut app = App::new(false, true);
         app.view.show_memory = true;
         app.memory.set_cached_for_test(Some(128 * 1024 * 1024));
 
@@ -502,7 +502,7 @@ mod tests {
 
     #[test]
     fn footer_omits_memory_when_disabled() {
-        let mut app = App::new(false);
+        let mut app = App::new(false, true);
         app.view.show_memory = false;
         app.memory.set_cached_for_test(Some(128 * 1024 * 1024));
 
@@ -512,7 +512,7 @@ mod tests {
 
     #[test]
     fn footer_omits_memory_when_unavailable() {
-        let mut app = App::new(false);
+        let mut app = App::new(false, true);
         app.view.show_memory = true;
         app.memory.set_cached_for_test(None);
 
@@ -522,7 +522,7 @@ mod tests {
 
     #[test]
     fn footer_focus_label_shows_terminal() {
-        let mut app = App::new(false);
+        let mut app = App::new(false, true);
         app.view.terminal = true;
         app.input_focus = InputFocus::Terminal;
         let status = footer_status_right(&app);
@@ -531,7 +531,7 @@ mod tests {
 
     #[test]
     fn footer_focus_label_shows_editor_pane_in_split() {
-        let mut app = App::new(false);
+        let mut app = App::new(false, true);
         app.editor_split.mode = crate::editor_split::SplitMode::Horizontal;
         app.editor_split.left_tab = 0;
         app.editor_split.right_tab = Some(1);
@@ -542,14 +542,14 @@ mod tests {
 
     #[test]
     fn footer_focus_label_shows_editor_by_default() {
-        let app = App::new(false);
+        let app = App::new(false, true);
         let status = footer_status_right(&app);
         assert!(status.starts_with("Editor |"));
     }
 
     #[test]
     fn footer_help_uses_status_message_without_layer_hint() {
-        let mut app = App::new(false);
+        let mut app = App::new(false, true);
         app.view.terminal = true;
         app.input_focus = InputFocus::Terminal;
         app.set_status("Pronto");

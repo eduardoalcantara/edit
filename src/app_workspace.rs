@@ -615,9 +615,7 @@ impl App {
 
         for tab in &self.workspace.tabs {
             let content = tab.editor.content_string();
-            if tab.document.path().is_none() {
-                let _ = write_content_tmp(&tab.session_id, &content);
-            }
+            let _ = write_content_tmp(&tab.session_id, &content);
             if self.workspace.salvar_desfazer_recentes {
                 let (line, col) = tab.editor.cursor_line_col();
                 let meta = SessionMeta {
@@ -737,6 +735,21 @@ impl App {
 use crate::document::Document;
 use crate::editor::Editor;
 
+/// Conteúdo da aba na sessão: `content.tmp` se bater com `meta.json`, senão fallback.
+fn session_editor_content(tab_id: &str, fallback: &str) -> String {
+    let Ok(Some(tmp)) = read_content_tmp(tab_id) else {
+        return fallback.to_string();
+    };
+    let Ok(Some(meta)) = read_meta(tab_id) else {
+        return fallback.to_string();
+    };
+    if content_hash(&tmp) == meta.content_hash {
+        tmp
+    } else {
+        fallback.to_string()
+    }
+}
+
 fn restore_tab_undo(
     tab: &mut Tab,
     tab_id: &str,
@@ -774,6 +787,7 @@ pub fn workspace_from_config(
     user_config: &crate::config::EditConfig,
     palette: &crate::theme::ThemePalette,
     word_wrap: bool,
+    restore_session: bool,
 ) -> WorkspaceBootstrap {
     let abas = &user_config.arquivo.abas;
     let mut pending_fs_checks = Vec::new();
@@ -785,7 +799,7 @@ pub fn workspace_from_config(
         salvar_desfazer_recentes: abas.salvar_desfazer_recentes,
     };
 
-    if !abas.fechar_tudo_ao_sair && !abas.sessao.is_empty() {
+    if restore_session && !abas.fechar_tudo_ao_sair && !abas.sessao.is_empty() {
         for entry in &abas.sessao {
             if let Some(path_str) = &entry.caminho {
                 let path = crate::file_io::normalize_open_path(Path::new(path_str));
@@ -802,13 +816,15 @@ pub fn workspace_from_config(
                         if drift == FsDrift::ModifiedExternally {
                             pending_fs_checks.push(PendingFsCheck::ReloadExternal { tab_index });
                         }
-                        let content = lines.join("\n");
+                        let disk_content = lines.join("\n");
+                        let editor_content =
+                            session_editor_content(&entry.tab_id, &disk_content);
                         let mut document = Document::new();
                         document.encoding = user_config.default_encoding();
                         document.tabulation = user_config.default_tabulation();
-                        document.set_opened(content.clone(), path.clone());
+                        document.set_opened(disk_content.clone(), path.clone());
                         let mut editor = Editor::new(palette);
-                        editor.set_lines(lines);
+                        editor.replace_content(&editor_content);
                         editor.set_tabulation(document.tabulation);
                         editor.set_word_wrap(word_wrap);
                         editor.set_cursor(
@@ -829,7 +845,7 @@ pub fn workspace_from_config(
                         restore_tab_undo(
                             &mut tab,
                             &entry.tab_id,
-                            &content,
+                            &editor_content,
                             entry.fs_mtime_ms,
                             entry.fs_len,
                             Some(path.as_path()),
@@ -960,13 +976,13 @@ mod tests {
             }],
         );
         let palette = ThemeId::ClassicBlue.palette();
-        let boot = workspace_from_config(&config, &palette, false);
+        let boot = workspace_from_config(&config, &palette, false, true);
         assert_eq!(boot.workspace.tabs[0].display_name, "Salvo");
     }
 
     #[test]
     fn sync_active_tab_preserves_app_editor_content() {
-        let mut app = App::new(false);
+        let mut app = App::new(false, true);
         app.editor.replace_content("# README\n\nConteúdo editado");
         app.sync_active_tab();
         assert_eq!(
@@ -981,7 +997,7 @@ mod tests {
 
     #[test]
     fn saved_cursor_position_roundtrips_without_drift() {
-        let mut app = App::new(false);
+        let mut app = App::new(false, true);
         app.editor.set_cursor(0, 0);
         app.sync_active_tab();
 
@@ -991,13 +1007,13 @@ mod tests {
 
         let config = sample_config(false, abas.sessao);
         let palette = ThemeId::ClassicBlue.palette();
-        let boot = workspace_from_config(&config, &palette, false);
+        let boot = workspace_from_config(&config, &palette, false, true);
         assert_eq!(boot.workspace.tabs[0].editor.cursor_line_col(), (1, 1));
     }
 
     #[test]
     fn history_survives_tab_switch_via_app() {
-        let mut app = App::new(false);
+        let mut app = App::new(false, true);
         app.editor.paste("z");
         app.sync_active_tab();
         let depth = app.editor.history_depth();
@@ -1019,6 +1035,92 @@ mod tests {
         assert_eq!(app.editor.content_string(), "");
     }
 
+    #[test]
+    fn undo_survives_session_restart_for_path_tab() {
+        use crate::session::{
+            clear_session_root_override, set_session_root, write_content_tmp, write_meta,
+            write_undo_stacks, SessionMeta,
+        };
+        use crate::session::test_lock;
+        use std::sync::MutexGuard;
+
+        struct Guard {
+            _lock: MutexGuard<'static, ()>,
+            root: std::path::PathBuf,
+        }
+        impl Guard {
+            fn new() -> Self {
+                let lock = test_lock();
+                let root = std::env::temp_dir().join(format!(
+                    "edit-undo-restart-{}",
+                    std::process::id()
+                ));
+                let _ = std::fs::remove_dir_all(&root);
+                set_session_root(root.clone());
+                Self { _lock: lock, root }
+            }
+        }
+        impl Drop for Guard {
+            fn drop(&mut self) {
+                let _ = std::fs::remove_dir_all(&self.root);
+                clear_session_root_override();
+            }
+        }
+        let _guard = Guard::new();
+
+        let path = std::env::temp_dir().join(format!("edit-undo-file-{}.txt", std::process::id()));
+        std::fs::write(&path, "hello").unwrap();
+
+        let tab_id = "tab-undo-restart".to_string();
+        let edited = "hell";
+        let _ = write_content_tmp(&tab_id, edited);
+        let meta = SessionMeta {
+            content_hash: content_hash(edited),
+            cursor_linha: 1,
+            cursor_coluna: 5,
+            encoding: "utf-8".into(),
+            fs_mtime_ms: None,
+            fs_len: None,
+            saved_at_ms: now_ms(),
+        };
+        let _ = write_meta(&tab_id, &meta);
+        let mut history = crate::editor::history::EditHistory::new();
+        history.record_change(4, "o".into(), String::new(), 5, 4);
+        let stacks = history.export_stacks();
+        let _ = write_undo_stacks(&tab_id, &stacks);
+
+        let config = sample_config(
+            false,
+            vec![SessaoTabEntry {
+                tab_id: tab_id.clone(),
+                caminho: Some(path.display().to_string()),
+                nome_virtual: None,
+                temporario: false,
+                cursor_linha: 1,
+                cursor_coluna: 5,
+                encoding: "utf-8".into(),
+                tabulacao: "4".into(),
+                fs_mtime_ms: std::fs::metadata(&path)
+                    .ok()
+                    .and_then(|m| m.modified().ok())
+                    .and_then(|t| {
+                        t.duration_since(std::time::UNIX_EPOCH)
+                            .ok()
+                            .map(|d| d.as_millis() as u64)
+                    }),
+                fs_len: Some(5),
+            }],
+        );
+        let palette = ThemeId::ClassicBlue.palette();
+        let boot = workspace_from_config(&config, &palette, false, true);
+        assert_eq!(boot.editor.content_string(), "hell");
+        assert!(boot.editor.history_depth() > 0);
+        let mut editor = boot.editor;
+        editor.undo();
+        assert_eq!(editor.content_string(), "hello");
+        let _ = std::fs::remove_file(path);
+    }
+
     fn skip_restore_when_fechar_tudo_ligado() {
         let config = sample_config(
             true,
@@ -1036,8 +1138,30 @@ mod tests {
             }],
         );
         let palette = ThemeId::ClassicBlue.palette();
-        let boot = workspace_from_config(&config, &palette, false);
+        let boot = workspace_from_config(&config, &palette, false, true);
         assert_eq!(boot.workspace.tabs.len(), 1);
+        assert_eq!(boot.workspace.tabs[0].display_name, "Novo");
+    }
+
+    #[test]
+    fn cli_skips_session_restore() {
+        let config = sample_config(
+            false,
+            vec![SessaoTabEntry {
+                tab_id: "t-old".into(),
+                caminho: None,
+                nome_virtual: Some("Antigo".into()),
+                temporario: true,
+                cursor_linha: 1,
+                cursor_coluna: 1,
+                encoding: "utf-8".into(),
+                tabulacao: "4".into(),
+                fs_mtime_ms: None,
+                fs_len: None,
+            }],
+        );
+        let palette = ThemeId::ClassicBlue.palette();
+        let boot = workspace_from_config(&config, &palette, false, false);
         assert_eq!(boot.workspace.tabs[0].display_name, "Novo");
     }
 }

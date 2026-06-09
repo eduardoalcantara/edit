@@ -15,6 +15,14 @@ const TABS_DIR: &str = "tabs";
 static SESSION_ROOT_OVERRIDE: std::sync::Mutex<Option<PathBuf>> =
     std::sync::Mutex::new(None);
 
+#[cfg(test)]
+static SESSION_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+#[cfg(test)]
+pub fn test_lock() -> std::sync::MutexGuard<'static, ()> {
+    SESSION_TEST_LOCK.lock().expect("session test lock")
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SessionMeta {
     pub content_hash: String,
@@ -215,16 +223,14 @@ mod tests {
     use crate::editor::HistoryStacks;
     use std::sync::{Mutex, MutexGuard};
 
-    static LOCK: Mutex<()> = Mutex::new(());
-
     struct Guard {
-        _lock: MutexGuard<'static, ()>,
+        _lock: std::sync::MutexGuard<'static, ()>,
         root: PathBuf,
     }
 
     impl Guard {
         fn new() -> Self {
-            let lock = LOCK.lock().unwrap();
+            let lock = super::test_lock();
             let root = std::env::temp_dir().join(format!(
                 "edit-session-test-{}",
                 std::process::id()

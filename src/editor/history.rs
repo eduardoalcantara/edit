@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::editor::selection::BlockDeletePatch;
 
-pub const PERSIST_UNDO_MIN: usize = 5;
+pub const PERSIST_UNDO_MIN: usize = 1;
 pub const PERSIST_UNDO_MAX: usize = 20;
 
 #[derive(Debug, Clone)]

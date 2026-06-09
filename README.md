@@ -152,4 +152,4 @@ Ver `PROJECT_RULES.md` para lista completa.
 cargo test
 ```
 
-166 testes unitários.
+168 testes unitários.

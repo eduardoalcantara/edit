@@ -72,7 +72,7 @@ impl App {
         &self.user_config
     }
 
-    pub fn new(mouse_enabled: bool) -> Self {
+    pub fn new(mouse_enabled: bool, restore_session: bool) -> Self {
         let user_config = EditConfig::load();
         let view_snapshot = user_config.view_settings();
         let theme = view_snapshot.theme;
@@ -112,7 +112,7 @@ impl App {
             editor,
             document,
             pending_fs_checks,
-        } = workspace_from_config(&user_config, &palette, word_wrap);
+        } = workspace_from_config(&user_config, &palette, word_wrap, restore_session);
         let mut editor_split = user_config.editor_split();
         if editor_split.is_active() && !editor_split.can_activate(workspace.tabs.len()) {
             editor_split = EditorSplit::default();
@@ -175,12 +175,14 @@ impl App {
             return;
         }
 
+        self.pending_fs_checks.clear();
         self.sync_active_tab();
-        if self.workspace.tabs.len() == 1 && self.workspace.tabs[0].filepath().is_none() {
-            if self.active_tab_is_pristine() {
-                let removed = self.workspace.remove_tab_at(0);
-                let _ = crate::session::purge_tab(&removed.session_id);
-            }
+        if self.workspace.tabs.len() == 1
+            && self.workspace.tabs[0].filepath().is_none()
+            && self.active_tab_is_pristine()
+        {
+            let removed = self.workspace.remove_tab_at(0);
+            let _ = crate::session::purge_tab(&removed.session_id);
         }
 
         let mut opened = 0usize;
