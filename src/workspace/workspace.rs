@@ -180,9 +180,10 @@ impl Workspace {
         }
         if self.active_index >= self.tabs.len() {
             self.active_index = self.tabs.len().saturating_sub(1);
-        } else if closed_index <= self.active_index && self.active_index > 0 {
-            // focus stays on same slot which shifted; prefer index 0
-            self.active_index = self.active_index.min(self.tabs.len() - 1);
+        } else if closed_index < self.active_index {
+            self.active_index -= 1;
+        } else if closed_index == self.active_index {
+            self.active_index = self.active_index.min(self.tabs.len().saturating_sub(1));
         }
     }
 

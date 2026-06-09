@@ -188,28 +188,10 @@ impl App {
         if tab_index >= self.workspace.tabs.len() {
             return;
         }
-        self.on_tab_closed(tab_index);
-        let removed = self.workspace.tabs.remove(tab_index);
-        let _ = purge_tab(&removed.session_id);
-        if self.workspace.tabs.is_empty() {
-            let palette = self.theme.palette();
-            let tab = create_tab_from_defaults(
-                &palette,
-                self.user_config().default_encoding(),
-                self.user_config().default_tabulation(),
-                self.view.word_wrap,
-                new_session_id(),
-                "Novo".to_string(),
-            );
-            self.workspace.tabs.push(tab);
+        if tab_index != self.workspace.active_index {
+            self.focus_tab_unchecked(tab_index);
         }
-        self.workspace.after_close_tab(tab_index);
-        self.workspace.active_index = self
-            .workspace
-            .active_index
-            .min(self.workspace.tabs.len().saturating_sub(1));
-        self.focus_tab_unchecked(self.workspace.active_index);
-        self.on_tab_count_changed();
+        self.remove_tab_at(tab_index);
     }
 
     pub(crate) fn handle_reload_external(
@@ -319,6 +301,38 @@ impl App {
         }
     }
 
+    pub(crate) fn discard_dirty_tab(&mut self, tab_index: usize) {
+        let Some(flow) = self.dirty_flow.take() else {
+            self.remove_tab_at(tab_index);
+            self.set_status("Aba fechada");
+            return;
+        };
+        let rest: Vec<usize> = flow
+            .pending
+            .into_iter()
+            .filter(|&i| i != tab_index)
+            .collect();
+
+        match flow.reason {
+            PromptReason::CloseTab | PromptReason::EvictTail => {
+                self.remove_tab_at(tab_index);
+            }
+            PromptReason::Quit | PromptReason::CloseAll | PromptReason::OpenInPane => {}
+        }
+
+        if rest.is_empty() {
+            self.finish_after_dirty(flow.after);
+        } else {
+            let next = rest[0];
+            self.dirty_flow = Some(DirtyFlow {
+                reason: flow.reason,
+                pending: rest,
+                after: flow.after,
+            });
+            self.prompt_tab_unsaved(next, flow.reason);
+        }
+    }
+
     pub(crate) fn advance_dirty_flow(&mut self, saved: bool) {
         let Some(flow) = self.dirty_flow.take() else {
             return;
@@ -391,17 +405,18 @@ impl App {
         self.sync_active_tab();
         let removed = self.workspace.remove_tab_at(index);
         let _ = purge_tab(&removed.session_id);
-        if let Some(path) = removed.document.path() {
-            self.recent.push(path.to_path_buf());
-            self.persist_user_config();
-        }
+        let removed_path = removed.document.path().map(|p| p.to_path_buf());
         self.workspace.after_close_tab(index);
         self.on_tab_closed(index);
         if self.workspace.tabs.is_empty() {
             self.create_new_tab_at_top();
         } else {
             let focus = self.workspace.active_index.min(self.workspace.tabs.len() - 1);
-            self.focus_tab(focus);
+            self.focus_tab_unchecked(focus);
+        }
+        if let Some(path) = removed_path {
+            self.recent.push(path);
+            self.persist_user_config();
         }
     }
 
@@ -781,7 +796,7 @@ impl App {
                     self.pending_dirty_save = Some((tab_index, reason));
                 }
             }
-            DialogButtonAction::Secondary => self.advance_dirty_flow(false),
+            DialogButtonAction::Secondary => self.discard_dirty_tab(tab_index),
             DialogButtonAction::Cancel => {
                 self.cancel_dirty_flow();
                 self.set_status("Ação cancelada");
@@ -1357,6 +1372,107 @@ mod tests {
                 .any(|t| t.display_name == "Outra")
         );
         assert_eq!(app.editor_text_for_test(), "arquivo cli");
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn close_dirty_tab_discard_removes_from_workspace() {
+        let _guard = IsolatedConfigGuard::new("close-discard");
+        let path =
+            std::env::temp_dir().join(format!("edit-close-discard-{}.md", std::process::id()));
+        std::fs::write(&path, "linha1\nlinha2").unwrap();
+
+        let mut app = App::new(false, false);
+        app.open_path(path.clone());
+        let idx = app
+            .workspace
+            .find_open_path(&path)
+            .expect("aba do arquivo");
+        app.focus_tab_unchecked(idx);
+        app.editor.replace_content("linha1\n\n\nlinha2");
+        app.sync_active_tab();
+        assert!(app.is_dirty());
+        let len_before = app.workspace.tabs.len();
+
+        app.remove_tab_at(idx);
+
+        assert_eq!(app.workspace.tabs.len(), len_before - 1);
+        assert!(
+            !app
+                .workspace
+                .tabs
+                .iter()
+                .any(|t| t.filepath().is_some_and(|p| crate::file_io::same_file_path(p, &path)))
+        );
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn discard_dirty_tab_removes_on_close() {
+        let _guard = IsolatedConfigGuard::new("discard-close");
+        let path =
+            std::env::temp_dir().join(format!("edit-discard-close-{}.md", std::process::id()));
+        std::fs::write(&path, "x").unwrap();
+
+        let mut app = App::new(false, false);
+        app.open_path(path.clone());
+        let idx = app.workspace.find_open_path(&path).unwrap();
+        app.focus_tab_unchecked(idx);
+        app.editor.replace_content("y");
+        app.sync_active_tab();
+        app.begin_dirty_flow(
+            vec![idx],
+            PromptReason::CloseTab,
+            AfterDirtyResolved::CloseTab,
+        );
+        app.discard_dirty_tab(idx);
+        assert!(
+            !app
+                .workspace
+                .tabs
+                .iter()
+                .any(|t| t.filepath().is_some_and(|p| crate::file_io::same_file_path(p, &path)))
+        );
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn remove_active_tab_reloads_editor_from_next_tab() {
+        let _guard = IsolatedConfigGuard::new("remove-reload");
+        let path =
+            std::env::temp_dir().join(format!("edit-remove-reload-{}.md", std::process::id()));
+        std::fs::write(&path, "conteudo").unwrap();
+
+        let mut app = App::new(false, false);
+        app.open_path(path.clone());
+        let file_idx = app.workspace.find_open_path(&path).unwrap();
+        while app.workspace.tabs.len() > 1 {
+            let tail = app.workspace.tabs.len() - 1;
+            if tail != file_idx {
+                app.remove_tab_at(tail);
+            } else {
+                break;
+            }
+        }
+        let tab_b = create_tab_from_defaults(
+            &ThemeId::ClassicBlue.palette(),
+            app.user_config().default_encoding(),
+            app.user_config().default_tabulation(),
+            false,
+            new_session_id(),
+            "Segunda".to_string(),
+        );
+        app.workspace.tabs.push(tab_b);
+        app.focus_tab_unchecked(file_idx);
+        app.editor.replace_content("modificado");
+        app.sync_active_tab();
+
+        app.remove_tab_at(file_idx);
+
+        assert_eq!(app.workspace.tabs.len(), 1);
+        assert_eq!(app.workspace.active_index, 0);
+        assert_eq!(app.editor_text_for_test(), "");
+        assert_eq!(app.document_title(), "Segunda");
         let _ = std::fs::remove_file(path);
     }
 }
