@@ -1,8 +1,8 @@
 # PROJECT_RULES — Editor Linux (`edit`)
 
 **Autor:** Perplexity AI  
-**Data:** 2026-06-08  
-**Versão:** 3.1
+**Data:** 2026-06-09  
+**Versão:** 3.2
 
 Regras estáveis do projeto. Para estado de implementação, ver `PROJECT_STATUS.md`; para histórico, `PROJECT_TIMELINE.md`; para detalhes de feature, specs em `specs/done/`.
 
@@ -144,7 +144,7 @@ Detalhes do terminal integrado: `specs/done/SPEC-TERMINAL-INFERIOR.md`.
 | **`Ctrl+1`** | Editor único; em split com foco direito → foco esquerdo |
 | **`Ctrl+2`** | Split horizontal (50/50); em split → foco painel direito |
 
-Ver também `specs/done/SPEC-EDITOR-SPLIT-VIEW.md` e `specs/to-do/SPEC-MULTPLOS-ARQUIVOS.md` §6.7 e §10.
+Ver também `specs/done/SPEC-EDITOR-SPLIT-VIEW.md` e `specs/done/SPEC-MULTPLOS-ARQUIVOS.md` §6.7 e §10.
 
 ## Regras de UX — barra de menu
 

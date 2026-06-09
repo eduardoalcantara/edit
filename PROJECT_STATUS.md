@@ -1,8 +1,10 @@
 # PROJECT_STATUS — Editor Linux
 
 **Autor:** Perplexity AI  
-**Data:** 2026-06-08  
-**Versão:** 3.9
+**Data:** 2026-06-09  
+**Versão:** 4.0
+
+**Branch:** `main` (desenvolvimento integrado; branches de feature removidas após merge em 2026-06-09).
 
 ## Estado atual
 
@@ -135,15 +137,15 @@
   - Módulos: `src/terminal/{session,workspace}.rs`, `src/app.rs`
 - **Atalhos e UX (2026-06-08):** `Ctrl+E` foco editor; `Ctrl+T`/`Ctrl+'` abre/foca ou fecha conforme foco; `Ctrl+G` e **Editar → Ir para linha...**; clique **Pos** / encoding no rodapé.
   - **130 testes** unitários passando (`cargo test`).
-- **Navegador de arquivos + menu Ajuda (2026-06-09, branch `fase2`):**
+- **Navegador de arquivos + menu Ajuda (2026-06-09):**
   - Modal **FileBrowser** estilo Turbo Pascal para Abrir / Salvar / Salvar Como (`src/modal/file_browser.rs`); filtro glob, ocultos, barra de status; persiste `ultimo_diretorio`, `mostrar_ocultos`, `filtro_abrir` em `edit.json`.
   - Menu **Ajuda** (`Alt+H`): Features, Atalhos, Sobre; **`F1`** abre Features; modais com scroll PgUp/PgDn.
   - `PathInput` mantido apenas para Renomear (`F2`).
   - Specs: `specs/done/SPEC-MODAL-ARQUIVO.md`, `specs/done/SPEC-MENU-AJUDA.md` (TV7 fechado).
   - **138 testes** unitários passando (`cargo test`).
-- **Editor split view (2026-06-09, branch `editor-split`):**
+- **Editor split view (2026-06-09):**
   - Dois painéis horizontais 50/50; `Ctrl+1` editor único / foco esquerdo; `Ctrl+2` split / foco direito.
-  - Borda dupla no painel com foco; persistência `exibir.split_editor` em `edit.json`.
+  - Borda dupla no painel com foco; persistência por caminho (`split_left_caminho`, `split_right_caminho`, `split_foco`) e legado `split_editor` em `edit.json`.
   - Módulos: `src/editor_split.rs`, `src/app_editor_split.rs`, `src/ui/layers/editor.rs`, `src/ui/layout.rs`
   - Spec: `specs/done/SPEC-EDITOR-SPLIT-VIEW.md`
 - **Modais Buscar / Substituir / Ir para linha + TextInput (2026-06-09):**
@@ -153,14 +155,14 @@
   - **Esc** em modal fecha diálogo; **Esc** no editor limpa busca ativa ou sai; **[Limpar]** só pelo botão.
   - Spec: `specs/done/SPEC-MODAL-TEXT-INPUT-BUSCA.md`
   - **157 testes** unitários passando (`cargo test`).
-- **Workspace fase 1 completa (2026-06-09, branch `workspace-fase1`):**
+- **Workspace fase 1 completa (2026-06-09):**
   - Histórico undo isolado por aba (swap em troca de aba).
   - Persistência `undo.json`/`redo.json`/`meta.json` em `.edit-session/` (toggle **Salvar desfazer recentes**).
   - Detecção de alteração externa ao focar aba e na restauração (modal Recarregar / Arquivo ausente).
   - Higiene startup: `purge_orphans`; `purge_undo` por aba quando inválido.
   - Spec: `specs/done/SPEC-MULTPLOS-ARQUIVOS.md` (barra de abas visual descartada).
   - **166 testes** unitários passando (`cargo test`).
-- **Correções workspace, I/O e split (2026-06-09, branch `workspace-fase1`):**
+- **Correções workspace, I/O e split (2026-06-09):**
   - **Linhas em branco ao salvar/abrir:** `to_lines()` removia `\n` interno do ropey de forma inconsistente com `content_string()`; save passou a usar `content_string()`; normalização CRLF em `encoding.rs`.
   - **Restauração de sessão + CLI:** `edit arquivo.md` restaura abas de `edit.json` e foca o arquivo pedido (sem duplicar aba existente).
   - **Split persistido por caminho:** `exibir.split_left_caminho`, `split_right_caminho`, `split_foco` em `edit.json`; `resolve_editor_split()` remapeia abas na restauração.
@@ -169,7 +171,7 @@
   - **PROJECT_RULES.md** restaurado após corrupção acidental de newlines.
   - Módulos: `src/{encoding,file_io,editor/engine,app,app_workspace,app_editor_split,config,main}.rs`
   - **177 testes** unitários passando (`cargo test`).
-- **Revisão workspace/split/sessão (2026-06-09, branch `workspace-fase1`):**
+- **Revisão workspace/split/sessão (2026-06-09):**
   - Split remapeado após **Ordenar abas** (`remap_editor_split_indices` por `session_id`).
   - **Reinterpretar encoding** relê o arquivo do disco com a nova codificação.
   - **Save** atualiza `fs_snapshot` e sincroniza aba ativa (menu deixa de marcar dirty após salvar).
@@ -178,6 +180,11 @@
   - Restauração usa **encoding/tabulacao por aba**; abas temporárias não aparecem dirty ao restaurar.
   - `PendingFsCheck` usa `tab_id` (estável após reorder); caminhos normalizados na leitura do split; `content.tmp` escrita atômica.
   - **178 testes** unitários passando (`cargo test`).
+- **Fix fechar aba sem salvar (2026-06-09, commit `aa8d3e2`):**
+  - `persist_user_config` após fechar não copiava mais o documento removido para a aba seguinte (`sync_active_tab` antes de `focus_tab_unchecked`).
+  - **Não Salvar** remove a aba correta (`discard_dirty_tab`); `close_tab_by_index` unificado com `remove_tab_at`.
+  - **181 testes** unitários passando (`cargo test`).
+- **Integração em `main` (2026-06-09):** merge de `workspace-fase1` (fast-forward `e1d0f8a` → `aa8d3e2`); branches locais/remotas de feature removidas.
 
 ### Em andamento
 - **Fidelidade Turbo Vision:** `specs/to-do/SPEC-UX-FIDELIDADE-TURBO-VISION.md` (TV1–TV3 paleta/rodapé; demais itens TV8+).

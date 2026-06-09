@@ -1,8 +1,8 @@
 # PROJECT_TIMELINE — Editor Linux
 
 **Autor:** Perplexity AI  
-**Data:** 2026-06-08  
-**Versão:** 3.7
+**Data:** 2026-06-09  
+**Versão:** 4.0
 
 ## Registro
 
@@ -153,17 +153,21 @@
 - 2026-06-09 — **Navegador de arquivos (TV7) + menu Ajuda** — `FileBrowserModal` Abrir/Salvar/Salvar Como; `HelpModal` Features/Atalhos/Sobre; `Alt+H`, `F1`; config `arquivo.ultimo_diretorio` / `mostrar_ocultos` / `filtro_abrir`.
   - Módulos: `src/modal/{file_browser,help,help_content}.rs`, `src/ui/layers/modal.rs`, `src/menus.rs`, `src/app.rs`, `src/config.rs`
   - Specs: `specs/done/SPEC-MODAL-ARQUIVO.md`, `specs/done/SPEC-MENU-AJUDA.md`
-  - Testes: **138** total (`cargo test`); branch **`fase2`**
-- 2026-06-09 — **Editor split view** — dois painéis 50/50; `Ctrl+1`/`Ctrl+2`; borda dupla no foco; persistência `exibir.split_editor`.
+  - Testes: **138** total (`cargo test`)
+- 2026-06-09 — **Editor split view** — dois painéis 50/50; `Ctrl+1`/`Ctrl+2`; borda dupla no foco; persistência por caminho em `edit.json`.
   - Módulos: `src/editor_split.rs`, `src/app_editor_split.rs`, `src/ui/{layers/editor,layout}.rs`, `src/config.rs`
   - Spec: `specs/done/SPEC-EDITOR-SPLIT-VIEW.md` (movido de `to-do/`)
 - 2026-06-09 — **TextInput + modais Buscar/Substituir/Ir para linha** — edição padrão em campos de modal; destaque múltiplo de busca; Esc corrigido (modal fecha, editor limpa busca ou sai).
   - Módulos: `src/modal/{text_input,find_replace,go_to_line,form_controls}.rs`, `src/editor/{search,render,engine}.rs`, `src/ui/compositor.rs`
   - Spec: `specs/done/SPEC-MODAL-TEXT-INPUT-BUSCA.md`
-  - Testes: **157** total (`cargo test`); branch **`editor-split`**
+  - Testes: **157** total (`cargo test`)
 - 2026-06-09 — **Correções workspace, I/O, split e CLI** — `to_lines()`/`content_string()` alinhados; save via `content_string`; CRLF normalizado; sessão sempre restaurada + CLI nos painéis; split por caminho em `edit.json`; anti-duplicação de abas; fix documento órfão na CLI.
   - Módulos: `src/{encoding,file_io,editor/engine,app,app_workspace,app_editor_split,config,main}.rs`, `PROJECT_RULES.md`
   - Testes: **177** total (`cargo test`); docs STATUS **v3.8**
 - 2026-06-09 — **Revisão pós-auditoria workspace/split** — remapeamento split após sort; reload encoding; fs_snapshot pós-save; close_tab + split; CLI eviction; encoding/tabulacao por aba na restauração; untitled não-dirty; pending_fs por session_id; paths normalizados; content.tmp atômico.
   - Módulos: `src/{app,app_workspace,app_editor_split,config,document,session/store}.rs`
   - Testes: **178** total (`cargo test`); docs STATUS **v3.9**
+- 2026-06-09 — **Fix fechar aba sem salvar** — `remove_tab_at` foca aba seguinte antes de `persist_user_config`; `discard_dirty_tab`; unificação `close_tab_by_index` → `remove_tab_at`; `after_close_tab` corrige `active_index`.
+  - Módulos: `src/{app_workspace,workspace/workspace}.rs`
+  - Testes: **181** total (`cargo test`); docs STATUS **v4.0**
+- 2026-06-09 — **Merge `workspace-fase1` → `main`** — fast-forward até `aa8d3e2`; push `main`; remoção de branches `workspace-fase1`, `editor-split`, `fase2` (local e remoto).

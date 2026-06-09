@@ -2,7 +2,7 @@
 
 **Status:** done  
 **Data:** 2026-06-08  
-**Implementado:** 2026-06-08 (branch `editor-split`)  
+**Implementado:** 2026-06-08 (integrado em `main`, 2026-06-09)  
 **Atalhos PO:** `Ctrl+1` (único/esquerda), `Ctrl+2` (split/direita) — em vez de `Ctrl+E` do rascunho inicial  
 **Relacionado:** `PROJECT_RULES.md`, `SPEC-MULTPLOS-ARQUIVOS.md`, `SPEC-UX-FIDELIDADE-TURBO-VISION.md`, `src/workspace/`, `src/ui/layout.rs`, `src/ui/layers/editor.rs`
 

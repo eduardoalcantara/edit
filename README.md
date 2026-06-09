@@ -1,8 +1,8 @@
 # edit — Editor de terminal (Power Edit)
 
 **Autor:** Perplexity AI  
-**Data:** 2026-06-07  
-**Versão:** 2.3
+**Data:** 2026-06-09  
+**Versão:** 2.4
 
 Editor TUI para Linux/Windows com menus estilo **Turbo Vision**, núcleo **ropey**, UX previsível e proteção contra perda de trabalho.
 
@@ -14,19 +14,22 @@ Editor TUI para Linux/Windows com menus estilo **Turbo Vision**, núcleo **ropey
 ## Build e execução
 
 ```bash
-cargo build
+cargo build              # debug
+cargo build --release    # release (Windows: edit.exe; Linux: edit)
 cargo run
 cargo run -- arquivo.txt outro.rs
 cargo run -- --clean
 cargo run -- --workspace src/main.rs
-# binário: target/debug/edit
+# binários: target/debug/edit | target/release/edit(.exe)
 ```
+
+Build **Linux** a partir do Windows: `wsl bash -lc "cd /mnt/d/caminho/edit && cargo build --release"`.
 
 ### Linha de comando
 
 | Parâmetro | Ação |
 |-----------|------|
-| `arquivo…` | Abre um ou mais arquivos em abas (até 10); o **primeiro** listado fica ativo no topo |
+| `arquivo…` | Restaura abas de `edit.json` e abre os arquivos (até 10). **1 arquivo** → painel esquerdo; **2 arquivos** → split horizontal; demais entram como abas sem duplicar existentes |
 | `--clean` | Limpa sessão (`.edit-session/`) e abas salvas no config ativo |
 | `--workspace` | Usa config local `./.edit/.edit.workspace` + sessão em `./.edit/.edit-session/` |
 | `--help` | Ajuda |
@@ -66,7 +69,8 @@ edit --workspace -- main.rs tests/mod.rs
 - Toggles Abas: **Fechar tudo ao sair**, **Salvar desfazer recentes** (modal ao desligar se houver undo no disco).
 - Submenu **Ordenar por** (nome, caminho, abertos primeiro/último, status).
 - Sessão em **`.edit-session/`** ao lado do executável (`content.tmp`, higiene por `tab_id`).
-- **`edit.json` v2** — seção `arquivo.abas` (toggles, ordem, metadados, cursor).
+- **`edit.json` v2** — seção `arquivo.abas` (toggles, ordem, metadados, cursor, encoding/tabulacao por aba).
+- Split persistido por **caminho** (`exibir.split_left_caminho`, `split_right_caminho`, `split_foco`).
 
 ### Menus (Alt+A / E / X / F / S / H)
 
@@ -136,7 +140,7 @@ Ver `PROJECT_RULES.md` para lista completa.
 
 ## Documentação
 
-1. [`PROJECT_RULES.md`](PROJECT_RULES.md) — regras estáveis (v2.0)
+1. [`PROJECT_RULES.md`](PROJECT_RULES.md) — regras estáveis (v3.1)
 2. [`PROJECT_STATUS.md`](PROJECT_STATUS.md) — estado e pendências
 3. [`PROJECT_TIMELINE.md`](PROJECT_TIMELINE.md) — histórico
 4. [`.cursorrules`](.cursorrules) — regras para o Cursor
@@ -152,4 +156,4 @@ Ver `PROJECT_RULES.md` para lista completa.
 cargo test
 ```
 
-168 testes unitários.
+**181** testes unitários (`cargo test -- --test-threads=1` recomendado no Windows).

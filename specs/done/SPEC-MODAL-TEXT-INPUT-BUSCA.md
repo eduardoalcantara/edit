@@ -2,7 +2,7 @@
 
 **Status:** done  
 **Data:** 2026-06-09  
-**Implementado:** 2026-06-09 (branch `editor-split`)  
+**Implementado:** 2026-06-09 (integrado em `main`)  
 **Relacionado:** `PROJECT_RULES.md`, `SPEC-MENU-EDITAR.md`, `SPEC-MODAL-ARQUIVO.md`, `src/modal/text_input.rs`, `src/modal/find_replace.rs`, `src/modal/go_to_line.rs`
 
 ---

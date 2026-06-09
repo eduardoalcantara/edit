@@ -2,7 +2,7 @@
 
 **Status:** done  
 **Data:** 2026-06-07  
-**Implementado:** 2026-06-09 (branch `workspace-fase1`) — escopo completo; barra de abas visual **descartada**  
+**Implementado:** 2026-06-09 (integrado em `main`) — escopo completo; barra de abas visual **descartada**  
 **Relacionado:** `PROJECT_RULES.md` v2.0, `src/config.rs` (`edit.json`), `src/app.rs`
 
 ---
