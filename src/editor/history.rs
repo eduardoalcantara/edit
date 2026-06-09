@@ -1,12 +1,47 @@
 use ropey::Rope;
+use serde::{Deserialize, Serialize};
 
 use crate::editor::selection::BlockDeletePatch;
+
+pub const PERSIST_UNDO_MIN: usize = 5;
+pub const PERSIST_UNDO_MAX: usize = 20;
 
 #[derive(Debug, Clone)]
 struct LinearPatch {
     start: usize,
     removed: String,
     inserted: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct SerializableLinearPatch {
+    start: usize,
+    removed: String,
+    inserted: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct SerializableBlockPatch {
+    row: usize,
+    char_col: usize,
+    removed: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SerializableHistoryEntry {
+    start: usize,
+    removed: String,
+    inserted: String,
+    cursor_before: usize,
+    cursor_after: usize,
+    block_delete: Option<Vec<SerializableBlockPatch>>,
+    linear_patches: Option<Vec<SerializableLinearPatch>>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct HistoryStacks {
+    pub undo: Vec<SerializableHistoryEntry>,
+    pub redo: Vec<SerializableHistoryEntry>,
 }
 
 #[derive(Debug, Clone)]
@@ -34,6 +69,49 @@ impl EditHistory {
             redo_stack: Vec::new(),
             max_depth: 100,
         }
+    }
+
+    pub fn undo_depth(&self) -> usize {
+        self.undo_stack.len()
+    }
+
+    pub fn export_stacks(&self) -> HistoryStacks {
+        HistoryStacks {
+            undo: self
+                .undo_stack
+                .iter()
+                .map(entry_to_serializable)
+                .collect(),
+            redo: self
+                .redo_stack
+                .iter()
+                .map(entry_to_serializable)
+                .collect(),
+        }
+    }
+
+    pub fn export_for_persist(&self) -> HistoryStacks {
+        let mut stacks = self.export_stacks();
+        if stacks.undo.len() > PERSIST_UNDO_MAX {
+            let drop = stacks.undo.len() - PERSIST_UNDO_MAX;
+            stacks.undo.drain(0..drop);
+        }
+        if stacks.redo.len() > PERSIST_UNDO_MAX {
+            let drop = stacks.redo.len() - PERSIST_UNDO_MAX;
+            stacks.redo.drain(0..drop);
+        }
+        stacks
+    }
+
+    pub fn import_stacks(&mut self, stacks: HistoryStacks) {
+        self.undo_stack = stacks.undo.into_iter().map(entry_from_serializable).collect();
+        self.redo_stack = stacks.redo.into_iter().map(entry_from_serializable).collect();
+    }
+
+    pub fn take_stacks(&mut self) -> HistoryStacks {
+        let stacks = self.export_stacks();
+        self.clear();
+        stacks
     }
 
     pub fn record_change(
@@ -178,6 +256,66 @@ impl EditHistory {
     }
 }
 
+fn entry_to_serializable(entry: &HistoryEntry) -> SerializableHistoryEntry {
+    SerializableHistoryEntry {
+        start: entry.start,
+        removed: entry.removed.clone(),
+        inserted: entry.inserted.clone(),
+        cursor_before: entry.cursor_before,
+        cursor_after: entry.cursor_after,
+        block_delete: entry.block_delete.as_ref().map(|patches| {
+            patches
+                .iter()
+                .map(|p| SerializableBlockPatch {
+                    row: p.row,
+                    char_col: p.char_col,
+                    removed: p.removed.clone(),
+                })
+                .collect()
+        }),
+        linear_patches: entry.linear_patches.as_ref().map(|patches| {
+            patches
+                .iter()
+                .map(|p| SerializableLinearPatch {
+                    start: p.start,
+                    removed: p.removed.clone(),
+                    inserted: p.inserted.clone(),
+                })
+                .collect()
+        }),
+    }
+}
+
+fn entry_from_serializable(entry: SerializableHistoryEntry) -> HistoryEntry {
+    HistoryEntry {
+        start: entry.start,
+        removed: entry.removed,
+        inserted: entry.inserted,
+        cursor_before: entry.cursor_before,
+        cursor_after: entry.cursor_after,
+        block_delete: entry.block_delete.map(|patches| {
+            patches
+                .into_iter()
+                .map(|p| BlockDeletePatch {
+                    row: p.row,
+                    char_col: p.char_col,
+                    removed: p.removed,
+                })
+                .collect()
+        }),
+        linear_patches: entry.linear_patches.map(|patches| {
+            patches
+                .into_iter()
+                .map(|p| LinearPatch {
+                    start: p.start,
+                    removed: p.removed,
+                    inserted: p.inserted,
+                })
+                .collect()
+        }),
+    }
+}
+
 fn apply_undo_patch(text: &mut Rope, patch: &LinearPatch) {
     let end = patch.start + patch.inserted.chars().count();
     if patch.start <= text.len_chars() && end <= text.len_chars() {
@@ -252,5 +390,15 @@ mod tests {
         assert!(history.undo(&mut text, &mut cursor));
         assert_eq!(text.to_string(), "abcde");
         assert_eq!(cursor, 4);
+    }
+
+    #[test]
+    fn export_import_round_trip() {
+        let mut history = EditHistory::new();
+        history.record_change(0, String::new(), "x".into(), 0, 1);
+        let stacks = history.export_stacks();
+        let mut other = EditHistory::new();
+        other.import_stacks(stacks);
+        assert_eq!(other.undo_depth(), 1);
     }
 }

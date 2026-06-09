@@ -1,7 +1,7 @@
 mod commands;
 mod cursor;
 mod engine;
-mod history;
+pub mod history;
 pub mod line_numbers;
 mod render;
 mod search;
@@ -14,6 +14,7 @@ mod wrap;
 pub use commands::EditorCommand;
 pub use cursor::SelectionMode;
 pub use engine::{EditorEngine, EMPTY_DOCUMENT_TEXT};
+pub use history::{HistoryStacks, PERSIST_UNDO_MIN, PERSIST_UNDO_MAX};
 pub use tabs::convert_tabulation_between;
 
 /// Área de texto do editor (inner + margens) para viewport e hit-test.
@@ -293,6 +294,26 @@ impl Editor {
 
     pub fn redo(&mut self) {
         self.engine.redo();
+    }
+
+    pub fn history_depth(&self) -> usize {
+        self.engine.history_depth()
+    }
+
+    pub fn clone_history_stacks(&self) -> HistoryStacks {
+        self.engine.export_history()
+    }
+
+    pub fn import_history(&mut self, stacks: HistoryStacks) {
+        self.engine.import_history(stacks);
+    }
+
+    pub fn take_history_stacks(&mut self) -> HistoryStacks {
+        self.engine.take_history_stacks()
+    }
+
+    pub fn export_history_for_persist(&self) -> HistoryStacks {
+        self.engine.export_history_for_persist()
     }
 
     pub fn select_all(&mut self) {

@@ -1,18 +1,17 @@
 # SPEC — Múltiplos arquivos (workspace / abas)
 
-**Status:** to-do (fase 1 **concluída** em 2026-06-07; fase 2 pendente)  
+**Status:** done  
 **Data:** 2026-06-07  
+**Implementado:** 2026-06-09 (branch `workspace-fase1`) — escopo completo; barra de abas visual **descartada**  
 **Relacionado:** `PROJECT_RULES.md` v2.0, `src/config.rs` (`edit.json`), `src/app.rs`
 
 ---
 
 ## 1. Objetivo
 
-Permitir até **10 arquivos abertos simultaneamente** no editor, alternando entre eles via **menu Abas**, atalhos de teclado e (futuro) barra de abas visual. O documento único atual (`App.document` + `App.editor`) evolui para um **workspace** com várias abas, cada uma encapsulando estado completo de edição.
+Permitir até **10 arquivos abertos simultaneamente** no editor, alternando entre eles via **menu Abas** e atalhos de teclado. O documento único (`App.document` + `App.editor`) evolui para um **workspace** com várias abas, cada uma encapsulando estado completo de edição.
 
-**Fase 1 (esta spec):** seleção de abas **somente pelo menu Abas** — sem barra de abas horizontal. A borda do editor continua exibindo o título da aba ativa: `[ nome ]` ou `[ Novo3* ]`.
-
-**Fase 2 (futuro, fora do escopo imediato):** barra de abas abaixo do menu com `[ ativa ]` / `( inativa )` e clique de mouse.
+Seleção de abas **somente pelo menu Abas** — a borda do editor exibe o título da aba ativa: `[ nome ]` ou `[ Novo3* ]`. Barra de abas horizontal abaixo do menu foi **descartada** (fora de escopo).
 
 ---
 
@@ -86,14 +85,6 @@ Após ordenar, **`active_tab_index` deve ser recalculado** para manter a mesma a
 - Mantém título `[ nome ]` da aba ativa (regra atual de `PROJECT_RULES`).
 - Dirty: asterisco no título (`[ main.rs* ]`, `[ Novo2* ]`).
 - Troca de aba atualiza título, conteúdo, cursor, encoding/tab no rodapé.
-
-### 4.2. Barra de abas (fase 2 — referência)
-
-Reservado para implementação futura:
-
-- Abaixo da barra de menus; sem scroll horizontal (máx. 10 abas).
-- Ativa: `[ arquivo.rs ]`; inativa: `( utils.rs )`; dirty: `*`.
-- Clique troca foco (consistente com mouse no menu Abas).
 
 ---
 
@@ -544,4 +535,5 @@ Barra de menu (existente): `Alt+A` Arquivo, `Alt+E` Editar, `Alt+X` Exibir, `Alt
 | 2026-06-07 | Decisões: evicção final da fila; `Ctrl+Alt+S`; `Ctrl+Shift+W`; `Alt+S`; Ctrl+N reuso NovoN; temps fase 1. |
 | 2026-06-07 | Modal ao desmarcar **Salvar desfazer recentes** (Apagar / Manter / Cancelar). |
 | 2026-06-08 | **F2** renomear no FS; **F10** salvar; menu Arquivo via **Alt+A**. |
-| 2026-06-08 | Fase 1 implementada (workspace, menu Abas, `edit.json` v2, `.edit-session/`, 74+ testes). Spec permanece em `to-do` até fase 2 (barra de abas, undo persistido, reload FS). |
+| 2026-06-08 | Fase 1 base (workspace, menu Abas, `edit.json` v2, `.edit-session/`, 74+ testes). |
+| 2026-06-09 | Conclusão: undo por aba + persistência, detecção FS externo, higiene sessão; barra de abas descartada. |

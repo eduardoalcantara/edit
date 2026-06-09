@@ -4,7 +4,7 @@ use crate::edit_mode::EditMode;
 use crate::editor::cursor::{
     char_idx_to_line_col, line_col_to_char_idx, line_content_len, Cursor, SelectionMode,
 };
-use crate::editor::history::EditHistory;
+use crate::editor::history::{EditHistory, HistoryStacks};
 use crate::editor::selection::{
     add_cursor_at, collect_block_delete_patches, delete_block, extract_block_text,
     extract_linear_text, merge_cursors, BlockSelectionState,
@@ -88,6 +88,26 @@ impl EditorEngine {
 
     pub fn load_lines(&mut self, lines: &[String]) {
         self.load_text(&lines.join("\n"));
+    }
+
+    pub fn history_depth(&self) -> usize {
+        self.history.undo_depth()
+    }
+
+    pub fn export_history(&self) -> HistoryStacks {
+        self.history.export_stacks()
+    }
+
+    pub fn export_history_for_persist(&self) -> HistoryStacks {
+        self.history.export_for_persist()
+    }
+
+    pub fn import_history(&mut self, stacks: HistoryStacks) {
+        self.history.import_stacks(stacks);
+    }
+
+    pub fn take_history_stacks(&mut self) -> HistoryStacks {
+        self.history.take_stacks()
     }
 
     pub fn to_lines(&self) -> Vec<String> {

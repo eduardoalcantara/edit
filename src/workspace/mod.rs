@@ -1,7 +1,10 @@
 mod tab;
 mod workspace;
 
-pub use tab::{create_tab_from_defaults, next_novo_counter, novo_display_name, snapshot_path, Tab};
+pub use tab::{
+    check_fs_drift, check_fs_drift_from_entry, create_tab_from_defaults, next_novo_counter,
+    novo_display_name, snapshot_path, FsDrift, Tab,
+};
 pub use workspace::{
     flush_editor_into_tab, PromptReason, TabSortStrategy, Workspace, WorkspaceAction,
 };

@@ -1,5 +1,5 @@
 use std::path::Path;
-use std::time::{Instant, SystemTime};
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use crate::document::Document;
 use crate::editor::{Editor, EMPTY_DOCUMENT_TEXT};
@@ -71,6 +71,70 @@ impl Tab {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FsDrift {
+    Ok,
+    ModifiedExternally,
+    Deleted,
+}
+
+pub fn check_fs_drift(path: &Path, snapshot: Option<&FileSnapshot>) -> FsDrift {
+    if !path.is_file() {
+        return FsDrift::Deleted;
+    }
+    let Some(snapshot) = snapshot else {
+        return FsDrift::Ok;
+    };
+    let Ok(current) = snapshot_path(path) else {
+        return FsDrift::Deleted;
+    };
+    if current.len != snapshot.len {
+        return FsDrift::ModifiedExternally;
+    }
+    let snap_ms = snapshot
+        .modified
+        .duration_since(UNIX_EPOCH)
+        .ok()
+        .map(|d| d.as_millis());
+    let cur_ms = current
+        .modified
+        .duration_since(UNIX_EPOCH)
+        .ok()
+        .map(|d| d.as_millis());
+    match (snap_ms, cur_ms) {
+        (Some(a), Some(b)) if a != b => FsDrift::ModifiedExternally,
+        _ => FsDrift::Ok,
+    }
+}
+
+pub fn check_fs_drift_from_entry(
+    path: &Path,
+    fs_mtime_ms: Option<u64>,
+    fs_len: Option<u64>,
+) -> FsDrift {
+    if !path.is_file() {
+        return FsDrift::Deleted;
+    }
+    let Ok(meta) = std::fs::metadata(path) else {
+        return FsDrift::Deleted;
+    };
+    if let Some(len) = fs_len {
+        if meta.len() != len {
+            return FsDrift::ModifiedExternally;
+        }
+    }
+    if let Some(expected_ms) = fs_mtime_ms {
+        if let Ok(modified) = meta.modified() {
+            if let Ok(dur) = modified.duration_since(UNIX_EPOCH) {
+                if dur.as_millis() as u64 != expected_ms {
+                    return FsDrift::ModifiedExternally;
+                }
+            }
+        }
+    }
+    FsDrift::Ok
+}
+
 pub fn snapshot_path(path: &Path) -> std::io::Result<FileSnapshot> {
     let meta = std::fs::metadata(path)?;
     Ok(FileSnapshot {
@@ -122,4 +186,55 @@ pub fn create_tab_from_defaults(
     editor.set_tabulation(tabulation);
     editor.set_word_wrap(word_wrap);
     Tab::new_untitled(editor, document, session_id, display_name)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+    use std::time::{Duration, UNIX_EPOCH};
+
+    #[test]
+    fn check_fs_drift_detects_deleted_file() {
+        let path = std::env::temp_dir().join(format!("edit-drift-{}.txt", std::process::id()));
+        std::fs::write(&path, b"x").unwrap();
+        let snap = snapshot_path(&path).unwrap();
+        std::fs::remove_file(&path).unwrap();
+        assert_eq!(check_fs_drift(&path, Some(&snap)), FsDrift::Deleted);
+    }
+
+    #[test]
+    fn check_fs_drift_detects_size_change() {
+        let path = std::env::temp_dir().join(format!("edit-size-{}.txt", std::process::id()));
+        std::fs::write(&path, b"short").unwrap();
+        let snap = snapshot_path(&path).unwrap();
+        std::fs::write(&path, b"much longer content").unwrap();
+        assert_eq!(
+            check_fs_drift(&path, Some(&snap)),
+            FsDrift::ModifiedExternally
+        );
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn check_fs_drift_from_entry_matches_metadata() {
+        let path = std::env::temp_dir().join(format!("edit-meta-{}.txt", std::process::id()));
+        std::fs::write(&path, b"abc").unwrap();
+        let meta = std::fs::metadata(&path).unwrap();
+        let mtime = meta.modified().unwrap();
+        let ms = mtime.duration_since(UNIX_EPOCH).unwrap().as_millis() as u64;
+        assert_eq!(
+            check_fs_drift_from_entry(&path, Some(ms), Some(meta.len())),
+            FsDrift::Ok
+        );
+        std::thread::sleep(Duration::from_millis(50));
+        let mut file = std::fs::OpenOptions::new().append(true).open(&path).unwrap();
+        file.write_all(b"!").unwrap();
+        drop(file);
+        assert_eq!(
+            check_fs_drift_from_entry(&path, Some(ms), Some(meta.len())),
+            FsDrift::ModifiedExternally
+        );
+        let _ = std::fs::remove_file(&path);
+    }
 }

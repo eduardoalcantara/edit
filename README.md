@@ -143,9 +143,8 @@ Ver `PROJECT_RULES.md` para lista completa.
 
 ## Próximo marco
 
-- **Barra de abas visual** (fase 2) — [`specs/to-do/SPEC-MULTPLOS-ARQUIVOS.md`](specs/to-do/SPEC-MULTPLOS-ARQUIVOS.md)
-- Serialização completa `undo.json`/`redo.json` entre sessões
-- Detecção de alteração externa ao focar aba
+- Fidelidade Turbo Vision — [`specs/to-do/SPEC-UX-FIDELIDADE-TURBO-VISION.md`](specs/to-do/SPEC-UX-FIDELIDADE-TURBO-VISION.md)
+- Demais pendências — [`specs/to-do/SPEC-LIMITACOES-PENDENTES.md`](specs/to-do/SPEC-LIMITACOES-PENDENTES.md)
 
 ## Testes
 
@@ -153,4 +152,4 @@ Ver `PROJECT_RULES.md` para lista completa.
 cargo test
 ```
 
-157 testes unitários.
+166 testes unitários.

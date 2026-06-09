@@ -25,7 +25,8 @@ use crate::workspace::PromptReason;
 use buttons::{
     CONVERT, DISCARD_CLOSE, DISCARD_NEW, DISCARD_OPEN,
     OVERWRITE,
-    PATH_OPEN, PATH_RENAME, PATH_SAVE_AS, PURGE_UNDO, QUIT_UNSAVED, REINTERPRET, TAB_UNSAVED,
+    FILE_MISSING, PATH_OPEN, PATH_RENAME, PATH_SAVE_AS, PURGE_UNDO, QUIT_UNSAVED, REINTERPRET,
+    RELOAD_EXTERNAL, TAB_UNSAVED,
 };
 
 /// Intenção de domínio associada a um diálogo de confirmação.
@@ -43,6 +44,8 @@ pub enum ConfirmKind {
         reason: PromptReason,
     },
     PurgeUndoOnToggle,
+    ReloadExternal { tab_index: usize },
+    FileMissing { tab_index: usize },
 }
 
 #[derive(Debug, Clone)]
@@ -124,6 +127,28 @@ impl Modal {
                 &TAB_UNSAVED,
             ),
             kind: ConfirmKind::TabUnsaved { tab_index, reason },
+        }
+    }
+
+    pub fn reload_external(filename: &str, tab_index: usize) -> Self {
+        Modal::Confirm {
+            dialog: Dialog::message(
+                "Recarregar",
+                format!("{filename} foi modificado externamente. Recarregar do disco?"),
+                &RELOAD_EXTERNAL,
+            ),
+            kind: ConfirmKind::ReloadExternal { tab_index },
+        }
+    }
+
+    pub fn file_missing(filename: &str, tab_index: usize) -> Self {
+        Modal::Confirm {
+            dialog: Dialog::message(
+                "Arquivo ausente",
+                format!("{filename} não foi encontrado. Fechar aba?"),
+                &FILE_MISSING,
+            ),
+            kind: ConfirmKind::FileMissing { tab_index },
         }
     }
 
@@ -240,5 +265,7 @@ fn confirm_buttons(kind: &ConfirmKind) -> &'static [DialogButton] {
         ConfirmKind::ConvertEncoding { .. } => &CONVERT,
         ConfirmKind::TabUnsaved { .. } => &TAB_UNSAVED,
         ConfirmKind::PurgeUndoOnToggle => &PURGE_UNDO,
+        ConfirmKind::ReloadExternal { .. } => &RELOAD_EXTERNAL,
+        ConfirmKind::FileMissing { .. } => &FILE_MISSING,
     }
 }

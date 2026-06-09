@@ -7,7 +7,10 @@ use ratatui::Terminal;
 
 use crate::cli;
 use crate::clipboard::Clipboard;
-use crate::app_workspace::{workspace_from_config, AfterDirtyResolved, DirtyFlow};
+use crate::app_workspace::{
+    workspace_from_config, AfterDirtyResolved, DirtyFlow, PendingFsCheck, WorkspaceBootstrap,
+};
+use crate::session::{purge_all, purge_orphans};
 use crate::config::{config_from_view, EditConfig};
 use crate::editor_split::EditorSplit;
 use crate::document::Document;
@@ -59,6 +62,8 @@ pub struct App {
     pub pending_dirty_save: Option<(usize, PromptReason)>,
     pub pending_save_all: bool,
     pub pending_open_path: Option<PathBuf>,
+    pub(crate) pending_fs_checks: Vec<PendingFsCheck>,
+    pub(crate) pending_focus_tab: Option<usize>,
     user_config: EditConfig,
 }
 
@@ -93,8 +98,21 @@ impl App {
             border: view_snapshot.border,
             theme: view_snapshot.theme,
         };
-        let (workspace, editor, document) =
-            workspace_from_config(&user_config, &palette, word_wrap);
+        let abas = &user_config.arquivo.abas;
+        if abas.fechar_tudo_ao_sair {
+            let _ = purge_all();
+        } else {
+            let ids: Vec<String> = abas.sessao.iter().map(|e| e.tab_id.clone()).collect();
+            if !ids.is_empty() {
+                let _ = purge_orphans(&ids);
+            }
+        }
+        let WorkspaceBootstrap {
+            workspace,
+            editor,
+            document,
+            pending_fs_checks,
+        } = workspace_from_config(&user_config, &palette, word_wrap);
         let mut editor_split = user_config.editor_split();
         if editor_split.is_active() && !editor_split.can_activate(workspace.tabs.len()) {
             editor_split = EditorSplit::default();
@@ -140,6 +158,8 @@ impl App {
             pending_dirty_save: None,
             pending_save_all: false,
             pending_open_path: None,
+            pending_fs_checks,
+            pending_focus_tab: None,
             user_config,
         };
         app.refresh_menu();
@@ -247,6 +267,7 @@ impl App {
 
     pub fn run(&mut self, terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>) -> io::Result<()> {
         while !self.should_quit {
+            self.process_pending_fs_checks();
             self.memory.refresh_if_due();
             self.terminal.drain_all();
             self.process_terminal_session_exits();
@@ -735,6 +756,14 @@ impl App {
             }
             (ConfirmKind::PurgeUndoOnToggle, DialogButtonAction::Cancel) => {
                 self.set_status("Toggle mantido");
+            }
+            (ConfirmKind::ReloadExternal { tab_index }, action) => {
+                let from_focus = self.pending_focus_tab == Some(tab_index);
+                self.handle_reload_external(tab_index, action, from_focus);
+            }
+            (ConfirmKind::FileMissing { tab_index }, action) => {
+                let from_focus = self.pending_focus_tab == Some(tab_index);
+                self.handle_file_missing(tab_index, action, from_focus);
             }
             (ConfirmKind::QuitUnsaved, DialogButtonAction::Primary) => {
                 self.pending_quit = true;

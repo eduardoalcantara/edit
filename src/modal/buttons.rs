@@ -49,6 +49,37 @@ pub const QUIT_UNSAVED: [DialogButton; 3] = [
 
 pub const TAB_UNSAVED: [DialogButton; 3] = QUIT_UNSAVED;
 
+pub const RELOAD_EXTERNAL: [DialogButton; 3] = [
+    DialogButton::new(
+        "Sim",
+        "Recarrega o arquivo do disco e descarta desfazer persistido",
+        DialogButtonAction::Primary,
+    ),
+    DialogButton::new(
+        "Não",
+        "Mantém o conteúdo atual em memória",
+        DialogButtonAction::Secondary,
+    ),
+    DialogButton::new(
+        "Cancelar",
+        "Não troca de aba",
+        DialogButtonAction::Cancel,
+    ),
+];
+
+pub const FILE_MISSING: [DialogButton; 2] = [
+    DialogButton::new(
+        "Fechar",
+        "Remove a aba do workspace",
+        DialogButtonAction::Primary,
+    ),
+    DialogButton::new(
+        "Manter",
+        "Mantém o buffer em memória sem path válido",
+        DialogButtonAction::Secondary,
+    ),
+];
+
 pub const DISCARD_NEW: [DialogButton; 2] = [
     DialogButton::new(
         "OK",

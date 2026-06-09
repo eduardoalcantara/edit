@@ -9,11 +9,28 @@ use crate::config::{
 use crate::editor_split::EditorSplit;
 use crate::modal::Modal;
 use crate::modal::dialog::DialogButtonAction;
-use crate::session::{purge_all, purge_orphans, purge_tab, read_content_tmp, write_content_tmp};
-use crate::workspace::{
-    create_tab_from_defaults, new_session_id, next_novo_counter, novo_display_name, snapshot_path,
-    flush_editor_into_tab, PromptReason, Tab, Workspace,
+use crate::session::{
+    content_hash, now_ms, purge_all, purge_orphans, purge_tab, purge_undo, read_content_tmp,
+    read_meta, read_undo_stacks, write_content_tmp, write_meta, write_undo_stacks, SessionMeta,
 };
+use crate::workspace::{
+    check_fs_drift, check_fs_drift_from_entry, create_tab_from_defaults, new_session_id,
+    next_novo_counter, novo_display_name, snapshot_path, flush_editor_into_tab, FsDrift,
+    PromptReason, Tab, Workspace,
+};
+
+#[derive(Debug, Clone)]
+pub enum PendingFsCheck {
+    ReloadExternal { tab_index: usize },
+    FileMissing { tab_index: usize },
+}
+
+pub struct WorkspaceBootstrap {
+    pub workspace: Workspace,
+    pub editor: Editor,
+    pub document: Document,
+    pub pending_fs_checks: Vec<PendingFsCheck>,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AfterDirtyResolved {
@@ -47,13 +64,38 @@ impl App {
     }
 
     pub(crate) fn focus_tab(&mut self, index: usize) {
+        if index >= self.workspace.tabs.len() || index == self.workspace.active_index {
+            return;
+        }
+        self.sync_active_tab();
+        if let Some(path) = self.workspace.tabs[index].filepath().map(|p| p.to_path_buf()) {
+            let snapshot = self.workspace.tabs[index].fs_snapshot.clone();
+            match check_fs_drift(&path, snapshot.as_ref()) {
+                FsDrift::ModifiedExternally => {
+                    let name = self.tab_display_name(index);
+                    self.pending_focus_tab = Some(index);
+                    self.modal = Modal::reload_external(&name, index);
+                    return;
+                }
+                FsDrift::Deleted => {
+                    let name = self.tab_display_name(index);
+                    self.pending_focus_tab = Some(index);
+                    self.modal = Modal::file_missing(&name, index);
+                    return;
+                }
+                FsDrift::Ok => {}
+            }
+        }
+        self.focus_tab_unchecked(index);
+    }
+
+    pub(crate) fn focus_tab_unchecked(&mut self, index: usize) {
         if index >= self.workspace.tabs.len() {
             return;
         }
-        if index != self.workspace.active_index {
-            self.sync_active_tab();
-        }
+        self.pending_focus_tab = None;
         self.workspace.active_index = index;
+        let history = self.workspace.tabs[index].editor.take_history_stacks();
         let tab = &self.workspace.tabs[index];
         let content = tab.editor.content_string();
         let (line, col) = tab.editor.cursor_line_col();
@@ -62,9 +104,151 @@ impl App {
         self.editor.set_tabulation(self.document.tabulation);
         self.editor.set_word_wrap(self.view.word_wrap);
         self.editor.set_cursor(line.saturating_sub(1), col.saturating_sub(1));
+        self.editor.import_history(history);
         let palette = self.theme.palette();
         self.editor.apply_theme(&palette);
         self.sync_split_after_focus_tab(index);
+    }
+
+    pub(crate) fn process_pending_fs_checks(&mut self) {
+        if self.modal.is_active() || self.pending_fs_checks.is_empty() {
+            return;
+        }
+        let check = self.pending_fs_checks[0].clone();
+        match check {
+            PendingFsCheck::ReloadExternal { tab_index } => {
+                let name = self.tab_display_name(tab_index);
+                self.modal = Modal::reload_external(&name, tab_index);
+            }
+            PendingFsCheck::FileMissing { tab_index } => {
+                let name = self.tab_display_name(tab_index);
+                self.modal = Modal::file_missing(&name, tab_index);
+            }
+        }
+    }
+
+    fn pop_pending_fs_check(&mut self) {
+        if !self.pending_fs_checks.is_empty() {
+            self.pending_fs_checks.remove(0);
+        }
+    }
+
+    pub(crate) fn reload_tab_from_disk(&mut self, tab_index: usize) -> bool {
+        let path = match self.workspace.tabs.get(tab_index).and_then(|t| t.filepath()) {
+            Some(p) => p.to_path_buf(),
+            None => return false,
+        };
+        if !path.is_file() {
+            return false;
+        }
+        let session_id = self.workspace.tabs[tab_index].session_id.clone();
+        let _ = purge_undo(&session_id);
+        let encoding = self.workspace.tabs[tab_index].document.encoding;
+        let Ok(lines) = crate::file_io::read_lines_encoded(&path, encoding) else {
+            return false;
+        };
+        let content = lines.join("\n");
+        let mut document = self.workspace.tabs[tab_index].document.clone();
+        document.set_opened(content.clone(), path.clone());
+        let palette = self.theme.palette();
+        let mut editor = Editor::new(&palette);
+        editor.set_lines(lines);
+        editor.set_tabulation(document.tabulation);
+        editor.set_word_wrap(self.view.word_wrap);
+        let tab = &mut self.workspace.tabs[tab_index];
+        tab.document = document;
+        tab.editor = editor;
+        tab.fs_snapshot = snapshot_path(&path).ok();
+        true
+    }
+
+    pub(crate) fn close_tab_by_index(&mut self, tab_index: usize) {
+        if tab_index >= self.workspace.tabs.len() {
+            return;
+        }
+        let removed = self.workspace.tabs.remove(tab_index);
+        let _ = purge_tab(&removed.session_id);
+        if self.workspace.tabs.is_empty() {
+            let palette = self.theme.palette();
+            let tab = create_tab_from_defaults(
+                &palette,
+                self.user_config().default_encoding(),
+                self.user_config().default_tabulation(),
+                self.view.word_wrap,
+                new_session_id(),
+                "Novo".to_string(),
+            );
+            self.workspace.tabs.push(tab);
+        }
+        self.workspace.active_index = self
+            .workspace
+            .active_index
+            .min(self.workspace.tabs.len().saturating_sub(1));
+        self.focus_tab_unchecked(self.workspace.active_index);
+        self.on_tab_count_changed();
+    }
+
+    pub(crate) fn handle_reload_external(
+        &mut self,
+        tab_index: usize,
+        action: DialogButtonAction,
+        from_focus: bool,
+    ) {
+        match action {
+            DialogButtonAction::Primary => {
+                if self.reload_tab_from_disk(tab_index) {
+                    if from_focus || tab_index == self.workspace.active_index {
+                        self.focus_tab_unchecked(tab_index);
+                    }
+                    self.set_status("Arquivo recarregado do disco");
+                } else {
+                    self.set_status("Falha ao recarregar arquivo");
+                }
+            }
+            DialogButtonAction::Secondary => {
+                if from_focus {
+                    self.focus_tab_unchecked(tab_index);
+                }
+            }
+            DialogButtonAction::Cancel => {
+                if from_focus {
+                    self.pending_focus_tab = None;
+                    self.set_status("Troca de aba cancelada");
+                }
+            }
+        }
+        self.pop_pending_fs_check();
+    }
+
+    pub(crate) fn handle_file_missing(
+        &mut self,
+        tab_index: usize,
+        action: DialogButtonAction,
+        from_focus: bool,
+    ) {
+        match action {
+            DialogButtonAction::Primary => {
+                if tab_index == self.workspace.active_index {
+                    self.sync_active_tab();
+                }
+                self.close_tab_by_index(tab_index);
+                self.set_status("Aba fechada — arquivo ausente");
+            }
+            DialogButtonAction::Secondary => {
+                if let Some(tab) = self.workspace.tabs.get_mut(tab_index) {
+                    tab.fs_snapshot = None;
+                }
+                if from_focus {
+                    self.focus_tab_unchecked(tab_index);
+                }
+            }
+            DialogButtonAction::Cancel => {
+                if from_focus {
+                    self.pending_focus_tab = None;
+                }
+            }
+        }
+        self.pop_pending_fs_check();
     }
 
     pub(crate) fn active_tab_is_pristine(&self) -> bool {
@@ -430,14 +614,29 @@ impl App {
         }
 
         for tab in &self.workspace.tabs {
+            let content = tab.editor.content_string();
             if tab.document.path().is_none() {
-                let content = tab.editor.content_string();
                 let _ = write_content_tmp(&tab.session_id, &content);
             }
-        }
-
-        if !self.workspace.salvar_desfazer_recentes {
-            let _ = crate::session::purge_all_undo();
+            if self.workspace.salvar_desfazer_recentes {
+                let (line, col) = tab.editor.cursor_line_col();
+                let meta = SessionMeta {
+                    content_hash: content_hash(&content),
+                    cursor_linha: line,
+                    cursor_coluna: col,
+                    encoding: encoding_to_config_str(tab.document.encoding),
+                    fs_mtime_ms: tab.fs_snapshot.as_ref().and_then(|s| {
+                        crate::session::system_time_to_ms(s.modified)
+                    }),
+                    fs_len: tab.fs_snapshot.as_ref().map(|s| s.len),
+                    saved_at_ms: now_ms(),
+                };
+                let _ = write_meta(&tab.session_id, &meta);
+                let stacks = tab.editor.export_history_for_persist();
+                let _ = write_undo_stacks(&tab.session_id, &stacks);
+            } else {
+                let _ = purge_undo(&tab.session_id);
+            }
         }
 
         let ids: Vec<String> = self
@@ -538,12 +737,46 @@ impl App {
 use crate::document::Document;
 use crate::editor::Editor;
 
+fn restore_tab_undo(
+    tab: &mut Tab,
+    tab_id: &str,
+    content: &str,
+    fs_mtime_ms: Option<u64>,
+    fs_len: Option<u64>,
+    path: Option<&Path>,
+    salvar_desfazer: bool,
+) {
+    if !salvar_desfazer {
+        let _ = purge_undo(tab_id);
+        return;
+    }
+    let hash = content_hash(content);
+    let Some(meta) = read_meta(tab_id).ok().flatten() else {
+        let _ = purge_undo(tab_id);
+        return;
+    };
+    if meta.content_hash != hash {
+        let _ = purge_undo(tab_id);
+        return;
+    }
+    if let Some(path) = path {
+        if check_fs_drift_from_entry(path, fs_mtime_ms, fs_len) != FsDrift::Ok {
+            let _ = purge_undo(tab_id);
+            return;
+        }
+    }
+    if let Ok(Some(stacks)) = read_undo_stacks(tab_id) {
+        tab.editor.import_history(stacks);
+    }
+}
+
 pub fn workspace_from_config(
     user_config: &crate::config::EditConfig,
     palette: &crate::theme::ThemePalette,
     word_wrap: bool,
-) -> (Workspace, Editor, Document) {
+) -> WorkspaceBootstrap {
     let abas = &user_config.arquivo.abas;
+    let mut pending_fs_checks = Vec::new();
     let mut workspace = Workspace {
         tabs: Vec::new(),
         active_index: 0,
@@ -563,11 +796,17 @@ pub fn workspace_from_config(
                     if let Ok(lines) =
                         crate::file_io::read_lines_encoded(&path, user_config.default_encoding())
                     {
+                        let tab_index = workspace.tabs.len();
+                        let drift =
+                            check_fs_drift_from_entry(&path, entry.fs_mtime_ms, entry.fs_len);
+                        if drift == FsDrift::ModifiedExternally {
+                            pending_fs_checks.push(PendingFsCheck::ReloadExternal { tab_index });
+                        }
                         let content = lines.join("\n");
                         let mut document = Document::new();
                         document.encoding = user_config.default_encoding();
                         document.tabulation = user_config.default_tabulation();
-                        document.set_opened(content, path.clone());
+                        document.set_opened(content.clone(), path.clone());
                         let mut editor = Editor::new(palette);
                         editor.set_lines(lines);
                         editor.set_tabulation(document.tabulation);
@@ -587,9 +826,20 @@ pub fn workspace_from_config(
                                 .to_string(),
                         );
                         tab.fs_snapshot = fs_snapshot;
+                        restore_tab_undo(
+                            &mut tab,
+                            &entry.tab_id,
+                            &content,
+                            entry.fs_mtime_ms,
+                            entry.fs_len,
+                            Some(path.as_path()),
+                            abas.salvar_desfazer_recentes,
+                        );
                         workspace.tabs.push(tab);
                         continue;
                     }
+                } else if entry.caminho.is_some() {
+                    continue;
                 }
             } else if entry.temporario {
                 let content = read_content_tmp(&entry.tab_id)
@@ -616,7 +866,16 @@ pub fn workspace_from_config(
                     .nome_virtual
                     .clone()
                     .unwrap_or_else(|| "Novo".to_string());
-                let tab = Tab::new_untitled(editor, document, entry.tab_id.clone(), name);
+                let mut tab = Tab::new_untitled(editor, document, entry.tab_id.clone(), name);
+                restore_tab_undo(
+                    &mut tab,
+                    &entry.tab_id,
+                    &content,
+                    entry.fs_mtime_ms,
+                    entry.fs_len,
+                    None,
+                    abas.salvar_desfazer_recentes,
+                );
                 workspace.tabs.push(tab);
             }
         }
@@ -646,15 +905,22 @@ pub fn workspace_from_config(
         .active_index
         .min(workspace.tabs.len().saturating_sub(1));
     let active_idx = workspace.active_index;
-    let active_tab = &workspace.tabs[active_idx];
-    let document = active_tab.document.clone();
+    let document = workspace.tabs[active_idx].document.clone();
+    let content = workspace.tabs[active_idx].editor.content_string();
+    let (line, col) = workspace.tabs[active_idx].editor.cursor_line_col();
+    let history = workspace.tabs[active_idx].editor.take_history_stacks();
     let mut editor = Editor::new(palette);
-    editor.replace_content(&active_tab.editor.content_string());
+    editor.replace_content(&content);
     editor.set_tabulation(document.tabulation);
     editor.set_word_wrap(word_wrap);
-    let (line, col) = active_tab.editor.cursor_line_col();
+    editor.import_history(history);
     editor.set_cursor(line.saturating_sub(1), col.saturating_sub(1));
-    (workspace, editor, document)
+    WorkspaceBootstrap {
+        workspace,
+        editor,
+        document,
+        pending_fs_checks,
+    }
 }
 
 #[cfg(test)]
@@ -694,8 +960,8 @@ mod tests {
             }],
         );
         let palette = ThemeId::ClassicBlue.palette();
-        let (ws, _, _) = workspace_from_config(&config, &palette, false);
-        assert_eq!(ws.tabs[0].display_name, "Salvo");
+        let boot = workspace_from_config(&config, &palette, false);
+        assert_eq!(boot.workspace.tabs[0].display_name, "Salvo");
     }
 
     #[test]
@@ -725,11 +991,34 @@ mod tests {
 
         let config = sample_config(false, abas.sessao);
         let palette = ThemeId::ClassicBlue.palette();
-        let (ws, _, _) = workspace_from_config(&config, &palette, false);
-        assert_eq!(ws.tabs[0].editor.cursor_line_col(), (1, 1));
+        let boot = workspace_from_config(&config, &palette, false);
+        assert_eq!(boot.workspace.tabs[0].editor.cursor_line_col(), (1, 1));
     }
 
     #[test]
+    fn history_survives_tab_switch_via_app() {
+        let mut app = App::new(false);
+        app.editor.paste("z");
+        app.sync_active_tab();
+        let depth = app.editor.history_depth();
+        assert!(depth > 0);
+        let session_b = new_session_id();
+        let tab_b = create_tab_from_defaults(
+            &ThemeId::ClassicBlue.palette(),
+            app.user_config().default_encoding(),
+            app.user_config().default_tabulation(),
+            false,
+            session_b,
+            "Segunda".to_string(),
+        );
+        app.workspace.tabs.push(tab_b);
+        app.focus_tab(1);
+        app.focus_tab(0);
+        assert_eq!(app.editor.history_depth(), depth);
+        app.editor.undo();
+        assert_eq!(app.editor.content_string(), "");
+    }
+
     fn skip_restore_when_fechar_tudo_ligado() {
         let config = sample_config(
             true,
@@ -747,8 +1036,8 @@ mod tests {
             }],
         );
         let palette = ThemeId::ClassicBlue.palette();
-        let (ws, _, _) = workspace_from_config(&config, &palette, false);
-        assert_eq!(ws.tabs.len(), 1);
-        assert_eq!(ws.tabs[0].display_name, "Novo");
+        let boot = workspace_from_config(&config, &palette, false);
+        assert_eq!(boot.workspace.tabs.len(), 1);
+        assert_eq!(boot.workspace.tabs[0].display_name, "Novo");
     }
 }

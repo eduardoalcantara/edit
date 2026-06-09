@@ -2,7 +2,7 @@
 
 **Autor:** Perplexity AI  
 **Data:** 2026-06-08  
-**Versão:** 3.6
+**Versão:** 3.7
 
 ## Registro
 
@@ -161,3 +161,6 @@
   - Módulos: `src/modal/{text_input,find_replace,go_to_line,form_controls}.rs`, `src/editor/{search,render,engine}.rs`, `src/ui/compositor.rs`
   - Spec: `specs/done/SPEC-MODAL-TEXT-INPUT-BUSCA.md`
   - Testes: **157** total (`cargo test`); branch **`editor-split`**
+- 2026-06-09 — **Workspace fase 1 completa** — undo por aba + persistência sessão; detecção FS externo; higiene `.edit-session/`; spec múltiplos arquivos em `done/` (barra de abas descartada).
+  - Módulos: `src/editor/history.rs`, `src/session/store.rs`, `src/app_workspace.rs`, `src/workspace/tab.rs`, `src/modal/mod.rs`
+  - Testes: **166** total (`cargo test`); branch **`workspace-fase1`**

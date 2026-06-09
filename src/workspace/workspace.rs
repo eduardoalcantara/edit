@@ -230,16 +230,19 @@ pub fn flush_editor_into_tab(
     word_wrap: bool,
 ) {
     tab.document = app_document.clone();
+    let (line, col) = app_editor.cursor_line_col();
     tab.editor.replace_content(&app_editor.content_string());
     tab.editor.set_tabulation(app_document.tabulation);
     tab.editor.set_word_wrap(word_wrap);
-    let (line, col) = app_editor.cursor_line_col();
     tab.editor.set_cursor(line.saturating_sub(1), col.saturating_sub(1));
+    tab.editor
+        .import_history(app_editor.clone_history_stacks());
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::editor::Editor;
     use crate::theme::ThemeId;
 
     fn palette() -> ThemePalette {
@@ -255,6 +258,18 @@ mod tests {
             id.to_string(),
             name.to_string(),
         )
+    }
+
+    #[test]
+    fn flush_copies_history_to_tab() {
+        let palette = palette();
+        let mut editor = Editor::new(&palette);
+        editor.paste("hello");
+        assert!(editor.history_depth() > 0);
+        let mut tab = empty_tab("a", "Novo");
+        let document = crate::document::Document::new();
+        flush_editor_into_tab(&editor, &document, &mut tab, false);
+        assert_eq!(tab.editor.history_depth(), editor.history_depth());
     }
 
     #[test]

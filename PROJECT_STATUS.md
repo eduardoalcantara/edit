@@ -2,7 +2,7 @@
 
 **Autor:** Perplexity AI  
 **Data:** 2026-06-08  
-**Versão:** 3.6
+**Versão:** 3.7
 
 ## Estado atual
 
@@ -153,9 +153,15 @@
   - **Esc** em modal fecha diálogo; **Esc** no editor limpa busca ativa ou sai; **[Limpar]** só pelo botão.
   - Spec: `specs/done/SPEC-MODAL-TEXT-INPUT-BUSCA.md`
   - **157 testes** unitários passando (`cargo test`).
+- **Workspace fase 1 completa (2026-06-09, branch `workspace-fase1`):**
+  - Histórico undo isolado por aba (swap em troca de aba).
+  - Persistência `undo.json`/`redo.json`/`meta.json` em `.edit-session/` (toggle **Salvar desfazer recentes**).
+  - Detecção de alteração externa ao focar aba e na restauração (modal Recarregar / Arquivo ausente).
+  - Higiene startup: `purge_orphans`; `purge_undo` por aba quando inválido.
+  - Spec: `specs/done/SPEC-MULTPLOS-ARQUIVOS.md` (barra de abas visual descartada).
+  - **166 testes** unitários passando (`cargo test`).
 
 ### Em andamento
-- **Múltiplos arquivos — fase 2:** barra de abas visual; serialização `undo.json`/`redo.json`; modal recarregar arquivo alterado externamente.
 - **Fidelidade Turbo Vision:** `specs/to-do/SPEC-UX-FIDELIDADE-TURBO-VISION.md` (TV1–TV3 paleta/rodapé; demais itens TV8+).
 - Resolução das demais limitações em `specs/to-do/SPEC-LIMITACOES-PENDENTES.md`.
 
