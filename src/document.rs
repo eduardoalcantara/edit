@@ -65,8 +65,7 @@ impl Document {
         self.path = None;
         self.encoding = encoding;
         self.tabulation = tabulation;
-        self.saved_content = EMPTY_DOCUMENT_TEXT.to_string();
-        let _ = content; // dirty derivado pelo conteúdo atual vs baseline
+        self.saved_content = content;
     }
 }
 

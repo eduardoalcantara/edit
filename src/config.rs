@@ -421,7 +421,10 @@ impl EditConfig {
             .exibir
             .split_left_caminho
             .as_ref()
-            .and_then(|s| workspace.find_open_path(Path::new(s)));
+            .and_then(|s| {
+                let path = crate::file_io::normalize_open_path(Path::new(s));
+                workspace.find_open_path(&path)
+            });
         let left_tab = left_from_path.unwrap_or(active);
 
         if mode != SplitMode::Horizontal || workspace.tabs.len() < 2 {
@@ -437,11 +440,16 @@ impl EditConfig {
             .exibir
             .split_right_caminho
             .as_ref()
-            .and_then(|s| workspace.find_open_path(Path::new(s)))
+            .and_then(|s| {
+                let path = crate::file_io::normalize_open_path(Path::new(s));
+                workspace.find_open_path(&path)
+            })
             .or_else(|| {
                 self.exibir
                     .split_right_tab
-                    .filter(|&i| i < workspace.tabs.len())
+                    .and_then(|i| workspace.tabs.get(i))
+                    .and_then(|tab| tab.filepath())
+                    .and_then(|p| workspace.find_open_path(p))
             });
 
         let mut split = EditorSplit {
@@ -661,6 +669,14 @@ fn parse_margin(value: &str) -> EditorMargin {
         "duas_linhas" | "duas linhas" => EditorMargin::TwoLines,
         _ => EditorMargin::None,
     }
+}
+
+pub fn encoding_from_config_str(value: &str) -> FileEncoding {
+    parse_encoding(value)
+}
+
+pub fn tabulation_from_config_str(value: &str) -> Tabulation {
+    parse_tabulation(value)
 }
 
 pub fn encoding_to_config_str(encoding: FileEncoding) -> String {

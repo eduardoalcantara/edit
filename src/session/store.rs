@@ -155,7 +155,12 @@ pub fn write_content_tmp(session_id: &str, content: &str) -> io::Result<PathBuf>
     let dir = tab_dir(session_id);
     fs::create_dir_all(&dir)?;
     let path = dir.join("content.tmp");
-    fs::write(&path, content)?;
+    let part = dir.join("content.tmp.part");
+    fs::write(&part, content)?;
+    if path.is_file() {
+        fs::remove_file(&path)?;
+    }
+    fs::rename(&part, &path)?;
     Ok(path)
 }
 

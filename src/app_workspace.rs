@@ -21,8 +21,15 @@ use crate::workspace::{
 
 #[derive(Debug, Clone)]
 pub enum PendingFsCheck {
-    ReloadExternal { tab_index: usize },
-    FileMissing { tab_index: usize },
+    ReloadExternal { tab_id: String },
+    FileMissing { tab_id: String },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EnsureTabResult {
+    Ok(usize),
+    BlockedNeedsSave,
+    Failed,
 }
 
 pub struct WorkspaceBootstrap {
@@ -110,17 +117,32 @@ impl App {
         self.sync_split_after_focus_tab(index);
     }
 
+    fn tab_index_for_session(&self, tab_id: &str) -> Option<usize> {
+        self.workspace
+            .tabs
+            .iter()
+            .position(|t| t.session_id == tab_id)
+    }
+
     pub(crate) fn process_pending_fs_checks(&mut self) {
         if self.modal.is_active() || self.pending_fs_checks.is_empty() {
             return;
         }
         let check = self.pending_fs_checks[0].clone();
         match check {
-            PendingFsCheck::ReloadExternal { tab_index } => {
+            PendingFsCheck::ReloadExternal { tab_id } => {
+                let Some(tab_index) = self.tab_index_for_session(&tab_id) else {
+                    self.pop_pending_fs_check();
+                    return;
+                };
                 let name = self.tab_display_name(tab_index);
                 self.modal = Modal::reload_external(&name, tab_index);
             }
-            PendingFsCheck::FileMissing { tab_index } => {
+            PendingFsCheck::FileMissing { tab_id } => {
+                let Some(tab_index) = self.tab_index_for_session(&tab_id) else {
+                    self.pop_pending_fs_check();
+                    return;
+                };
                 let name = self.tab_display_name(tab_index);
                 self.modal = Modal::file_missing(&name, tab_index);
             }
@@ -166,6 +188,7 @@ impl App {
         if tab_index >= self.workspace.tabs.len() {
             return;
         }
+        self.on_tab_closed(tab_index);
         let removed = self.workspace.tabs.remove(tab_index);
         let _ = purge_tab(&removed.session_id);
         if self.workspace.tabs.is_empty() {
@@ -180,6 +203,7 @@ impl App {
             );
             self.workspace.tabs.push(tab);
         }
+        self.workspace.after_close_tab(tab_index);
         self.workspace.active_index = self
             .workspace
             .active_index
@@ -435,19 +459,19 @@ impl App {
     }
 
     /// Garante aba para o caminho (abre se necessário) sem focar nem alterar painéis do split.
-    pub(crate) fn ensure_tab_for_path(&mut self, path: PathBuf) -> Option<usize> {
+    pub(crate) fn ensure_tab_for_path(&mut self, path: PathBuf) -> EnsureTabResult {
         let path = crate::file_io::normalize_open_path(&path);
         if !path.is_file() {
-            return None;
+            return EnsureTabResult::Failed;
         }
         if let Some(index) = self.workspace.find_open_path(&path) {
-            return Some(index);
+            return EnsureTabResult::Ok(index);
         }
 
         if self.workspace.needs_eviction() {
             match self.workspace.prepare_open_path(&path) {
                 crate::workspace::WorkspaceAction::PromptSaveRequired { .. } => {
-                    return None;
+                    return EnsureTabResult::BlockedNeedsSave;
                 }
                 _ => {}
             }
@@ -459,9 +483,12 @@ impl App {
                 let tab = self.tab_from_opened_path(&path, lines);
                 self.workspace.insert_tab_at_top(tab);
                 self.on_tab_count_changed();
-                self.workspace.find_open_path(&path)
+                self.workspace
+                    .find_open_path(&path)
+                    .map(EnsureTabResult::Ok)
+                    .unwrap_or(EnsureTabResult::Failed)
             }
-            Err(_) => None,
+            Err(_) => EnsureTabResult::Failed,
         }
     }
 
@@ -838,22 +865,26 @@ pub fn workspace_from_config(
                     continue;
                 }
                 if path.is_file() {
+                    let tab_encoding = crate::config::encoding_from_config_str(&entry.encoding);
+                    let tab_tabulation =
+                        crate::config::tabulation_from_config_str(&entry.tabulacao);
                     if let Ok(lines) =
-                        crate::file_io::read_lines_encoded(&path, user_config.default_encoding())
+                        crate::file_io::read_lines_encoded(&path, tab_encoding)
                     {
-                        let tab_index = workspace.tabs.len();
                         let drift =
                             check_fs_drift_from_entry(&path, entry.fs_mtime_ms, entry.fs_len);
                         if drift == FsDrift::ModifiedExternally {
-                            pending_fs_checks.push(PendingFsCheck::ReloadExternal { tab_index });
+                            pending_fs_checks.push(PendingFsCheck::ReloadExternal {
+                                tab_id: entry.tab_id.clone(),
+                            });
                         }
                         let disk_content = crate::encoding::normalize_newlines(&lines.join("\n"));
                         let editor_content = crate::encoding::normalize_newlines(
                             &session_editor_content(&entry.tab_id, &disk_content),
                         );
                         let mut document = Document::new();
-                        document.encoding = user_config.default_encoding();
-                        document.tabulation = user_config.default_tabulation();
+                        document.encoding = tab_encoding;
+                        document.tabulation = tab_tabulation;
                         document.set_opened(disk_content.clone(), path.clone());
                         let mut editor = Editor::new(palette);
                         editor.replace_content(&editor_content);
@@ -894,14 +925,12 @@ pub fn workspace_from_config(
                     .ok()
                     .flatten()
                     .unwrap_or_else(|| crate::editor::EMPTY_DOCUMENT_TEXT.to_string());
+                let tab_encoding = crate::config::encoding_from_config_str(&entry.encoding);
+                let tab_tabulation = crate::config::tabulation_from_config_str(&entry.tabulacao);
                 let mut document = Document::new();
-                document.encoding = user_config.default_encoding();
-                document.tabulation = user_config.default_tabulation();
-                document.restore_untitled(
-                    content.clone(),
-                    user_config.default_encoding(),
-                    user_config.default_tabulation(),
-                );
+                document.encoding = tab_encoding;
+                document.tabulation = tab_tabulation;
+                document.restore_untitled(content.clone(), tab_encoding, tab_tabulation);
                 let mut editor = Editor::new(palette);
                 editor.replace_content(&content);
                 editor.set_tabulation(document.tabulation);
@@ -1189,6 +1218,7 @@ mod tests {
         let _ = std::fs::remove_file(path);
     }
 
+    #[test]
     fn skip_restore_when_fechar_tudo_ligado() {
         let config = sample_config(
             true,

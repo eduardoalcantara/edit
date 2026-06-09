@@ -8,7 +8,8 @@ use ratatui::Terminal;
 use crate::cli;
 use crate::clipboard::Clipboard;
 use crate::app_workspace::{
-    workspace_from_config, AfterDirtyResolved, DirtyFlow, PendingFsCheck, WorkspaceBootstrap,
+    workspace_from_config, AfterDirtyResolved, DirtyFlow, EnsureTabResult, PendingFsCheck,
+    WorkspaceBootstrap,
 };
 use crate::session::{purge_all, purge_orphans};
 use crate::config::{config_from_view, EditConfig};
@@ -222,8 +223,13 @@ impl App {
         }
 
         let pane_paths: Vec<PathBuf> = valid.iter().take(2).cloned().collect();
+        let mut blocked = 0usize;
         for path in pane_paths.iter().rev() {
-            let _ = self.ensure_tab_for_path(path.clone());
+            match self.ensure_tab_for_path(path.clone()) {
+                EnsureTabResult::Ok(_) => {}
+                EnsureTabResult::BlockedNeedsSave => blocked += 1,
+                EnsureTabResult::Failed => {}
+            }
         }
         let pane_indices: Vec<usize> = pane_paths
             .iter()
@@ -260,6 +266,10 @@ impl App {
 
         if pane_indices.is_empty() && self.workspace.tabs.is_empty() {
             self.create_new_tab_at_top();
+        } else if blocked > 0 {
+            self.set_status(format!(
+                "Abertura parcial: {blocked} arquivo(s) bloqueado(s) (salve a aba da cauda)"
+            ));
         } else {
             self.set_status(format!("{} arquivo(s) na linha de comando", valid.len()));
         }
@@ -762,6 +772,10 @@ impl App {
         match file_io::write_content_encoded(&path, &content, self.document.encoding) {
             Ok(()) => {
                 self.document.mark_saved(content, path.clone());
+                self.sync_active_tab();
+                if let Some(tab) = self.workspace.tabs.get_mut(self.workspace.active_index) {
+                    tab.fs_snapshot = crate::workspace::snapshot_path(&path).ok();
+                }
                 self.note_recent_file(path.clone());
                 self.set_status(format!("Salvo: {}", path.display()));
                 if self.pending_quit {
@@ -1154,14 +1168,22 @@ impl App {
     }
 
     fn reinterpret_encoding(&mut self, encoding: FileEncoding) {
-        if let Some(path) = self.document.path().map(|p| p.to_path_buf()) {
-            self.document.encoding = encoding;
-            self.open_path(path);
-            self.set_status(format!("Reinterpretado como {}", encoding.label()));
-        } else {
+        let Some(path) = self.document.path().map(|p| p.to_path_buf()) else {
             self.document.encoding = encoding;
             self.set_status(format!("Codificação: {}", encoding.label()));
+            return;
+        };
+        let idx = self.workspace.active_index;
+        if idx < self.workspace.tabs.len() {
+            self.workspace.tabs[idx].document.encoding = encoding;
         }
+        self.document.encoding = encoding;
+        if !self.reload_tab_from_disk(idx) {
+            self.set_status(format!("Erro ao reler: {}", path.display()));
+            return;
+        }
+        self.focus_tab_unchecked(idx);
+        self.set_status(format!("Reinterpretado como {}", encoding.label()));
     }
 
     fn convert_encoding(&mut self, encoding: FileEncoding) {
@@ -1378,26 +1400,31 @@ impl App {
             ActionId::SortFileName => {
                 self.sync_active_tab();
                 self.workspace.sort_tabs(TabSortStrategy::FileName);
+                self.remap_editor_split_indices();
                 self.focus_tab(self.workspace.active_index);
             }
             ActionId::SortFilePath => {
                 self.sync_active_tab();
                 self.workspace.sort_tabs(TabSortStrategy::FilePath);
+                self.remap_editor_split_indices();
                 self.focus_tab(self.workspace.active_index);
             }
             ActionId::SortOpenedFirst => {
                 self.sync_active_tab();
                 self.workspace.sort_tabs(TabSortStrategy::OpenedFirst);
+                self.remap_editor_split_indices();
                 self.focus_tab(self.workspace.active_index);
             }
             ActionId::SortOpenedLast => {
                 self.sync_active_tab();
                 self.workspace.sort_tabs(TabSortStrategy::OpenedLast);
+                self.remap_editor_split_indices();
                 self.focus_tab(self.workspace.active_index);
             }
             ActionId::SortStatus => {
                 self.sync_active_tab();
                 self.workspace.sort_tabs(TabSortStrategy::Status);
+                self.remap_editor_split_indices();
                 self.focus_tab(self.workspace.active_index);
             }
             ActionId::HelpFeatures => self.modal = Modal::help(HelpKind::Features),

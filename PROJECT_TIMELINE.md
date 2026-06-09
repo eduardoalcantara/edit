@@ -164,3 +164,6 @@
 - 2026-06-09 — **Correções workspace, I/O, split e CLI** — `to_lines()`/`content_string()` alinhados; save via `content_string`; CRLF normalizado; sessão sempre restaurada + CLI nos painéis; split por caminho em `edit.json`; anti-duplicação de abas; fix documento órfão na CLI.
   - Módulos: `src/{encoding,file_io,editor/engine,app,app_workspace,app_editor_split,config,main}.rs`, `PROJECT_RULES.md`
   - Testes: **177** total (`cargo test`); docs STATUS **v3.8**
+- 2026-06-09 — **Revisão pós-auditoria workspace/split** — remapeamento split após sort; reload encoding; fs_snapshot pós-save; close_tab + split; CLI eviction; encoding/tabulacao por aba na restauração; untitled não-dirty; pending_fs por session_id; paths normalizados; content.tmp atômico.
+  - Módulos: `src/{app,app_workspace,app_editor_split,config,document,session/store}.rs`
+  - Testes: **178** total (`cargo test`); docs STATUS **v3.9**

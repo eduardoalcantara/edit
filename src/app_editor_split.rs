@@ -151,6 +151,44 @@ impl App {
         self.editor_split.set_pane_tab(self.editor_split.focused_pane, index);
     }
 
+    pub(crate) fn remap_editor_split_indices(&mut self) {
+        if !self.editor_split.is_active() {
+            return;
+        }
+        let left_id = self
+            .workspace
+            .tabs
+            .get(self.editor_split.left_tab)
+            .map(|t| t.session_id.clone());
+        let right_id = self.editor_split.right_tab.and_then(|i| {
+            self.workspace
+                .tabs
+                .get(i)
+                .map(|t| t.session_id.clone())
+        });
+        if let Some(id) = left_id {
+            if let Some(i) = self
+                .workspace
+                .tabs
+                .iter()
+                .position(|t| t.session_id == id)
+            {
+                self.editor_split.left_tab = i;
+            }
+        }
+        if let Some(id) = right_id {
+            if let Some(i) = self
+                .workspace
+                .tabs
+                .iter()
+                .position(|t| t.session_id == id)
+            {
+                self.editor_split.right_tab = Some(i);
+            }
+        }
+        self.editor_split.ensure_distinct_tabs();
+    }
+
     fn pick_secondary_tab(&self, primary: usize) -> Option<usize> {
         let len = self.workspace.tabs.len();
         if len < 2 {

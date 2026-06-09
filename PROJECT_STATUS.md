@@ -2,7 +2,7 @@
 
 **Autor:** Perplexity AI  
 **Data:** 2026-06-08  
-**Versão:** 3.8
+**Versão:** 3.9
 
 ## Estado atual
 
@@ -169,6 +169,15 @@
   - **PROJECT_RULES.md** restaurado após corrupção acidental de newlines.
   - Módulos: `src/{encoding,file_io,editor/engine,app,app_workspace,app_editor_split,config,main}.rs`
   - **177 testes** unitários passando (`cargo test`).
+- **Revisão workspace/split/sessão (2026-06-09, branch `workspace-fase1`):**
+  - Split remapeado após **Ordenar abas** (`remap_editor_split_indices` por `session_id`).
+  - **Reinterpretar encoding** relê o arquivo do disco com a nova codificação.
+  - **Save** atualiza `fs_snapshot` e sincroniza aba ativa (menu deixa de marcar dirty após salvar).
+  - **Fechar aba** chama `on_tab_closed` + `after_close_tab` (split consistente).
+  - **CLI** reporta abertura bloqueada quando eviction exige salvar cauda dirty.
+  - Restauração usa **encoding/tabulacao por aba**; abas temporárias não aparecem dirty ao restaurar.
+  - `PendingFsCheck` usa `tab_id` (estável após reorder); caminhos normalizados na leitura do split; `content.tmp` escrita atômica.
+  - **178 testes** unitários passando (`cargo test`).
 
 ### Em andamento
 - **Fidelidade Turbo Vision:** `specs/to-do/SPEC-UX-FIDELIDADE-TURBO-VISION.md` (TV1–TV3 paleta/rodapé; demais itens TV8+).
