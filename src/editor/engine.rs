@@ -115,7 +115,15 @@ impl EditorEngine {
             return vec![String::new()];
         }
         (0..self.text.len_lines())
-            .map(|i| self.text.line(i).to_string())
+            .map(|i| {
+                let mut line = self.text.line(i).to_string();
+                // `RopeSlice::to_string()` pode incluir o `\n` interno; remover evita
+                // linhas em branco extras ao serializar com `join("\n")`.
+                while line.ends_with('\n') || line.ends_with('\r') {
+                    line.pop();
+                }
+                line
+            })
             .collect()
     }
 
@@ -1123,6 +1131,23 @@ mod tests {
     }
 
     #[test]
+    fn content_string_matches_joined_to_lines() {
+        for sample in [
+            "hello\nworld",
+            "hello\nworld\n",
+            "# t\n\nbody",
+            "a\n\nb\n\nc",
+        ] {
+            let mut e = EditorEngine::new();
+            e.load_text(sample);
+            assert_eq!(
+                e.content_string(),
+                e.to_lines().join("\n"),
+                "sample: {sample:?}"
+            );
+        }
+    }
+
     fn load_text_resets_viewport() {
         let mut e = EditorEngine::new();
         e.load_text("line0\nline1\nline2\nline3");

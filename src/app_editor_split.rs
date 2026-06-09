@@ -65,6 +65,7 @@ impl App {
         self.editor_split.focused_pane = pane;
         self.focus_tab(index);
         self.input_focus = InputFocus::Editor;
+        self.persist_user_config();
     }
 
     /// `Ctrl+1`: editor único ou foco no painel esquerdo.

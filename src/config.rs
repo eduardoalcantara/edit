@@ -142,8 +142,44 @@ pub struct ExibirConfig {
     pub margem: String,
     #[serde(default = "default_split_editor")]
     pub split_editor: String,
+    /// Legado: índice da aba no painel direito (preferir `split_right_caminho`).
     #[serde(default)]
     pub split_right_tab: Option<usize>,
+    /// Caminho do arquivo no editor esquerdo (ou único quando `split_editor` = off).
+    #[serde(default)]
+    pub split_left_caminho: Option<String>,
+    /// Caminho do arquivo no editor direito (split horizontal).
+    #[serde(default)]
+    pub split_right_caminho: Option<String>,
+    /// `esquerda` ou `direita` — painel com foco ao restaurar.
+    #[serde(default = "default_split_foco")]
+    pub split_foco: String,
+}
+
+fn default_split_foco() -> String {
+    "esquerda".to_string()
+}
+
+fn split_pane_to_str(pane: SplitPane) -> &'static str {
+    match pane {
+        SplitPane::Left => "esquerda",
+        SplitPane::Right => "direita",
+    }
+}
+
+fn split_pane_from_str(value: Option<&str>) -> SplitPane {
+    match value.map(str::trim).unwrap_or("esquerda").to_ascii_lowercase().as_str() {
+        "direita" | "right" => SplitPane::Right,
+        _ => SplitPane::Left,
+    }
+}
+
+fn tab_path_at(workspace: &crate::workspace::Workspace, index: usize) -> Option<String> {
+    workspace
+        .tabs
+        .get(index)
+        .and_then(|t| t.filepath())
+        .map(|p| crate::file_io::normalize_open_path(p).display().to_string())
 }
 
 fn default_split_editor() -> String {
@@ -204,7 +240,23 @@ pub fn config_from_view(
     tabulation: Tabulation,
     abas: AbasConfig,
     editor_split: &EditorSplit,
+    workspace: &crate::workspace::Workspace,
 ) -> EditConfig {
+    let (split_mode, split_left, split_right) = if editor_split.is_active() {
+        (
+            split_mode_to_str(editor_split.mode).to_string(),
+            tab_path_at(workspace, editor_split.left_tab),
+            editor_split
+                .right_tab
+                .and_then(|i| tab_path_at(workspace, i)),
+        )
+    } else {
+        (
+            split_mode_to_str(SplitMode::Off).to_string(),
+            tab_path_at(workspace, workspace.active_index),
+            None,
+        )
+    };
     EditConfig {
         version: CONFIG_VERSION,
         arquivo: ArquivoConfig {
@@ -235,12 +287,15 @@ pub fn config_from_view(
             colunas: guide_column_to_str(view.guide_column).to_string(),
             borda: border_to_str(view.border).to_string(),
             margem: margin_to_str(view.margin).to_string(),
-            split_editor: split_mode_to_str(editor_split.mode).to_string(),
+            split_editor: split_mode,
             split_right_tab: if editor_split.is_active() {
                 editor_split.right_tab
             } else {
                 None
             },
+            split_left_caminho: split_left,
+            split_right_caminho: split_right,
+            split_foco: split_pane_to_str(editor_split.focused_pane).to_string(),
         },
         formatar: FormatarConfig {
             codificacao: encoding_to_str(encoding).to_string(),
@@ -280,6 +335,9 @@ impl Default for EditConfig {
                 margem: "sem".to_string(),
                 split_editor: default_split_editor(),
                 split_right_tab: None,
+                split_left_caminho: None,
+                split_right_caminho: None,
+                split_foco: default_split_foco(),
             },
             formatar: FormatarConfig {
                 codificacao: encoding_to_str(FileEncoding::Utf8).to_string(),
@@ -349,18 +407,61 @@ impl EditConfig {
         }
     }
 
-    pub fn editor_split(&self) -> EditorSplit {
+    /// Restaura split e abas dos painéis a partir de caminhos persistidos em `edit.json`.
+    pub fn resolve_editor_split(&self, workspace: &crate::workspace::Workspace) -> EditorSplit {
+        let active = self
+            .arquivo
+            .abas
+            .indice_ativo
+            .min(workspace.tabs.len().saturating_sub(1));
+        let foco = split_pane_from_str(Some(&self.exibir.split_foco));
         let mode = split_mode_from_str(&self.exibir.split_editor);
-        EditorSplit {
-            mode,
-            left_tab: self.arquivo.abas.indice_ativo,
-            right_tab: if mode == SplitMode::Horizontal {
-                self.exibir.split_right_tab
-            } else {
-                None
-            },
-            focused_pane: SplitPane::Left,
+
+        let left_from_path = self
+            .exibir
+            .split_left_caminho
+            .as_ref()
+            .and_then(|s| workspace.find_open_path(Path::new(s)));
+        let left_tab = left_from_path.unwrap_or(active);
+
+        if mode != SplitMode::Horizontal || workspace.tabs.len() < 2 {
+            return EditorSplit {
+                mode: SplitMode::Off,
+                left_tab,
+                right_tab: None,
+                focused_pane: foco,
+            };
         }
+
+        let right_tab = self
+            .exibir
+            .split_right_caminho
+            .as_ref()
+            .and_then(|s| workspace.find_open_path(Path::new(s)))
+            .or_else(|| {
+                self.exibir
+                    .split_right_tab
+                    .filter(|&i| i < workspace.tabs.len())
+            });
+
+        let mut split = EditorSplit {
+            mode: SplitMode::Horizontal,
+            left_tab,
+            right_tab,
+            focused_pane: foco,
+        };
+        split.ensure_distinct_tabs();
+        if split.right_tab.is_none() {
+            let len = workspace.tabs.len();
+            let candidate = (split.left_tab + 1) % len;
+            if candidate != split.left_tab {
+                split.right_tab = Some(candidate);
+            } else {
+                split.mode = SplitMode::Off;
+                split.right_tab = None;
+            }
+        }
+        split
     }
 
     pub fn recent_paths(&self) -> Vec<PathBuf> {
@@ -384,6 +485,11 @@ impl EditConfig {
         self.arquivo.abas.sessao.clear();
         self.arquivo.abas.indice_ativo = 0;
         self.arquivo.abas.fechar_tudo_ao_sair = false;
+        self.exibir.split_editor = default_split_editor();
+        self.exibir.split_right_tab = None;
+        self.exibir.split_left_caminho = None;
+        self.exibir.split_right_caminho = None;
+        self.exibir.split_foco = default_split_foco();
     }
 }
 
@@ -663,6 +769,71 @@ mod tests {
 
         let _ = fs::remove_file(&legacy_file);
         let _ = fs::remove_dir(legacy_dir);
+    }
+
+    #[test]
+    fn resolve_editor_split_from_saved_paths() {
+        use crate::theme::ThemeId;
+        use crate::workspace::{create_tab_from_defaults, Workspace};
+
+        let dir = std::env::temp_dir().join(format!("edit-split-resolve-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let left = dir.join("left.md");
+        let right = dir.join("right.md");
+        fs::write(&left, "L").unwrap();
+        fs::write(&right, "R").unwrap();
+
+        let palette = ThemeId::ClassicBlue.palette();
+        let tab_l = create_tab_from_defaults(
+            &palette,
+            FileEncoding::Utf8,
+            Tabulation::Spaces4,
+            false,
+            "t-l".into(),
+            "left.md".into(),
+        );
+        let mut tab_l_doc = tab_l.document.clone();
+        tab_l_doc.set_opened("L".into(), left.clone());
+        let mut tab_l = tab_l;
+        tab_l.document = tab_l_doc;
+
+        let tab_r = create_tab_from_defaults(
+            &palette,
+            FileEncoding::Utf8,
+            Tabulation::Spaces4,
+            false,
+            "t-r".into(),
+            "right.md".into(),
+        );
+        let mut tab_r_doc = tab_r.document.clone();
+        tab_r_doc.set_opened("R".into(), right.clone());
+        let mut tab_r = tab_r;
+        tab_r.document = tab_r_doc;
+
+        let workspace = Workspace {
+            tabs: vec![tab_l, tab_r],
+            active_index: 0,
+            max_tabs: 10,
+            fechar_tudo_ao_sair: false,
+            salvar_desfazer_recentes: true,
+        };
+
+        let mut config = EditConfig::default();
+        config.exibir.split_editor = "horizontal".to_string();
+        config.exibir.split_left_caminho =
+            Some(crate::file_io::normalize_open_path(&left).display().to_string());
+        config.exibir.split_right_caminho =
+            Some(crate::file_io::normalize_open_path(&right).display().to_string());
+        config.exibir.split_foco = "direita".to_string();
+
+        let split = config.resolve_editor_split(&workspace);
+        assert!(split.is_active());
+        assert_eq!(split.left_tab, 0);
+        assert_eq!(split.right_tab, Some(1));
+        assert_eq!(split.focused_pane, SplitPane::Right);
+
+        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]

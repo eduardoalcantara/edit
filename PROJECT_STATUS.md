@@ -2,7 +2,7 @@
 
 **Autor:** Perplexity AI  
 **Data:** 2026-06-08  
-**Versão:** 3.7
+**Versão:** 3.8
 
 ## Estado atual
 
@@ -160,6 +160,15 @@
   - Higiene startup: `purge_orphans`; `purge_undo` por aba quando inválido.
   - Spec: `specs/done/SPEC-MULTPLOS-ARQUIVOS.md` (barra de abas visual descartada).
   - **166 testes** unitários passando (`cargo test`).
+- **Correções workspace, I/O e split (2026-06-09, branch `workspace-fase1`):**
+  - **Linhas em branco ao salvar/abrir:** `to_lines()` removia `\n` interno do ropey de forma inconsistente com `content_string()`; save passou a usar `content_string()`; normalização CRLF em `encoding.rs`.
+  - **Restauração de sessão + CLI:** `edit arquivo.md` restaura abas de `edit.json` e foca o arquivo pedido (sem duplicar aba existente).
+  - **Split persistido por caminho:** `exibir.split_left_caminho`, `split_right_caminho`, `split_foco` em `edit.json`; `resolve_editor_split()` remapeia abas na restauração.
+  - **CLI com 1–2 arquivos:** primeiro argumento → editor esquerdo; dois argumentos → split horizontal (esquerda/direita); demais abrem como abas.
+  - **Documento órfão:** corrigido flush de `app.document` stale sobre abas recém-abertas via CLI (`ensure_tab_for_path`, `open_cli_files`).
+  - **PROJECT_RULES.md** restaurado após corrupção acidental de newlines.
+  - Módulos: `src/{encoding,file_io,editor/engine,app,app_workspace,app_editor_split,config,main}.rs`
+  - **177 testes** unitários passando (`cargo test`).
 
 ### Em andamento
 - **Fidelidade Turbo Vision:** `specs/to-do/SPEC-UX-FIDELIDADE-TURBO-VISION.md` (TV1–TV3 paleta/rodapé; demais itens TV8+).

@@ -76,7 +76,7 @@ impl TerminalGuard {
 
 fn run_app(opts: &LaunchOptions) -> io::Result<()> {
     let (mut terminal, guard) = TerminalGuard::enter()?;
-    let mut app = App::new(guard.mouse_enabled, opts.files.is_empty());
+    let mut app = App::new(guard.mouse_enabled, true);
     app.open_cli_files(&opts.files);
 
     let result = app.run(&mut terminal);

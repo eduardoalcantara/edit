@@ -12,7 +12,7 @@ use crate::app_workspace::{
 };
 use crate::session::{purge_all, purge_orphans};
 use crate::config::{config_from_view, EditConfig};
-use crate::editor_split::EditorSplit;
+use crate::editor_split::{EditorSplit, SplitMode, SplitPane};
 use crate::document::Document;
 use crate::editor::Editor;
 use crate::encoding::{FileEncoding, Tabulation};
@@ -113,7 +113,7 @@ impl App {
             document,
             pending_fs_checks,
         } = workspace_from_config(&user_config, &palette, word_wrap, restore_session);
-        let mut editor_split = user_config.editor_split();
+        let mut editor_split = user_config.resolve_editor_split(&workspace);
         if editor_split.is_active() && !editor_split.can_activate(workspace.tabs.len()) {
             editor_split = EditorSplit::default();
         }
@@ -166,17 +166,28 @@ impl App {
         if app.view.terminal {
             app.ensure_terminal_session();
         }
+        if app.editor_split.is_active() {
+            let pane = app.editor_split.focused_pane;
+            let idx = app.editor_split.focused_tab();
+            if idx < app.workspace.tabs.len() {
+                app.focus_tab_unchecked(idx);
+                app.editor_split.focused_pane = pane;
+            }
+        } else if app.editor_split.left_tab < app.workspace.tabs.len()
+            && app.editor_split.left_tab != app.workspace.active_index
+        {
+            app.focus_tab_unchecked(app.editor_split.left_tab);
+        }
         app
     }
 
-    /// Abre arquivos passados na linha de comando (primeiro argumento = aba ativa no topo).
+    /// Abre arquivos da linha de comando nos painéis do editor (até 2 nos split).
     pub fn open_cli_files(&mut self, files: &[PathBuf]) {
         if files.is_empty() {
             return;
         }
 
         self.pending_fs_checks.clear();
-        self.sync_active_tab();
         if self.workspace.tabs.len() == 1
             && self.workspace.tabs[0].filepath().is_none()
             && self.active_tab_is_pristine()
@@ -184,23 +195,75 @@ impl App {
             let removed = self.workspace.remove_tab_at(0);
             let _ = crate::session::purge_tab(&removed.session_id);
         }
+        if self.workspace.tabs.is_empty() {
+            let encoding = self.document.encoding;
+            let tabulation = self.document.tabulation;
+            self.document = crate::document::Document::new();
+            self.document.encoding = encoding;
+            self.document.tabulation = tabulation;
+            self.editor.clear();
+        } else {
+            let idx = self
+                .workspace
+                .active_index
+                .min(self.workspace.tabs.len().saturating_sub(1));
+            self.focus_tab_unchecked(idx);
+        }
 
-        let mut opened = 0usize;
-        for path in files.iter().rev() {
-            let path = cli::canonicalize_open_path(path);
-            if !path.is_file() {
-                self.set_status(format!("Arquivo não encontrado: {}", path.display()));
-                continue;
+        let cli_files: Vec<PathBuf> = files
+            .iter()
+            .map(|p| cli::canonicalize_open_path(p))
+            .collect();
+        let valid: Vec<PathBuf> = cli_files.into_iter().filter(|p| p.is_file()).collect();
+        if valid.is_empty() {
+            self.set_status("Nenhum arquivo válido na linha de comando");
+            self.refresh_menu();
+            return;
+        }
+
+        let pane_paths: Vec<PathBuf> = valid.iter().take(2).cloned().collect();
+        for path in pane_paths.iter().rev() {
+            let _ = self.ensure_tab_for_path(path.clone());
+        }
+        let pane_indices: Vec<usize> = pane_paths
+            .iter()
+            .filter_map(|p| {
+                let norm = crate::file_io::normalize_open_path(p);
+                self.workspace.find_open_path(&norm)
+            })
+            .collect();
+
+        for path in valid.iter().skip(2).rev() {
+            self.open_path_impl(path.clone());
+        }
+
+        match pane_indices.len() {
+            0 => {}
+            1 => {
+                let idx = pane_indices[0];
+                if self.editor_split.is_active() {
+                    self.editor_split
+                        .set_pane_tab(self.editor_split.focused_pane, idx);
+                }
+                self.focus_tab_unchecked(idx);
             }
-            self.open_path_impl(path);
-            opened += 1;
+            2 => {
+                self.editor_split.mode = SplitMode::Horizontal;
+                self.editor_split.left_tab = pane_indices[0];
+                self.editor_split.right_tab = Some(pane_indices[1]);
+                self.editor_split.focused_pane = SplitPane::Left;
+                self.editor_split.ensure_distinct_tabs();
+                self.focus_tab_unchecked(pane_indices[0]);
+            }
+            _ => {}
         }
 
-        if opened == 0 && self.workspace.tabs.is_empty() {
+        if pane_indices.is_empty() && self.workspace.tabs.is_empty() {
             self.create_new_tab_at_top();
-        } else if opened > 0 {
-            self.set_status(format!("{opened} arquivo(s) aberto(s)"));
+        } else {
+            self.set_status(format!("{} arquivo(s) na linha de comando", valid.len()));
         }
+        self.persist_user_config();
         self.refresh_menu();
     }
 
@@ -221,6 +284,7 @@ impl App {
             self.document.tabulation,
             self.build_abas_config(),
             &self.editor_split,
+            &self.workspace,
         );
         self.user_config.arquivo.ultimo_diretorio = ultimo;
         self.user_config.arquivo.mostrar_ocultos = ocultos;
@@ -694,9 +758,8 @@ impl App {
             return;
         }
 
-        let lines = self.editor.lines();
         let content = self.editor.content_string();
-        match file_io::write_lines_encoded(&path, &lines, self.document.encoding) {
+        match file_io::write_content_encoded(&path, &content, self.document.encoding) {
             Ok(()) => {
                 self.document.mark_saved(content, path.clone());
                 self.note_recent_file(path.clone());

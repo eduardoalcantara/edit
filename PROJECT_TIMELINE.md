@@ -161,6 +161,6 @@
   - Módulos: `src/modal/{text_input,find_replace,go_to_line,form_controls}.rs`, `src/editor/{search,render,engine}.rs`, `src/ui/compositor.rs`
   - Spec: `specs/done/SPEC-MODAL-TEXT-INPUT-BUSCA.md`
   - Testes: **157** total (`cargo test`); branch **`editor-split`**
-- 2026-06-09 — **Workspace fase 1 completa** — undo por aba + persistência sessão; detecção FS externo; higiene `.edit-session/`; spec múltiplos arquivos em `done/` (barra de abas descartada).
-  - Módulos: `src/editor/history.rs`, `src/session/store.rs`, `src/app_workspace.rs`, `src/workspace/tab.rs`, `src/modal/mod.rs`
-  - Testes: **166** total (`cargo test`); branch **`workspace-fase1`**
+- 2026-06-09 — **Correções workspace, I/O, split e CLI** — `to_lines()`/`content_string()` alinhados; save via `content_string`; CRLF normalizado; sessão sempre restaurada + CLI nos painéis; split por caminho em `edit.json`; anti-duplicação de abas; fix documento órfão na CLI.
+  - Módulos: `src/{encoding,file_io,editor/engine,app,app_workspace,app_editor_split,config,main}.rs`, `PROJECT_RULES.md`
+  - Testes: **177** total (`cargo test`); docs STATUS **v3.8**

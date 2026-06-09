@@ -434,6 +434,37 @@ impl App {
         self.open_path_impl(path);
     }
 
+    /// Garante aba para o caminho (abre se necessário) sem focar nem alterar painéis do split.
+    pub(crate) fn ensure_tab_for_path(&mut self, path: PathBuf) -> Option<usize> {
+        let path = crate::file_io::normalize_open_path(&path);
+        if !path.is_file() {
+            return None;
+        }
+        if let Some(index) = self.workspace.find_open_path(&path) {
+            return Some(index);
+        }
+
+        if self.workspace.needs_eviction() {
+            match self.workspace.prepare_open_path(&path) {
+                crate::workspace::WorkspaceAction::PromptSaveRequired { .. } => {
+                    return None;
+                }
+                _ => {}
+            }
+            self.evict_tail_silent();
+        }
+
+        match crate::file_io::read_lines_encoded(&path, self.document.encoding) {
+            Ok(lines) => {
+                let tab = self.tab_from_opened_path(&path, lines);
+                self.workspace.insert_tab_at_top(tab);
+                self.on_tab_count_changed();
+                self.workspace.find_open_path(&path)
+            }
+            Err(_) => None,
+        }
+    }
+
     pub(crate) fn open_path_impl(&mut self, path: PathBuf) {
         let path = crate::file_io::normalize_open_path(&path);
         if let Some(index) = self.workspace.find_open_path(&path) {
@@ -816,9 +847,10 @@ pub fn workspace_from_config(
                         if drift == FsDrift::ModifiedExternally {
                             pending_fs_checks.push(PendingFsCheck::ReloadExternal { tab_index });
                         }
-                        let disk_content = lines.join("\n");
-                        let editor_content =
-                            session_editor_content(&entry.tab_id, &disk_content);
+                        let disk_content = crate::encoding::normalize_newlines(&lines.join("\n"));
+                        let editor_content = crate::encoding::normalize_newlines(
+                            &session_editor_content(&entry.tab_id, &disk_content),
+                        );
                         let mut document = Document::new();
                         document.encoding = user_config.default_encoding();
                         document.tabulation = user_config.default_tabulation();
@@ -943,8 +975,41 @@ pub fn workspace_from_config(
 mod tests {
     use super::*;
     use crate::app::App;
-    use crate::config::{AbasConfig, EditConfig, SessaoTabEntry};
+    use crate::config::{
+        clear_config_path_override, set_config_path_for_tests, AbasConfig, EditConfig,
+        SessaoTabEntry,
+    };
     use crate::theme::ThemeId;
+    use std::path::PathBuf;
+    use std::sync::{Mutex, MutexGuard};
+
+    static APP_TEST_LOCK: Mutex<()> = Mutex::new(());
+
+    struct IsolatedConfigGuard {
+        _lock: MutexGuard<'static, ()>,
+        path: PathBuf,
+    }
+
+    impl IsolatedConfigGuard {
+        fn new(name: &str) -> Self {
+            let lock = APP_TEST_LOCK.lock().unwrap();
+            let path = std::env::temp_dir().join(format!(
+                "edit-app-test-{name}-{}.json",
+                std::process::id()
+            ));
+            let _ = std::fs::remove_file(&path);
+            set_config_path_for_tests(path.clone());
+            EditConfig::default().save().unwrap();
+            Self { _lock: lock, path }
+        }
+    }
+
+    impl Drop for IsolatedConfigGuard {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_file(&self.path);
+            clear_config_path_override();
+        }
+    }
 
     fn sample_config(fechar_tudo_ao_sair: bool, sessao: Vec<SessaoTabEntry>) -> EditConfig {
         let mut config = EditConfig::default();
@@ -982,6 +1047,7 @@ mod tests {
 
     #[test]
     fn sync_active_tab_preserves_app_editor_content() {
+        let _guard = IsolatedConfigGuard::new("sync-active");
         let mut app = App::new(false, true);
         app.editor.replace_content("# README\n\nConteúdo editado");
         app.sync_active_tab();
@@ -997,6 +1063,7 @@ mod tests {
 
     #[test]
     fn saved_cursor_position_roundtrips_without_drift() {
+        let _guard = IsolatedConfigGuard::new("cursor-roundtrip");
         let mut app = App::new(false, true);
         app.editor.set_cursor(0, 0);
         app.sync_active_tab();
@@ -1013,6 +1080,7 @@ mod tests {
 
     #[test]
     fn history_survives_tab_switch_via_app() {
+        let _guard = IsolatedConfigGuard::new("history-switch");
         let mut app = App::new(false, true);
         app.editor.paste("z");
         app.sync_active_tab();
@@ -1144,20 +1212,21 @@ mod tests {
     }
 
     #[test]
-    #[test]
     fn cli_open_loads_file_content_into_editor() {
+        let _guard = IsolatedConfigGuard::new("cli-open");
         let path =
             std::env::temp_dir().join(format!("edit-cli-open-{}.txt", std::process::id()));
         std::fs::write(&path, "conteudo cli").unwrap();
 
-        let mut app = App::new(false, false);
+        let mut app = App::new(false, true);
         app.open_cli_files(&[path.clone()]);
         assert_eq!(app.editor_text_for_test(), "conteudo cli");
         assert!(app.workspace.tabs[0].filepath().is_some());
         let _ = std::fs::remove_file(path);
     }
 
-    fn cli_skips_session_restore() {
+    #[test]
+    fn restore_session_flag_controls_workspace_bootstrap() {
         let config = sample_config(
             false,
             vec![SessaoTabEntry {
@@ -1174,7 +1243,90 @@ mod tests {
             }],
         );
         let palette = ThemeId::ClassicBlue.palette();
-        let boot = workspace_from_config(&config, &palette, false, false);
-        assert_eq!(boot.workspace.tabs[0].display_name, "Novo");
+        let boot = workspace_from_config(&config, &palette, false, true);
+        assert_eq!(boot.workspace.tabs[0].display_name, "Antigo");
+        let boot_off = workspace_from_config(&config, &palette, false, false);
+        assert_eq!(boot_off.workspace.tabs[0].display_name, "Novo");
+    }
+
+    #[test]
+    fn cli_two_files_open_in_split_editors() {
+        let _guard = IsolatedConfigGuard::new("cli-split");
+        let dir = std::env::temp_dir().join(format!("edit-cli-split-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let a = dir.join("a.txt");
+        let b = dir.join("b.txt");
+        std::fs::write(&a, "alfa").unwrap();
+        std::fs::write(&b, "beta").unwrap();
+
+        let mut app = App::new(false, false);
+        app.open_cli_files(&[a.clone(), b.clone()]);
+        assert!(app.editor_split.is_active());
+        let idx_a = app.workspace.find_open_path(&a).unwrap();
+        let idx_b = app.workspace.find_open_path(&b).unwrap();
+        assert_eq!(app.editor_split.left_tab, idx_a);
+        assert_eq!(app.editor_split.right_tab, Some(idx_b));
+        assert_ne!(idx_a, idx_b);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn cli_reuses_existing_tab_without_duplicate() {
+        let _guard = IsolatedConfigGuard::new("cli-dup");
+        let dir = std::env::temp_dir().join(format!("edit-cli-dup-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("dup.txt");
+        std::fs::write(&file, "x").unwrap();
+
+        let mut app = App::new(false, false);
+        app.open_cli_files(&[file.clone()]);
+        let count_after_first = app.workspace.tabs.len();
+        app.open_cli_files(&[file.clone()]);
+        assert_eq!(app.workspace.tabs.len(), count_after_first);
+        assert_eq!(
+            app.workspace
+                .tabs
+                .iter()
+                .filter(|t| t
+                    .filepath()
+                    .is_some_and(|p| crate::file_io::same_file_path(p, &file)))
+                .count(),
+            1
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn cli_keeps_existing_workspace_tabs_when_opening_file() {
+        let _guard = IsolatedConfigGuard::new("cli-keep");
+        let path =
+            std::env::temp_dir().join(format!("edit-cli-keep-{}.txt", std::process::id()));
+        std::fs::write(&path, "arquivo cli").unwrap();
+
+        let mut app = App::new(false, false);
+        let tab_b = create_tab_from_defaults(
+            &ThemeId::ClassicBlue.palette(),
+            app.user_config().default_encoding(),
+            app.user_config().default_tabulation(),
+            false,
+            new_session_id(),
+            "Outra".to_string(),
+        );
+        app.workspace.tabs.push(tab_b);
+
+        app.open_cli_files(&[path.clone()]);
+        assert_eq!(app.workspace.tabs.len(), 3);
+        assert_eq!(app.workspace.active_index, 0);
+        assert!(app.workspace.find_open_path(&path).is_some());
+        assert!(
+            app.workspace
+                .tabs
+                .iter()
+                .any(|t| t.display_name == "Outra")
+        );
+        assert_eq!(app.editor_text_for_test(), "arquivo cli");
+        let _ = std::fs::remove_file(path);
     }
 }

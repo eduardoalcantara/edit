@@ -1,6 +1,8 @@
 use std::path::{Path, PathBuf};
 
-use crate::encoding::{read_with_encoding, write_with_encoding, FileEncoding};
+use crate::encoding::{
+    read_with_encoding, write_text_with_encoding, write_with_encoding, FileEncoding,
+};
 
 pub fn read_lines(path: &Path) -> std::io::Result<Vec<String>> {
     read_with_encoding(path, FileEncoding::Utf8)
@@ -16,6 +18,10 @@ pub fn write_lines(path: &Path, lines: &[String]) -> std::io::Result<()> {
 
 pub fn write_lines_encoded(path: &Path, lines: &[String], enc: FileEncoding) -> std::io::Result<()> {
     write_with_encoding(path, lines, enc)
+}
+
+pub fn write_content_encoded(path: &Path, content: &str, enc: FileEncoding) -> std::io::Result<()> {
+    write_text_with_encoding(path, content, enc)
 }
 
 pub fn path_exists(path: &Path) -> bool {
@@ -88,6 +94,31 @@ mod tests {
         let via_dir = dir.join("./sample.txt");
         assert!(same_file_path(&file_path, &via_dir));
 
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn save_content_round_trip_via_editor_matches_disk() {
+        use crate::editor::Editor;
+        use crate::theme::ThemeId;
+
+        let dir = std::env::temp_dir().join(format!("edit-save-rt-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).expect("mkdir");
+        let path = dir.join("doc.txt");
+        let palette = ThemeId::ClassicBlue.palette();
+        let original = "alfa\n\nbeta\ngamma";
+        write_content_encoded(&path, original, FileEncoding::Utf8).unwrap();
+
+        for _ in 0..3 {
+            let lines = read_lines_encoded(&path, FileEncoding::Utf8).unwrap();
+            let mut editor = Editor::new(&palette);
+            editor.set_lines(lines);
+            write_content_encoded(&path, &editor.content_string(), FileEncoding::Utf8).unwrap();
+        }
+
+        let final_lines = read_lines_encoded(&path, FileEncoding::Utf8).unwrap();
+        assert_eq!(final_lines.join("\n"), original);
         let _ = fs::remove_dir_all(&dir);
     }
 

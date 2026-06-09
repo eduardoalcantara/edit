@@ -101,9 +101,14 @@ impl Tabulation {
     }
 }
 
+/// Converte `\r\n` e `\r` solto em `\n` para round-trip estável no Windows.
+pub fn normalize_newlines(text: &str) -> String {
+    text.replace("\r\n", "\n").replace('\r', "\n")
+}
+
 pub fn read_with_encoding(path: &std::path::Path, enc: FileEncoding) -> std::io::Result<Vec<String>> {
     let bytes = std::fs::read(path)?;
-    let content = decode_bytes(&bytes, enc)?;
+    let content = normalize_newlines(&decode_bytes(&bytes, enc)?);
     if content.is_empty() {
         return Ok(vec![String::new()]);
     }
@@ -115,7 +120,15 @@ pub fn write_with_encoding(
     lines: &[String],
     enc: FileEncoding,
 ) -> std::io::Result<()> {
-    let text = lines.join("\n");
+    write_text_with_encoding(path, &lines.join("\n"), enc)
+}
+
+pub fn write_text_with_encoding(
+    path: &std::path::Path,
+    text: &str,
+    enc: FileEncoding,
+) -> std::io::Result<()> {
+    let text = normalize_newlines(text);
     let bytes = encode_text(&text, enc)?;
     std::fs::write(path, bytes)
 }
@@ -149,6 +162,54 @@ fn decode_utf16(bytes: &[u8], le: bool) -> std::io::Result<String> {
         })
         .collect();
     String::from_utf16(&u16s).map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn normalize_newlines_strips_cr() {
+        assert_eq!(normalize_newlines("a\r\nb\rc"), "a\nb\nc");
+    }
+
+    #[test]
+    fn read_write_round_trip_preserves_line_count() {
+        let dir = std::env::temp_dir().join(format!("edit-io-rt-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("sample.md");
+        let original = "# Título\n\nParágrafo\nLinha final";
+        write_text_with_encoding(&path, original, FileEncoding::Utf8).unwrap();
+        let initial = read_with_encoding(&path, FileEncoding::Utf8).unwrap();
+        for _ in 0..3 {
+            let lines = read_with_encoding(&path, FileEncoding::Utf8).unwrap();
+            write_text_with_encoding(&path, &lines.join("\n"), FileEncoding::Utf8).unwrap();
+        }
+        let final_lines = read_with_encoding(&path, FileEncoding::Utf8).unwrap();
+        assert_eq!(final_lines.len(), initial.len());
+        assert_eq!(
+            final_lines.join("\n"),
+            normalize_newlines(original),
+            "conteúdo deve permanecer estável após ciclos save/load"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn crlf_on_disk_normalizes_without_blank_line_growth() {
+        let dir = std::env::temp_dir().join(format!("edit-crlf-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("crlf.txt");
+        std::fs::write(&path, b"linha1\r\nlinha2\r\n").unwrap();
+        let lines = read_with_encoding(&path, FileEncoding::Utf8).unwrap();
+        assert_eq!(lines, vec!["linha1".to_string(), "linha2".to_string()]);
+        write_text_with_encoding(&path, &lines.join("\n"), FileEncoding::Utf8).unwrap();
+        let again = read_with_encoding(&path, FileEncoding::Utf8).unwrap();
+        assert_eq!(again.len(), 2);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }
 
 fn encode_text(text: &str, enc: FileEncoding) -> std::io::Result<Vec<u8>> {

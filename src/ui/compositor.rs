@@ -485,7 +485,7 @@ mod tests {
 
     #[test]
     fn footer_includes_tab_indicator() {
-        let app = App::new(false, true);
+        let app = App::new(false, false);
         let status = footer_status_right(&app);
         assert!(status.contains("Aba 1/1"));
     }
