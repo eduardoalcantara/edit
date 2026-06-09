@@ -1,8 +1,9 @@
 # SPEC — Editor split view (duas abas visíveis)
 
-**Status:** to-do  
+**Status:** done  
 **Data:** 2026-06-08  
-**Prioridade:** após fase 2 de `SPEC-MULTPLOS-ARQUIVOS.md` (barra de abas visual)  
+**Implementado:** 2026-06-08 (branch `editor-split`)  
+**Atalhos PO:** `Ctrl+1` (único/esquerda), `Ctrl+2` (split/direita) — em vez de `Ctrl+E` do rascunho inicial  
 **Relacionado:** `PROJECT_RULES.md`, `SPEC-MULTPLOS-ARQUIVOS.md`, `SPEC-UX-FIDELIDADE-TURBO-VISION.md`, `src/workspace/`, `src/ui/layout.rs`, `src/ui/layers/editor.rs`
 
 ---
@@ -53,7 +54,7 @@ Regra: **a mesma aba não pode ocupar os dois painéis** ao mesmo tempo.
 ### 4.1. Ativação
 
 - Menu **Exibir** → **Dividir editor** (toggle) ou submenu **Horizontal**.
-- Atalho sugerido: submenu **Exibir → Dividir editor** (toggle horizontal); **`Ctrl+E` reservado para foco no editor** (ver `PROJECT_RULES.md`).
+- Atalho: menu **Exibir → Dividir editor** (toggle); **`Ctrl+1`** / **`Ctrl+2`** (ver `PROJECT_RULES.md`).
 - Ao ativar com uma aba: painel esquerdo = aba ativa; direito = próxima aba na lista ou vazio com prompt “Selecione aba…”.
 
 ### 4.2. Foco
@@ -179,4 +180,4 @@ Estimativa: **1–2 semanas** (MVP); +1 semana com persistência e polish TV.
 
 | Data | Nota |
 |------|------|
-| 2026-06-08 | Rascunho inicial (discussão PO + referência Turbo C++ tiled windows). |
+| 2026-06-08 | Implementado MVP: split 50/50, borda dupla, Ctrl+1/Ctrl+2, persistência `edit.json`. |

@@ -116,12 +116,36 @@ pub fn render_editor_frame(
     border_visible: bool,
     terminal_block: Option<u16>,
 ) -> Rect {
+    render_editor_frame_with_border(
+        frame,
+        outer,
+        title,
+        fill,
+        border_style,
+        title_style,
+        border_visible,
+        terminal_block,
+        PanelBorder::Plain,
+    )
+}
+
+pub fn render_editor_frame_with_border(
+    frame: &mut Frame,
+    outer: Rect,
+    title: &str,
+    fill: Style,
+    border_style: Style,
+    title_style: Style,
+    border_visible: bool,
+    terminal_block: Option<u16>,
+    panel_border: PanelBorder,
+) -> Rect {
     if outer.width == 0 || outer.height == 0 {
         return outer;
     }
 
     fill_rect(frame, outer, fill);
-    let c = PanelBorder::Plain.chars();
+    let c = panel_border.chars();
 
     if border_visible {
         render_titled_top_row(

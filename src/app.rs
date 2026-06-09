@@ -9,6 +9,7 @@ use crate::cli;
 use crate::clipboard::Clipboard;
 use crate::app_workspace::{workspace_from_config, AfterDirtyResolved, DirtyFlow};
 use crate::config::{config_from_view, EditConfig};
+use crate::editor_split::EditorSplit;
 use crate::document::Document;
 use crate::editor::Editor;
 use crate::encoding::{FileEncoding, Tabulation};
@@ -17,7 +18,10 @@ use crate::events;
 use crate::file_io;
 use crate::memory::MemoryMonitor;
 use crate::menus::{ActionId, MenuBar, MenuState};
-use crate::modal::{ConfirmKind, DialogButtonAction, FileBrowserMode, HelpKind, Modal, PathInputKind};
+use crate::modal::{
+    ConfirmKind, DialogButtonAction, FileBrowserMode, FindReplaceCommand, GoToLineCommand,
+    HelpKind, Modal, PathInputKind,
+};
 use crate::recent::RecentFiles;
 use crate::theme::ThemeId;
 use crate::ui;
@@ -49,6 +53,7 @@ pub struct App {
     pub last_frame_height: u16,
     pub memory: MemoryMonitor,
     pub workspace: Workspace,
+    pub editor_split: EditorSplit,
     pub terminal: TerminalWorkspace,
     pub dirty_flow: Option<DirtyFlow>,
     pub pending_dirty_save: Option<(usize, PromptReason)>,
@@ -90,6 +95,10 @@ impl App {
         };
         let (workspace, editor, document) =
             workspace_from_config(&user_config, &palette, word_wrap);
+        let mut editor_split = user_config.editor_split();
+        if editor_split.is_active() && !editor_split.can_activate(workspace.tabs.len()) {
+            editor_split = EditorSplit::default();
+        }
         let mut editor = editor;
         let document = document;
         editor.set_tabulation(document.tabulation);
@@ -110,6 +119,7 @@ impl App {
                 Tabulation::Spaces4,
                 &Clipboard::default(),
                 &workspace,
+                editor_split.is_active(),
             ),
             menu_state: MenuState::default(),
             find_pattern: String::new(),
@@ -124,6 +134,7 @@ impl App {
             last_frame_height: 24,
             memory: MemoryMonitor::new(),
             workspace,
+            editor_split,
             terminal: TerminalWorkspace::default(),
             dirty_flow: None,
             pending_dirty_save: None,
@@ -182,6 +193,7 @@ impl App {
             self.document.encoding,
             self.document.tabulation,
             self.build_abas_config(),
+            &self.editor_split,
         );
         self.user_config.arquivo.ultimo_diretorio = ultimo;
         self.user_config.arquivo.mostrar_ocultos = ocultos;
@@ -202,16 +214,28 @@ impl App {
             self.document.tabulation,
             &self.clipboard,
             &self.workspace,
+            self.split_active(),
         );
     }
 
     pub fn document_title(&self) -> String {
-        let mut title = if self.document.path().is_some() {
-            self.document.title()
-        } else {
-            self.workspace.active_tab().display_name.clone()
+        self.tab_pane_title(Some(self.workspace.active_index))
+    }
+
+    pub fn tab_pane_title(&self, tab_index: Option<usize>) -> String {
+        let Some(index) = tab_index else {
+            return "Selecione aba…".to_string();
         };
-        if self.is_dirty() {
+        if index >= self.workspace.tabs.len() {
+            return "Selecione aba…".to_string();
+        }
+        let tab = &self.workspace.tabs[index];
+        let mut title = if tab.document.path().is_some() {
+            tab.document.title()
+        } else {
+            tab.display_name.clone()
+        };
+        if tab.is_dirty() {
             title.push('*');
         }
         title
@@ -798,7 +822,7 @@ impl App {
             .get(modal.list_cursor)
             .is_some_and(|e| e.kind == FileEntryKind::File);
 
-        if modal.name_input.trim().is_empty() && !has_file_selection {
+        if modal.name_input.text().trim().is_empty() && !has_file_selection {
             self.set_status("Informe um nome de arquivo");
             return;
         }
@@ -814,7 +838,7 @@ impl App {
         }
 
         let show_hidden = modal.show_hidden;
-        let filter = modal.filter_input.clone();
+        let filter = modal.filter_input.text().to_string();
         let dir = modal.current_dir.clone();
         self.modal = Modal::None;
 
@@ -860,35 +884,99 @@ impl App {
         self.modal = Modal::None;
     }
 
-    pub fn submit_find(&mut self) {
-        let Some((pattern, replacement, replace_mode)) = self.take_find_input() else {
+    pub fn has_active_search(&self) -> bool {
+        !self.find_pattern.is_empty() || !self.editor.search_pattern().is_empty()
+    }
+
+    pub fn clear_search(&mut self) {
+        self.find_pattern.clear();
+        self.editor.set_search_pattern("");
+        if let Modal::Find(modal) = &mut self.modal {
+            modal.pattern.clear();
+            modal.replacement.clear();
+            modal.focus = crate::modal::find_replace::FindReplaceFocus::Pattern;
+        }
+        self.set_status("Busca limpa");
+    }
+
+    pub fn apply_find_command(&mut self, cmd: FindReplaceCommand) {
+        if matches!(cmd, FindReplaceCommand::Clear) {
+            self.clear_search();
             return;
-        };
-        self.find_pattern = pattern.clone();
-        self.editor.set_search_pattern(&pattern);
-        if pattern.is_empty() {
-            self.set_status("Padrão vazio");
+        }
+        if matches!(cmd, FindReplaceCommand::Close) {
             self.modal = Modal::None;
             return;
         }
-        if replace_mode {
-            if self.editor.replace_one(&replacement) {
-                self.set_status("Substituído");
-            } else {
-                self.set_status("Nenhuma ocorrência");
-            }
-        } else if self.editor.find_next() {
-            self.set_status(format!("Busca: {pattern}"));
-        } else {
-            self.set_status("Não encontrado");
-        }
-        self.modal = Modal::None;
-    }
 
-    pub fn submit_go_to_line(&mut self) {
-        let Some((line_text, col_text)) = self.take_go_to_line_input() else {
+        let Modal::Find(modal) = &self.modal else {
             return;
         };
+        let pattern = modal.pattern.text().to_string();
+        let replacement = modal.replacement.text().to_string();
+
+        if pattern.is_empty() {
+            self.set_status("Padrão vazio");
+            return;
+        }
+
+        self.find_pattern = pattern;
+        self.editor.set_search_pattern(&self.find_pattern);
+
+        let status = match cmd {
+            FindReplaceCommand::FindNext => {
+                if self.editor.find_next() {
+                    "Próximo"
+                } else {
+                    "Fim da busca"
+                }
+            }
+            FindReplaceCommand::FindPrev => {
+                if self.editor.find_prev() {
+                    "Anterior"
+                } else {
+                    "Início da busca"
+                }
+            }
+            FindReplaceCommand::FindFirst => {
+                if self.editor.find_first() {
+                    "Primeiro"
+                } else {
+                    "Não encontrado"
+                }
+            }
+            FindReplaceCommand::FindLast => {
+                if self.editor.find_last() {
+                    "Último"
+                } else {
+                    "Não encontrado"
+                }
+            }
+            FindReplaceCommand::ReplaceNext => {
+                if self.editor.find_next() && self.editor.replace_one(&replacement) {
+                    "Substituído"
+                } else {
+                    "Nenhuma ocorrência"
+                }
+            }
+            FindReplaceCommand::ReplaceAll => {
+                let count = self.editor.replace_all(&replacement);
+                if count > 0 {
+                    return self.set_status(format!("{count} substituída(s)"));
+                }
+                "Nenhuma ocorrência"
+            }
+            FindReplaceCommand::Clear | FindReplaceCommand::Close => unreachable!(),
+        };
+        self.set_status(status);
+    }
+
+    pub fn apply_go_to_line(&mut self) {
+        let Modal::GoToLine(modal) = &self.modal else {
+            return;
+        };
+        let line_text = modal.line.text().to_string();
+        let col_text = modal.col.text().to_string();
         let line_num = line_text.trim().parse::<usize>().unwrap_or(0);
         if line_num == 0 {
             self.set_status("Número de linha inválido");
@@ -910,9 +998,16 @@ impl App {
         self.set_status(format!("Linha {line_num}"));
     }
 
-    pub fn find_next(&mut self) {
+    pub fn apply_go_to_line_command(&mut self, cmd: GoToLineCommand) {
+        match cmd {
+            GoToLineCommand::Go => self.apply_go_to_line(),
+            GoToLineCommand::Close => self.modal = Modal::None,
+        }
+    }
+
+    pub fn request_find_next(&mut self) {
         if self.find_pattern.is_empty() {
-            self.set_status("Defina um padrão com Ctrl+F");
+            self.modal = Modal::find("Buscar", &self.find_pattern);
             return;
         }
         self.editor.set_search_pattern(&self.find_pattern);
@@ -935,32 +1030,7 @@ impl App {
 
     fn take_path_input(&mut self) -> Option<(String, PathInputKind)> {
         match std::mem::replace(&mut self.modal, Modal::None) {
-            Modal::PathInput { input, kind, .. } => Some((input, kind)),
-            other => {
-                self.modal = other;
-                None
-            }
-        }
-    }
-
-    fn take_go_to_line_input(&mut self) -> Option<(String, String)> {
-        match std::mem::replace(&mut self.modal, Modal::None) {
-            Modal::GoToLine { line, col, .. } => Some((line, col)),
-            other => {
-                self.modal = other;
-                None
-            }
-        }
-    }
-
-    fn take_find_input(&mut self) -> Option<(String, String, bool)> {
-        match std::mem::replace(&mut self.modal, Modal::None) {
-            Modal::Find {
-                pattern,
-                replacement,
-                replace_mode,
-                ..
-            } => Some((pattern, replacement, replace_mode)),
+            Modal::PathInput { input, kind, .. } => Some((input.text().to_string(), kind)),
             other => {
                 self.modal = other;
                 None
@@ -1166,6 +1236,7 @@ impl App {
                     EditorBorder::Hidden => "Borda: invisível",
                 });
             }
+            ActionId::ToggleSplitEditor => self.toggle_editor_split(),
             ActionId::EncodingUtf8 => self.set_encoding(FileEncoding::Utf8),
             ActionId::EncodingUtf8NoBom => self.set_encoding(FileEncoding::Utf8NoBom),
             ActionId::EncodingUtf16Le => self.set_encoding(FileEncoding::Utf16Le),
@@ -1280,5 +1351,6 @@ fn is_persistent_setting(action: ActionId) -> bool {
             | ActionId::MarginOneLine
             | ActionId::MarginTwoLines
             | ActionId::BorderToggle
+            | ActionId::ToggleSplitEditor
     )
 }

@@ -60,6 +60,7 @@ pub fn draw(
     show_cursor: bool,
     show_tabs: bool,
     show_line_numbers: bool,
+    pane_border: panel::PanelBorder,
 ) -> (Rect, Rect) {
     let border_style = Style::default()
         .fg(palette.border)
@@ -69,7 +70,7 @@ pub fn draw(
         .bg(palette.editor_bg)
         .add_modifier(Modifier::BOLD);
 
-    let inner = panel::render_editor_frame(
+    let inner = panel::render_editor_frame_with_border(
         frame,
         area,
         title,
@@ -78,6 +79,7 @@ pub fn draw(
         title_style,
         border == EditorBorder::Visible,
         terminal_block,
+        pane_border,
     );
     let content = text_viewport.unwrap_or_else(|| text_area(inner, margin));
 
@@ -108,6 +110,12 @@ pub fn draw(
         engine.viewport.top_line
     };
     let left = if word_wrap { 0 } else { engine.viewport.left_col };
+
+    if !engine.search_pattern.is_empty() {
+        engine.rebuild_search_match_positions();
+    } else {
+        engine.search_match_positions.clear();
+    }
 
     if let Some(gutter) = gutter_layout {
         line_numbers::paint_gutter(
@@ -154,6 +162,7 @@ pub fn draw(
                 &display,
                 tab_width,
                 palette,
+                &engine.search_match_positions,
             );
             frame.render_widget(Paragraph::new(Line::from(spans)), line_area);
         } else {
@@ -178,6 +187,7 @@ pub fn draw(
                 &display,
                 tab_width,
                 palette,
+                &engine.search_match_positions,
             );
             frame.render_widget(Paragraph::new(Line::from(spans)), line_area);
         }
@@ -207,10 +217,35 @@ fn styled_line(
     display: &str,
     tab_width: usize,
     palette: ThemePalette,
+    search_matches: &[usize],
 ) -> Vec<Span<'static>> {
     let normal = palette.editor_text_style();
     let selected = palette.selection_style();
     let mut spans = vec![Span::styled(display.to_string(), normal)];
+
+    if !engine.search_pattern.is_empty() {
+        let match_style = palette.search_match_style();
+        let current_style = palette.search_match_current_style();
+        let ranges = crate::editor::search::line_match_visual_ranges(
+            &engine.text,
+            &engine.search_pattern,
+            search_matches,
+            doc_line,
+            engine.search_match_start,
+            line_str,
+            tab_width,
+        );
+        if !ranges.is_empty() {
+            spans = highlight_search_ranges(
+                display,
+                left_vis,
+                &ranges,
+                normal,
+                match_style,
+                current_style,
+            );
+        }
+    }
 
     if engine.selection_mode == SelectionMode::Normal {
         if let Some(anchor) = engine.primary().anchor {
@@ -253,24 +288,51 @@ fn styled_line(
         }
     }
 
-    if !engine.search_pattern.is_empty() {
-        let content = display.to_string();
-        if let Some(pos) = content.find(&engine.search_pattern) {
-            let before = &content[..pos];
-            let mid = &content[pos..pos + engine.search_pattern.len()];
-            let after = &content[pos + engine.search_pattern.len()..];
-            let match_style = Style::default()
-                .fg(palette.status)
-                .bg(palette.editor_bg)
-                .add_modifier(Modifier::BOLD);
-            spans = vec![
-                Span::styled(before.to_string(), normal),
-                Span::styled(mid.to_string(), match_style),
-                Span::styled(after.to_string(), normal),
-            ];
+    spans
+}
+
+fn highlight_search_ranges(
+    display: &str,
+    left_vis: usize,
+    ranges: &[(usize, usize, bool)],
+    normal: Style,
+    match_style: Style,
+    current_style: Style,
+) -> Vec<Span<'static>> {
+    let chars: Vec<char> = display.chars().collect();
+    let mut events: Vec<(usize, usize, Style)> = Vec::new();
+    for &(vis_start, vis_end, is_current) in ranges {
+        let style = if is_current { current_style } else { match_style };
+        let start = vis_start.saturating_sub(left_vis);
+        let end = vis_end.saturating_sub(left_vis);
+        if end > start && start < chars.len() {
+            events.push((start, end.min(chars.len()), style));
         }
     }
+    if events.is_empty() {
+        return vec![Span::styled(display.to_string(), normal)];
+    }
+    events.sort_by_key(|(s, _, _)| *s);
 
+    let mut spans = Vec::new();
+    let mut pos = 0usize;
+    for (start, end, style) in events {
+        if start > pos {
+            let text: String = chars[pos..start.min(chars.len())].iter().collect();
+            spans.push(Span::styled(text, normal));
+        }
+        let mid_start = start.min(chars.len());
+        let mid_end = end.min(chars.len());
+        if mid_end > mid_start {
+            let text: String = chars[mid_start..mid_end].iter().collect();
+            spans.push(Span::styled(text, style));
+            pos = mid_end;
+        }
+    }
+    if pos < chars.len() {
+        let text: String = chars[pos..].iter().collect();
+        spans.push(Span::styled(text, normal));
+    }
     spans
 }
 

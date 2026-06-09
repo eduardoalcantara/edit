@@ -12,7 +12,7 @@ menus pull-down, modais e proteção contra perda de trabalho.
   • Seleção em bloco (Alt+arraste) e multi-cursor (Ctrl+clique) — parcial
   • Smart Word Navigation: Ctrl+←/→ e Ctrl+Shift+←/→ (camelCase, _, -, dígitos)
   • Tabulação literal ou por espaços (2/4/8); expansão visual de \t
-  • Busca e substituição (Ctrl+F / Ctrl+H); F3 / Shift+F3 próxima/anterior
+  • Busca e substituição (Ctrl+F / Ctrl+R); F3 / Shift+F3 próxima/anterior
   • Ir para linha e coluna (Ctrl+G)
   • Números de linha, word wrap, colunas-guia (80/120/160/ilimitado)
   • Margem interna (0/1/2 linhas), borda visível ou mínima
@@ -23,6 +23,7 @@ menus pull-down, modais e proteção contra perda de trabalho.
 ═══ WORKSPACE / ABAS ═══
 
   • Até 10 abas; Ctrl+Tab / Ctrl+Shift+Tab / F4 / Shift+F4
+  • Split horizontal: Exibir → Dividir editor; Ctrl+1 (único/esquerda) / Ctrl+2 (split/direita)
   • Alt+1 … Alt+0 foco direto; menu Abas (Alt+S)
   • Novo (Ctrl+N): reutiliza aba pristine ou cria NovoN
   • Fechar aba (Ctrl+W); Fechar Todos (Ctrl+Shift+W) com confirmação
@@ -58,7 +59,8 @@ menus pull-down, modais e proteção contra perda de trabalho.
   • Temas: Azul Clássico, Escuro, Claro, Matrix (Exibir → Temas)
   • Rodapé: help à esquerda; Tam/Pos/modo/encoding/tab/memória à direita
   • Zoom 1–3; consumo de memória opcional (~2s)
-  • Menus Alt+A/E/X/F/H; toggles com √; opções exclusivas estilo radio
+  • Menus Alt+A/E/X/F/S/H; toggles com √; opções exclusivas estilo radio
+  • Split: rodapé mostra Editor 1 / Editor 2 conforme painel em foco
 
 
 ═══ PERSISTÊNCIA ═══
@@ -80,7 +82,7 @@ quando indicado (ex.: Ctrl+Q, Alt+F4).
 ─── GLOBAL ───
 
   Ctrl+Q / Alt+F4     Sair (confirma se dirty)
-  Esc                 Sair (só com foco no editor, sem menu/modal)
+  Esc                 Limpa busca ativa; sem busca, sai do editor
   Ctrl+E              Foco no editor
   Ctrl+T / Ctrl+'     Editor: abre/foca terminal; Terminal: fecha painel
   F6                  Alterna foco Editor ↔ Terminal
@@ -106,9 +108,16 @@ quando indicado (ex.: Ctrl+Q, Alt+F4).
   Ctrl+Z / Ctrl+Y     Desfazer / Refazer
   Ctrl+X / Ctrl+C / Ctrl+V   Recortar / Copiar / Colar
   Ctrl+A              Selecionar tudo
-  Ctrl+F / Ctrl+H     Buscar / Substituir
+  Ctrl+F / Ctrl+R     Buscar / Substituir
   Ctrl+G              Ir para linha...
   F3 / Shift+F3       Próxima / anterior ocorrência de busca
+  Esc                 Limpa busca ativa no editor (sem modal aberto)
+
+
+─── BUSCAR / SUBSTITUIR (modal) ───
+
+  Esc (modal busca)   Fecha o diálogo (equivale a [Fechar])
+  Limpar              Limpa campos e remove destaque no texto
 
 
 ─── NAVEGAÇÃO NO TEXTO ───
@@ -128,16 +137,18 @@ quando indicado (ex.: Ctrl+Q, Alt+F4).
   Ctrl+Shift+Tab      Aba anterior
   F4 / Shift+F4       Próxima / anterior aba (Windows-safe)
   Alt+1 … Alt+0       Foco aba na posição 1–10
+  Ctrl+1              Editor único (ou foco esquerdo em split)
+  Ctrl+2              Dividir editor / foco painel direito
   Alt+S               Menu Abas
 
 
 ─── MENUS (BARRA SUPERIOR) ───
 
   Alt+A               Arquivo
-  Alt+S               Abas
   Alt+E               Editar
   Alt+X               Exibir  (mnemônico X, não E)
   Alt+F               Formatar
+  Alt+S               Abas
   Alt+H               Ajuda (Funcionalidades, Atalhos, Sobre)
 
 
@@ -159,6 +170,13 @@ quando indicado (ex.: Ctrl+Q, Alt+F4).
   Esc / Cancelar      Fecha sem alterar
   Alt+O / Alt+C       Abrir/Salvar ou Cancelar
   Duplo-clique        Pasta: entra; arquivo (Abrir): confirma
+
+
+─── CAMPOS DE TEXTO (modais) ───
+
+  ←/→ Home/End        Cursor; Shift+setas seleciona
+  Backspace/Delete    Apagar caractere ou seleção
+  Ctrl+C/X/V/A        Copiar / Recortar / Colar / Selecionar tudo
 
 
 ─── MODAIS EM GERAL ───

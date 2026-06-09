@@ -29,6 +29,10 @@ pub struct EditorEngine {
     pub render_show_tabs: bool,
     pub tabulation: Tabulation,
     pub search_pattern: String,
+    /// Início da ocorrência ativa (cursor posicionado aqui após buscar).
+    pub search_match_start: Option<usize>,
+    /// Cache de ocorrências do padrão atual (reconstruído no render e na navegação).
+    pub search_match_positions: Vec<usize>,
     history: EditHistory,
     /// Atualizado a cada frame em `render::draw` para o rodapé.
     cached_visible_chars: usize,
@@ -54,6 +58,8 @@ impl EditorEngine {
             render_show_tabs: false,
             tabulation: Tabulation::default(),
             search_pattern: String::new(),
+            search_match_start: None,
+            search_match_positions: Vec::new(),
             history: EditHistory::new(),
             cached_visible_chars: 0,
             cached_total_chars: 0,
@@ -848,36 +854,122 @@ impl EditorEngine {
         }
     }
 
+    pub fn rebuild_search_match_positions(&mut self) {
+        self.search_match_positions = if self.search_pattern.is_empty() {
+            Vec::new()
+        } else {
+            crate::editor::search::all_match_starts(&self.text, &self.search_pattern)
+        };
+    }
+
     pub fn find_next(&mut self) -> bool {
         if self.search_pattern.is_empty() {
             return false;
         }
-        if let Some(idx) =
-            crate::editor::search::find_next(&self.text, &self.search_pattern, self.primary().char_idx + 1)
-        {
-            self.primary_mut().char_idx = idx;
-            self.sync_primary_virtual();
-            self.ensure_visible();
-            true
-        } else {
-            false
-        }
+        let pattern = self.search_pattern.clone();
+        let pattern_chars = pattern.chars().count();
+        self.rebuild_search_match_positions();
+        let matches = &self.search_match_positions;
+        let Some(idx) = crate::editor::search::next_match_after_cursor(
+            matches,
+            pattern_chars,
+            self.primary().char_idx,
+        ) else {
+            return false;
+        };
+        self.go_to_search_match(idx);
+        true
     }
 
     pub fn find_prev(&mut self) -> bool {
         if self.search_pattern.is_empty() {
             return false;
         }
-        if let Some(idx) =
-            crate::editor::search::find_prev(&self.text, &self.search_pattern, self.primary().char_idx)
-        {
-            self.primary_mut().char_idx = idx;
+        let pattern = self.search_pattern.clone();
+        let pattern_chars = pattern.chars().count();
+        self.rebuild_search_match_positions();
+        let matches = &self.search_match_positions;
+        let Some(idx) = crate::editor::search::prev_match_before_cursor(
+            matches,
+            pattern_chars,
+            self.primary().char_idx,
+        ) else {
+            return false;
+        };
+        self.go_to_search_match(idx);
+        true
+    }
+
+    pub fn find_first(&mut self) -> bool {
+        if self.search_pattern.is_empty() {
+            return false;
+        }
+        self.rebuild_search_match_positions();
+        let Some(&idx) = self.search_match_positions.first() else {
+            return false;
+        };
+        self.go_to_search_match(idx);
+        true
+    }
+
+    pub fn find_last(&mut self) -> bool {
+        if self.search_pattern.is_empty() {
+            return false;
+        }
+        self.rebuild_search_match_positions();
+        let Some(&idx) = self.search_match_positions.last() else {
+            return false;
+        };
+        self.go_to_search_match(idx);
+        true
+    }
+
+    fn go_to_search_match(&mut self, char_idx: usize) {
+        self.search_match_start = Some(char_idx);
+        self.primary_mut().char_idx = char_idx;
+        self.primary_mut().anchor = None;
+        self.sync_primary_virtual();
+        self.ensure_visible();
+    }
+
+    pub fn replace_all(&mut self, replacement: &str) -> usize {
+        let pattern = self.search_pattern.clone();
+        if pattern.is_empty() {
+            return 0;
+        }
+        let pattern_chars = pattern.chars().count();
+        let mut positions = Vec::new();
+        let mut from = 0;
+        while let Some(idx) = crate::editor::search::find_next(&self.text, &pattern, from) {
+            positions.push(idx);
+            from = idx.saturating_add(pattern_chars);
+            if from >= self.text.len_chars() {
+                break;
+            }
+        }
+        let mut count = 0;
+        for start_char in positions.into_iter().rev() {
+            let end_char = start_char + pattern_chars;
+            let removed = self.text.slice(start_char..end_char).to_string();
+            let before = self.primary().char_idx;
+            self.text.remove(start_char..end_char);
+            self.text.insert(start_char, replacement);
+            let after = start_char + replacement.chars().count();
+            self.record(
+                start_char,
+                removed,
+                replacement.to_string(),
+                before,
+                after,
+            );
+            count += 1;
+        }
+        if count > 0 {
+            self.search_match_start = None;
             self.sync_primary_virtual();
             self.ensure_visible();
-            true
-        } else {
-            false
         }
+        count
     }
 
     pub fn replace_one(&mut self, replacement: &str) -> bool {
@@ -896,6 +988,7 @@ impl EditorEngine {
         self.text.insert(start_char, replacement);
         let after = start_char + replacement.chars().count();
         self.primary_mut().char_idx = start_char;
+        self.search_match_start = Some(start_char);
         self.sync_primary_virtual();
         self.record(
             start_char,
@@ -1109,6 +1202,21 @@ mod tests {
         assert_eq!(e.text.to_string(), " world");
         e.undo();
         assert_eq!(e.text.to_string(), "hello world");
+    }
+
+    #[test]
+    fn find_next_jumps_to_occurrence_start() {
+        let mut e = EditorEngine::new();
+        e.load_text("aaa foo bar foo");
+        e.search_pattern = "foo".into();
+        e.set_cursor_line_col(0, 0);
+        assert!(e.find_next());
+        assert_eq!(e.primary().char_idx, 4);
+        assert_eq!(e.search_match_start, Some(4));
+        assert!(e.find_next());
+        assert_eq!(e.primary().char_idx, 12);
+        assert!(e.find_next());
+        assert_eq!(e.primary().char_idx, 4);
     }
 
     #[test]

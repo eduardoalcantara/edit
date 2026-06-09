@@ -1,4 +1,5 @@
 mod app;
+mod app_editor_split;
 mod app_workspace;
 mod cli;
 mod clipboard;
@@ -6,6 +7,7 @@ mod config;
 mod document;
 mod edit_mode;
 mod editor;
+mod editor_split;
 mod encoding;
 mod events;
 mod file_io;

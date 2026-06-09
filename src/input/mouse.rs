@@ -61,7 +61,9 @@ pub fn handle_editor_mouse(app: &mut App, mouse: MouseEvent) {
     }
 
     if !point_in_rect(&mouse, text) {
-        if point_in_rect(&mouse, content) {
+        if point_in_rect(&mouse, content)
+            && matches!(mouse.kind, MouseEventKind::Down(MouseButton::Left))
+        {
             app.input_focus = InputFocus::Editor;
         }
         return;

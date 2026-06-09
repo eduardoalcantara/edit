@@ -17,6 +17,9 @@ use ratatui::widgets::Paragraph;
 use ratatui::Frame;
 
 use crate::modal::buttons::{FILE_BROWSER_OPEN, FILE_BROWSER_SAVE};
+use crate::modal::form_controls::paint_text_input;
+use crate::modal::text_input::{CharAccept, TextInput};
+use crate::clipboard::Clipboard;
 use crate::modal::dialog::{
     centered_dialog_rect, dialog_content_rect, paint_titled_dialog_content, Dialog,
 };
@@ -89,8 +92,8 @@ pub struct FileBrowserModal {
     pub dialog: Dialog,
     pub mode: FileBrowserMode,
     pub current_dir: PathBuf,
-    pub name_input: String,
-    pub filter_input: String,
+    pub name_input: TextInput,
+    pub filter_input: TextInput,
     pub show_hidden: bool,
     pub entries: Vec<FileEntry>,
     pub list_cursor: usize,
@@ -117,8 +120,8 @@ impl FileBrowserModal {
             dialog: Dialog::form(mode.title(), String::new(), buttons),
             mode,
             current_dir,
-            name_input,
-            filter_input,
+            name_input: TextInput::new(name_input),
+            filter_input: TextInput::new(filter_input),
             show_hidden,
             entries: Vec::new(),
             list_cursor: 0,
@@ -133,7 +136,7 @@ impl FileBrowserModal {
     }
 
     pub fn refresh_listing(&mut self) {
-        match list_directory(&self.current_dir, &self.filter_input, self.show_hidden) {
+        match list_directory(&self.current_dir, self.filter_input.text(), self.show_hidden) {
             Ok(entries) => {
                 self.entries = entries;
                 self.status_msg.clear();
@@ -158,10 +161,10 @@ impl FileBrowserModal {
                         return entry.path.clone();
                     }
                 }
-                resolve_open_target(&self.current_dir, &self.name_input)
+                resolve_open_target(&self.current_dir, self.name_input.text())
             }
             FileBrowserMode::Save | FileBrowserMode::SaveAs => {
-                resolve_save_target(&self.current_dir, &self.name_input)
+                resolve_save_target(&self.current_dir, self.name_input.text())
             }
         }
     }
@@ -189,7 +192,7 @@ impl FileBrowserModal {
         let layout = self.layout(content);
 
         self.paint_label(frame, layout.name_label, "Nome", palette);
-        self.paint_field(
+        paint_text_input(
             frame,
             layout.name_field,
             &self.name_input,
@@ -209,7 +212,7 @@ impl FileBrowserModal {
         self.paint_list(frame, layout.list_box, palette);
 
         self.paint_label(frame, layout.filter_label, "Filtro", palette);
-        self.paint_field(
+        paint_text_input(
             frame,
             layout.filter_field,
             &self.filter_input,
@@ -352,7 +355,7 @@ impl FileBrowserModal {
         Some(help.to_string())
     }
 
-    pub fn handle_key(&mut self, key: KeyEvent) -> FileBrowserKeyResult {
+    pub fn handle_key(&mut self, key: KeyEvent, clipboard: &mut Clipboard) -> FileBrowserKeyResult {
         if key.code == KeyCode::Esc {
             return FileBrowserKeyResult::Cancel;
         }
@@ -369,9 +372,9 @@ impl FileBrowserModal {
         }
 
         match self.focus {
-            FileBrowserFocus::Name => self.handle_name_key(key),
+            FileBrowserFocus::Name => self.handle_name_key(key, clipboard),
             FileBrowserFocus::List => self.handle_list_key(key),
-            FileBrowserFocus::Filter => self.handle_filter_key(key),
+            FileBrowserFocus::Filter => self.handle_filter_key(key, clipboard),
             FileBrowserFocus::HiddenToggle => self.handle_hidden_key(key),
             FileBrowserFocus::PrimaryButton => self.handle_primary_button_key(key),
             FileBrowserFocus::CancelButton => self.handle_cancel_button_key(key),
@@ -392,43 +395,41 @@ impl FileBrowserModal {
         }
     }
 
-    fn handle_name_key(&mut self, key: KeyEvent) -> FileBrowserKeyResult {
+    fn handle_name_key(&mut self, key: KeyEvent, clipboard: &mut Clipboard) -> FileBrowserKeyResult {
         if let Some(result) = self.handle_tab_navigation(key) {
             return result;
         }
-        match key.code {
-            KeyCode::Enter => FileBrowserKeyResult::Submit,
-            KeyCode::Backspace => {
-                self.name_input.pop();
-                FileBrowserKeyResult::Consumed
-            }
-            KeyCode::Char(ch) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
-                self.name_input.push(ch);
-                FileBrowserKeyResult::Consumed
-            }
-            _ => FileBrowserKeyResult::Consumed,
+        if key.code == KeyCode::Enter {
+            return FileBrowserKeyResult::Submit;
         }
+        if self.name_input.handle_key(key, clipboard, CharAccept::Any) {
+            return FileBrowserKeyResult::Consumed;
+        }
+        FileBrowserKeyResult::Consumed
     }
 
-    fn handle_filter_key(&mut self, key: KeyEvent) -> FileBrowserKeyResult {
+    fn handle_filter_key(&mut self, key: KeyEvent, clipboard: &mut Clipboard) -> FileBrowserKeyResult {
         if let Some(result) = self.handle_tab_navigation(key) {
             return result;
         }
-        match key.code {
-            KeyCode::Enter => {
-                self.refresh_listing();
-                FileBrowserKeyResult::Consumed
-            }
-            KeyCode::Backspace => {
-                self.filter_input.pop();
-                FileBrowserKeyResult::Consumed
-            }
-            KeyCode::Char(ch) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
-                self.filter_input.push(ch);
-                FileBrowserKeyResult::Consumed
-            }
-            _ => FileBrowserKeyResult::Consumed,
+        if key.code == KeyCode::Enter {
+            self.refresh_listing();
+            return FileBrowserKeyResult::Consumed;
         }
+        let refresh = matches!(
+            key.code,
+            KeyCode::Backspace
+                | KeyCode::Delete
+                | KeyCode::Char(_)
+        ) || (key.modifiers.contains(KeyModifiers::CONTROL)
+            && matches!(key.code, KeyCode::Char('v' | 'V' | 'x' | 'X')));
+        if self.filter_input.handle_key(key, clipboard, CharAccept::Any) {
+            if refresh {
+                self.refresh_listing();
+            }
+            return FileBrowserKeyResult::Consumed;
+        }
+        FileBrowserKeyResult::Consumed
     }
 
     fn handle_hidden_key(&mut self, key: KeyEvent) -> FileBrowserKeyResult {
@@ -526,7 +527,7 @@ impl FileBrowserModal {
                 FileBrowserKeyResult::Consumed
             }
             FileEntryKind::File => {
-                self.name_input = entry.name;
+                self.name_input.set_text(&entry.name);
                 if self.mode == FileBrowserMode::Open {
                     FileBrowserKeyResult::Submit
                 } else {
@@ -781,7 +782,7 @@ impl FileBrowserModal {
     fn sync_name_from_selection(&mut self) {
         if let Some(entry) = self.entries.get(self.list_cursor) {
             match entry.kind {
-                FileEntryKind::File => self.name_input = entry.name.clone(),
+                FileEntryKind::File => self.name_input.set_text(&entry.name),
                 FileEntryKind::Dir | FileEntryKind::Parent => self.name_input.clear(),
             }
         }

@@ -158,6 +158,7 @@ impl Editor {
         show_cursor: bool,
         show_tabs: bool,
         show_line_numbers: bool,
+        pane_border: crate::widgets::panel::PanelBorder,
     ) {
         self.engine.render_show_tabs = show_tabs;
         let (text_area, content_area) = render::draw(
@@ -173,6 +174,7 @@ impl Editor {
             show_cursor,
             show_tabs,
             show_line_numbers,
+            pane_border,
         );
         self.text_area = text_area;
         self.content_area = content_area;
@@ -332,6 +334,12 @@ impl Editor {
 
     pub fn set_search_pattern(&mut self, pattern: &str) {
         self.engine.search_pattern = pattern.to_string();
+        self.engine.search_match_start = None;
+        self.engine.search_match_positions.clear();
+    }
+
+    pub fn search_pattern(&self) -> &str {
+        &self.engine.search_pattern
     }
 
     pub fn find_next(&mut self) -> bool {
@@ -342,8 +350,20 @@ impl Editor {
         self.engine.find_prev()
     }
 
+    pub fn find_first(&mut self) -> bool {
+        self.engine.find_first()
+    }
+
+    pub fn find_last(&mut self) -> bool {
+        self.engine.find_last()
+    }
+
     pub fn replace_one(&mut self, replacement: &str) -> bool {
         self.engine.replace_one(replacement)
+    }
+
+    pub fn replace_all(&mut self, replacement: &str) -> usize {
+        self.engine.replace_all(replacement)
     }
 
     pub fn replace_content(&mut self, content: &str) {

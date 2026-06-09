@@ -2,7 +2,7 @@
 
 **Autor:** Perplexity AI  
 **Data:** 2026-06-07  
-**Versão:** 2.2
+**Versão:** 2.3
 
 Editor TUI para Linux/Windows com menus estilo **Turbo Vision**, núcleo **ropey**, UX previsível e proteção contra perda de trabalho.
 
@@ -68,15 +68,15 @@ edit --workspace -- main.rs tests/mod.rs
 - Sessão em **`.edit-session/`** ao lado do executável (`content.tmp`, higiene por `tab_id`).
 - **`edit.json` v2** — seção `arquivo.abas` (toggles, ordem, metadados, cursor).
 
-### Menus (Alt+A / S / E / X / F)
+### Menus (Alt+A / E / X / F / S / H)
 
 | Menu | Destaques |
 |------|-------------|
 | **Arquivo** | Novo, Abrir, **Recentes** (10 fechados), Salvar, Salvar Como, **Salvar Todos**, Fechar, Sair |
-| **Abas** | Lista dinâmica (até 10, radio na ativa), Fechar Todos, toggles sessão, Ordenar por |
 | **Editar** | Recortar/Copiar/Colar, clipboard 5 itens, Buscar/Substituir (modal), Selecionar tudo |
-| **Exibir** | Temas (Escuro, Claro, Azul Clássico, Matrix), zoom, word wrap, mostrar símbolos/espaços/tabs/EOL, colunas, margem, borda, painel, terminal, rodapé, **memória** |
+| **Exibir** | Temas, word wrap, símbolos/espaços/tabs/EOL, colunas, margem, borda, **Dividir editor**, terminal, rodapé, **memória** |
 | **Formatar** | Codificação (UTF-8, ANSI, UTF-16…), tabulação, converter tabulação |
+| **Abas** | Lista dinâmica (até 10, radio na ativa), Fechar Todos, toggles sessão, Ordenar por |
 
 ### Interface
 
@@ -85,6 +85,9 @@ edit --workspace -- main.rs tests/mod.rs
 - Rodapé: help do menu ou hover dos grupos à esquerda; à direita `Tam XXX/NNN/YYYY | Pos XX/YY | modo | encoding | tab | Mem NMB` (XXX = chars visíveis no viewport, NNN = linhas, YYY = total com `\n`).
 - Modais com mouse/hover; sair/fechar com **[Salvar] [Não Salvar] [Cancelar]**; `Ctrl+Q` / `Alt+F4` global.
 - **Navegador de arquivos** estilo Turbo Pascal para Abrir / Salvar Como (`Ctrl+O`, `Ctrl+Shift+S`).
+- **Buscar / Substituir / Ir para linha** — modais dedicados; campos com `TextInput` (cursor, seleção, Del, setas, Home/End, Ctrl+C/V/X/A).
+- **Split horizontal** — duas abas lado a lado (`Ctrl+1` único, `Ctrl+2` dividir); borda dupla no painel com foco.
+- Busca no editor destaca **todas** as ocorrências; `F3` / `Shift+F3` navega entre elas.
 
 ### Persistência
 
@@ -104,10 +107,12 @@ edit --workspace -- main.rs tests/mod.rs
 | `Ctrl+Shift+W` | Fechar Todos |
 | `Ctrl+Tab` / `Ctrl+Shift+Tab` | Próxima / anterior aba |
 | `Alt+1` … `Alt+0` | Foco aba 1–10 |
+| `Ctrl+1` / `Ctrl+2` | Editor único / split horizontal (foco esquerda-direita) |
 | `Alt+S` | Menu Abas |
 | `Ctrl+F/H` | Buscar / Substituir |
 | `Ctrl+Q`, `Alt+F4` | Sair (global) |
-| `Esc` | Sair (editor, sem menu/modal) |
+| `Esc` | Modal/menu: fecha/cancela; editor com busca ativa: limpa destaque; senão: sai |
+| `F3` / `Shift+F3` | Próxima / anterior ocorrência de busca |
 | `Alt+A` | Menu Arquivo |
 | `Alt+H` | Menu Ajuda |
 | **`F1`** | Ajuda → Funcionalidades |
@@ -148,4 +153,4 @@ Ver `PROJECT_RULES.md` para lista completa.
 cargo test
 ```
 
-77 testes unitários.
+157 testes unitários.

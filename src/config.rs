@@ -7,6 +7,7 @@ use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
 
+use crate::editor_split::{EditorSplit, SplitMode, SplitPane};
 use crate::encoding::{FileEncoding, Tabulation};
 use crate::theme::ThemeId;
 use crate::view_state::{EditorBorder, EditorMargin, GuideColumn, TerminalColorScheme, parse_terminal_color_scheme};
@@ -139,6 +140,28 @@ pub struct ExibirConfig {
     pub colunas: String,
     pub borda: String,
     pub margem: String,
+    #[serde(default = "default_split_editor")]
+    pub split_editor: String,
+    #[serde(default)]
+    pub split_right_tab: Option<usize>,
+}
+
+fn default_split_editor() -> String {
+    "off".to_string()
+}
+
+fn split_mode_from_str(value: &str) -> SplitMode {
+    match value {
+        "horizontal" => SplitMode::Horizontal,
+        _ => SplitMode::Off,
+    }
+}
+
+fn split_mode_to_str(mode: SplitMode) -> &'static str {
+    match mode {
+        SplitMode::Off => "off",
+        SplitMode::Horizontal => "horizontal",
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -180,6 +203,7 @@ pub fn config_from_view(
     encoding: FileEncoding,
     tabulation: Tabulation,
     abas: AbasConfig,
+    editor_split: &EditorSplit,
 ) -> EditConfig {
     EditConfig {
         version: CONFIG_VERSION,
@@ -211,6 +235,12 @@ pub fn config_from_view(
             colunas: guide_column_to_str(view.guide_column).to_string(),
             borda: border_to_str(view.border).to_string(),
             margem: margin_to_str(view.margin).to_string(),
+            split_editor: split_mode_to_str(editor_split.mode).to_string(),
+            split_right_tab: if editor_split.is_active() {
+                editor_split.right_tab
+            } else {
+                None
+            },
         },
         formatar: FormatarConfig {
             codificacao: encoding_to_str(encoding).to_string(),
@@ -248,6 +278,8 @@ impl Default for EditConfig {
                 colunas: "ilimitado".to_string(),
                 borda: "visivel".to_string(),
                 margem: "sem".to_string(),
+                split_editor: default_split_editor(),
+                split_right_tab: None,
             },
             formatar: FormatarConfig {
                 codificacao: encoding_to_str(FileEncoding::Utf8).to_string(),
@@ -314,6 +346,20 @@ impl EditConfig {
             margin: parse_margin(&self.exibir.margem),
             border: parse_border(&self.exibir.borda),
             theme: parse_theme(&self.exibir.tema),
+        }
+    }
+
+    pub fn editor_split(&self) -> EditorSplit {
+        let mode = split_mode_from_str(&self.exibir.split_editor);
+        EditorSplit {
+            mode,
+            left_tab: self.arquivo.abas.indice_ativo,
+            right_tab: if mode == SplitMode::Horizontal {
+                self.exibir.split_right_tab
+            } else {
+                None
+            },
+            focused_pane: SplitPane::Left,
         }
     }
 

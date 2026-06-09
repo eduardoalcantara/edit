@@ -6,6 +6,7 @@ use crate::app::App;
 use crate::config::{
     encoding_to_config_str, tabulation_to_config_str, AbasConfig, SessaoTabEntry,
 };
+use crate::editor_split::EditorSplit;
 use crate::modal::Modal;
 use crate::modal::dialog::DialogButtonAction;
 use crate::session::{purge_all, purge_orphans, purge_tab, read_content_tmp, write_content_tmp};
@@ -63,6 +64,7 @@ impl App {
         self.editor.set_cursor(line.saturating_sub(1), col.saturating_sub(1));
         let palette = self.theme.palette();
         self.editor.apply_theme(&palette);
+        self.sync_split_after_focus_tab(index);
     }
 
     pub(crate) fn active_tab_is_pristine(&self) -> bool {
@@ -123,11 +125,12 @@ impl App {
                     PromptReason::CloseTab | PromptReason::EvictTail => {
                         self.remove_tab_at(index);
                     }
-                    PromptReason::Quit | PromptReason::CloseAll => {}
+                    PromptReason::Quit | PromptReason::CloseAll | PromptReason::OpenInPane => {}
                 }
-            } else if matches!(flow.reason, PromptReason::CloseTab) {
-                self.remove_tab_at(index);
-            } else if matches!(flow.reason, PromptReason::EvictTail) {
+            } else if matches!(
+                flow.reason,
+                PromptReason::CloseTab | PromptReason::EvictTail
+            ) {
                 self.remove_tab_at(index);
             }
         }
@@ -185,6 +188,7 @@ impl App {
             self.persist_user_config();
         }
         self.workspace.after_close_tab(index);
+        self.on_tab_closed(index);
         if self.workspace.tabs.is_empty() {
             self.create_new_tab_at_top();
         } else {
@@ -209,6 +213,7 @@ impl App {
             }
         }
         self.persist_user_config();
+        self.editor_split = EditorSplit::default();
         self.create_new_tab_at_top();
         self.set_status("Todas as abas fechadas");
     }
@@ -248,6 +253,9 @@ impl App {
     pub(crate) fn open_path_impl(&mut self, path: PathBuf) {
         let path = crate::file_io::normalize_open_path(&path);
         if let Some(index) = self.workspace.find_open_path(&path) {
+            if self.split_active() {
+                self.assign_tab_to_focused_pane(index);
+            }
             self.focus_tab(index);
             self.set_status(format!("Focado: {}", path.display()));
             return;
@@ -255,7 +263,11 @@ impl App {
 
         match self.workspace.prepare_open_path(&path) {
             crate::workspace::WorkspaceAction::FocusedExisting => {
-                self.focus_tab(self.workspace.active_index);
+                let index = self.workspace.active_index;
+                if self.split_active() {
+                    self.assign_tab_to_focused_pane(index);
+                }
+                self.focus_tab(index);
             }
             crate::workspace::WorkspaceAction::PromptSaveRequired { tab_index, reason } => {
                 self.begin_dirty_flow(
@@ -270,40 +282,97 @@ impl App {
 
         self.evict_tail_silent();
 
+        if self.split_active() {
+            if let Some(idx) = self
+                .editor_split
+                .pane_tab_index(self.editor_split.focused_pane)
+            {
+                if idx < self.workspace.tabs.len() && self.workspace.tabs[idx].is_dirty() {
+                    self.begin_dirty_flow(
+                        vec![idx],
+                        PromptReason::OpenInPane,
+                        AfterDirtyResolved::EvictThenOpen(path),
+                    );
+                    return;
+                }
+            }
+        }
+
         match crate::file_io::read_lines_encoded(&path, self.document.encoding) {
             Ok(lines) => {
-                let content = lines.join("\n");
-                let session_id = new_session_id();
-                let mut document = Document::new();
-                document.encoding = self.document.encoding;
-                document.tabulation = self.document.tabulation;
-                document.set_opened(content.clone(), path.clone());
-                let mut editor = Editor::new(&self.theme.palette());
-                editor.set_lines(lines);
-                editor.set_tabulation(document.tabulation);
-                editor.set_word_wrap(self.view.word_wrap);
-                let fs_snapshot = snapshot_path(&path).ok();
-                let tab = Tab::new_untitled(
-                    editor,
-                    document,
-                    session_id,
-                    path.file_name()
-                        .and_then(|n| n.to_str())
-                        .unwrap_or("?")
-                        .to_string(),
-                );
-                let mut tab = tab;
-                tab.fs_snapshot = fs_snapshot;
-                self.workspace.insert_tab_at_top(tab);
-                self.focus_tab(0);
-                self.recent.remove_path(&path);
-                self.persist_user_config();
-                self.set_status(format!("Aberto: {}", path.display()));
+                let tab = self.tab_from_opened_path(&path, lines);
+                self.install_opened_tab(tab, &path);
             }
             Err(error) => {
                 self.set_status(format!("Erro ao abrir: {error}"));
             }
         }
+    }
+
+    fn assign_tab_to_focused_pane(&mut self, index: usize) {
+        if !self.split_active() {
+            return;
+        }
+        self.editor_split
+            .set_pane_tab(self.editor_split.focused_pane, index);
+    }
+
+    fn tab_from_opened_path(&self, path: &Path, lines: Vec<String>) -> Tab {
+        let content = lines.join("\n");
+        let session_id = new_session_id();
+        let mut document = Document::new();
+        document.encoding = self.document.encoding;
+        document.tabulation = self.document.tabulation;
+        document.set_opened(content, path.to_path_buf());
+        let mut editor = Editor::new(&self.theme.palette());
+        editor.set_lines(lines);
+        editor.set_tabulation(document.tabulation);
+        editor.set_word_wrap(self.view.word_wrap);
+        let fs_snapshot = snapshot_path(path).ok();
+        let mut tab = Tab::new_untitled(
+            editor,
+            document,
+            session_id,
+            path.file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("?")
+                .to_string(),
+        );
+        tab.fs_snapshot = fs_snapshot;
+        tab
+    }
+
+    fn replace_tab_at(&mut self, index: usize, new_tab: Tab) {
+        let old_session = self.workspace.tabs[index].session_id.clone();
+        let _ = purge_tab(&old_session);
+        self.workspace.tabs[index] = new_tab;
+        self.focus_tab(index);
+        if self.split_active() {
+            self.editor_split
+                .set_pane_tab(self.editor_split.focused_pane, index);
+        }
+    }
+
+    fn install_opened_tab(&mut self, tab: Tab, path: &Path) {
+        if self.split_active() {
+            let pane = self.editor_split.focused_pane;
+            if let Some(index) = self.editor_split.pane_tab_index(pane) {
+                self.replace_tab_at(index, tab);
+            } else {
+                let index = self.workspace.tabs.len();
+                self.workspace.tabs.push(tab);
+                self.editor_split.set_pane_tab(pane, index);
+                self.focus_tab(index);
+                self.on_tab_count_changed();
+            }
+        } else {
+            self.workspace.insert_tab_at_top(tab);
+            self.focus_tab(0);
+            self.on_tab_count_changed();
+        }
+        self.recent.remove_path(path);
+        self.persist_user_config();
+        self.set_status(format!("Aberto: {}", path.display()));
     }
 
     fn note_recent_file_on_open_only(&mut self) {

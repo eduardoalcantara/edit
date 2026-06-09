@@ -1,6 +1,7 @@
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 
 use crate::app::App;
+use crate::editor_split::{EditorSplitLayout, split_editor_horizontally};
 use crate::terminal::{
     editor_content_in_shell, layout_terminal_panel, terminal_panel_outer,
     terminal_reserved_rows, TerminalPanelLayout,
@@ -13,6 +14,7 @@ pub struct UiLayout {
     /// Área unificada do editor (e terminal, se visível).
     pub shell: Rect,
     pub editor_content: Rect,
+    pub editor_split: Option<EditorSplitLayout>,
     pub terminal_divider_y: Option<u16>,
     pub terminal_panel_rows: Option<u16>,
     pub terminal: Option<TerminalPanelLayout>,
@@ -38,6 +40,18 @@ impl UiLayout {
 
         let border_visible = app.view.border == crate::view_state::EditorBorder::Visible;
 
+        let terminal_reserve = if app.view.terminal {
+            terminal_reserved_rows(shell, app.view.terminal_panel_rows)
+        } else {
+            0
+        };
+
+        let editor_split = if app.split_active() {
+            Some(split_editor_horizontally(shell, terminal_reserve))
+        } else {
+            None
+        };
+
         if app.view.terminal {
             let panel_rows = app.view.terminal_panel_rows;
             let reserve = terminal_reserved_rows(shell, panel_rows);
@@ -49,6 +63,7 @@ impl UiLayout {
                 menu_bar: chunks[0],
                 shell,
                 editor_content,
+                editor_split,
                 terminal_divider_y: Some(term_outer.y),
                 terminal_panel_rows: Some(panel_rows),
                 terminal: Some(panel),
@@ -61,6 +76,7 @@ impl UiLayout {
                 menu_bar: chunks[0],
                 shell,
                 editor_content,
+                editor_split,
                 terminal_divider_y: None,
                 terminal_panel_rows: None,
                 terminal: None,

@@ -2,7 +2,7 @@
 
 **Autor:** Perplexity AI  
 **Data:** 2026-06-08  
-**Versão:** 3.0
+**Versão:** 3.1
 
 Regras estáveis do projeto. Para estado de implementação, ver `PROJECT_STATUS.md`; para histórico, `PROJECT_TIMELINE.md`; para detalhes de feature, specs em `specs/done/`.
 
@@ -71,7 +71,7 @@ Regras estáveis do projeto. Para estado de implementação, ver `PROJECT_STATUS
 | `Ctrl+N` | Novo documento |
 | `Ctrl+W` | Fechar documento |
 | `Ctrl+Q` / `Alt+F4` | Sair (com confirmação se dirty; funciona mesmo com menu/modal aberto) |
-| **`Esc`** | Sair com foco no editor e sem menu/modal aberto (modal/menu: Esc cancela/fecha; terminal: Esc devolve foco ao editor) |
+| **`Esc`** | Modal/menu: cancela/fecha; terminal: devolve foco ao editor; editor com busca ativa (sem modal): limpa destaque; senão: sai |
 | **`Ctrl+E`** | Foco no **editor** (mesmo com terminal visível) |
 | `Ctrl+T` / **`Ctrl+'`** | Do **editor**: abre o terminal (se fechado) ou **foca** o terminal; do **terminal**: **fecha** o painel |
 | **`F6`** | Alterna foco Editor ↔ Terminal (abre terminal se estiver fechado) |
@@ -141,8 +141,10 @@ Detalhes do terminal integrado: `specs/done/SPEC-TERMINAL-INFERIOR.md`.
 | `Ctrl+Shift+W` | Fechar todas as abas |
 | `Ctrl+Tab` / `Ctrl+Shift+Tab` | Próxima / anterior aba |
 | **`F4`** / **`Shift+F4`** | Próxima / anterior aba (Windows-safe) |
+| **`Ctrl+1`** | Editor único; em split com foco direito → foco esquerdo |
+| **`Ctrl+2`** | Split horizontal (50/50); em split → foco painel direito |
 
-Ver também `specs/to-do/SPEC-MULTPLOS-ARQUIVOS.md` §6.7 e §10.
+Ver também `specs/done/SPEC-EDITOR-SPLIT-VIEW.md` e `specs/to-do/SPEC-MULTPLOS-ARQUIVOS.md` §6.7 e §10.
 
 ## Regras de UX — barra de menu
 
@@ -164,6 +166,9 @@ Mnemônico de Exibir é **X** (não E).
 - Converter tabulação: modal **De / Para** lado a lado; listas completas; foco sutil (borda preta/branca, sem fundo verde); Tab/Shift+Tab e ←/→ entre listas; botão **[Converter]**; opção **Para** vira tabulação ativa após confirmar.
 - Botões de modal respondem a clique, hover e teclado; help do botão focado no rodapé.
 - Modal aberto fecha menu dropdown automaticamente; modal e menu capturam input (`captures_input`).
+- **`Esc` em modal** equivale a **[Fechar]** ou **[Cancelar]** do diálogo aberto — não limpa busca ativa no editor.
+- Campos de texto em modais usam **`TextInput`** (`src/modal/text_input.rs`): cursor, seleção, `Backspace`/`Delete`, setas, `Home`/`End`, `Ctrl+C/X/V/A`; clipboard interno de 5 itens.
+- Buscar / Substituir / Ir para linha: layout campo → linha em branco → botões; **[Limpar]** no modal de busca limpa campos e destaque no texto.
 
 ---
 
@@ -177,6 +182,8 @@ Mnemônico de Exibir é **X** (não E).
 - **Exibir → Colunas:** guia 80 / 120 / 160 / ilimitado.
 - **Exibir → Mostrar:** símbolos, espaços, tabs (`»` onde há `\t`), fim de linha, tudo.
 - **Exibir → Mostrar consumo de memória:** toggle (default ativo); amostragem leve (~2s).
+- **Exibir → Dividir editor:** dois arquivos lado a lado (50/50); painel com foco = borda dupla; terminal inferior **não** é dividido.
+- **`Ctrl+1` / `Ctrl+2`:** ver tabela em abas de edição (único / split / foco esquerda-direita).
 - Tabulação literal e por espaços (2/4/8): expansão visual, cursor e scroll por coluna visual; parada 8 para Tab literal.
 - Baseline dirty: documento novo ou aberto sem edição não dispara confirmação de saída (`EMPTY_DOCUMENT_TEXT`).
 
@@ -225,7 +232,7 @@ Codificação e tabulação persistidas em `formatar` são **padrão** para novo
 | Módulo | Responsabilidade |
 |--------|------------------|
 | `src/menus.rs` | Menu shell Turbo Vision; **proibido** menu estático com rótulos de comando |
-| `src/modal/` | Shell `Dialog` reutilizável; presets em `buttons.rs` |
+| `src/modal/` | Shell `Dialog` reutilizável; presets em `buttons.rs`; `TextInput` para campos de linha única |
 | `src/widgets/panel.rs` | Painéis, bordas ASCII, dropdown |
 | `src/config.rs` | Load/save `edit.json` |
 | `src/recent.rs` | Lista em memória (persistida via config) |

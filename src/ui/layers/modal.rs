@@ -1,8 +1,9 @@
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+use crossterm::event::{KeyEvent, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::layout::Rect;
 
 use crate::modal::{
-    convert_tab::ConvertTabKeyResult, file_browser::FileBrowserKeyResult, help::HelpKeyResult,
+    convert_tab::ConvertTabKeyResult, file_browser::FileBrowserKeyResult,
+    find_replace::FindReplaceKeyResult, go_to_line::GoToLineKeyResult, help::HelpKeyResult,
     DialogButtonAction, DialogKeyResult, Modal,
 };
 use crate::theme::ThemePalette;
@@ -37,6 +38,14 @@ impl UiLayer for ModalLayer {
                 modal.paint(frame, area, palette);
             }
             Modal::FileBrowser(modal) => {
+                let area = modal.outer_rect(frame.area());
+                modal.paint(frame, area, palette);
+            }
+            Modal::Find(modal) => {
+                let area = modal.outer_rect(frame.area());
+                modal.paint(frame, area, palette);
+            }
+            Modal::GoToLine(modal) => {
                 let area = modal.outer_rect(frame.area());
                 modal.paint(frame, area, palette);
             }
@@ -82,95 +91,33 @@ impl UiLayer for ModalLayer {
                     DialogKeyResult::Consumed => return InputResult::Consumed,
                     DialogKeyResult::Ignored => {}
                 }
-                match key.code {
-                    KeyCode::Backspace => {
-                        input.pop();
-                    }
-                    KeyCode::Char(ch) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
-                        input.push(ch);
-                    }
-                    _ => {}
+                if input.handle_key(key, &mut app.clipboard, crate::modal::CharAccept::Any) {
+                    app.modal.refresh_body();
                 }
                 InputResult::Consumed
             }
-            Modal::Find {
-                dialog,
-                pattern,
-                replacement,
-                replace_mode,
-                ..
-            } => {
-                match dialog.handle_button_keys(key) {
-                    DialogKeyResult::Activate(_) => {
-                        app.submit_find();
-                        return InputResult::Consumed;
-                    }
-                    DialogKeyResult::Cancel => {
-                        app.cancel_modal();
-                        return InputResult::Consumed;
-                    }
-                    DialogKeyResult::Consumed => return InputResult::Consumed,
-                    DialogKeyResult::Ignored => {}
+            Modal::Find(modal) => match modal.handle_key(key, &mut app.clipboard) {
+                FindReplaceKeyResult::Command(cmd) => {
+                    app.apply_find_command(cmd);
+                    InputResult::Consumed
                 }
-                match key.code {
-                    KeyCode::Tab if *replace_mode => {}
-                    KeyCode::Backspace => {
-                        pattern.pop();
-                    }
-                    KeyCode::Char(ch) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
-                        if *replace_mode && key.modifiers.contains(KeyModifiers::SHIFT) {
-                            replacement.push(ch);
-                        } else {
-                            pattern.push(ch);
-                        }
-                    }
-                    _ => {}
+                FindReplaceKeyResult::Cancel => {
+                    app.cancel_modal();
+                    InputResult::Consumed
                 }
-                InputResult::Consumed
-            }
-            Modal::GoToLine {
-                dialog,
-                line,
-                col,
-                field_line,
-            } => {
-                match dialog.handle_button_keys(key) {
-                    DialogKeyResult::Activate(_) => {
-                        app.submit_go_to_line();
-                        return InputResult::Consumed;
-                    }
-                    DialogKeyResult::Cancel => {
-                        app.cancel_modal();
-                        return InputResult::Consumed;
-                    }
-                    DialogKeyResult::Consumed => return InputResult::Consumed,
-                    DialogKeyResult::Ignored => {}
+                FindReplaceKeyResult::Consumed => InputResult::Consumed,
+            },
+            Modal::GoToLine(modal) => match modal.handle_key(key, &mut app.clipboard) {
+                GoToLineKeyResult::Command(cmd) => {
+                    app.apply_go_to_line_command(cmd);
+                    InputResult::Consumed
                 }
-                match key.code {
-                    KeyCode::Tab => {
-                        *field_line = !*field_line;
-                    }
-                    KeyCode::Backspace => {
-                        if *field_line {
-                            line.pop();
-                        } else {
-                            col.pop();
-                        }
-                    }
-                    KeyCode::Char(ch)
-                        if !key.modifiers.contains(KeyModifiers::CONTROL)
-                            && ch.is_ascii_digit() =>
-                    {
-                        if *field_line {
-                            line.push(ch);
-                        } else {
-                            col.push(ch);
-                        }
-                    }
-                    _ => {}
+                GoToLineKeyResult::Cancel => {
+                    app.cancel_modal();
+                    InputResult::Consumed
                 }
-                InputResult::Consumed
-            }
+                GoToLineKeyResult::Consumed => InputResult::Consumed,
+            },
             Modal::ConvertTabulation(modal) => match modal.handle_key(key) {
                 ConvertTabKeyResult::Submit => {
                     app.submit_convert_tabulation();
@@ -182,7 +129,7 @@ impl UiLayer for ModalLayer {
                 }
                 ConvertTabKeyResult::Consumed => InputResult::Consumed,
             },
-            Modal::FileBrowser(modal) => match modal.handle_key(key) {
+            Modal::FileBrowser(modal) => match modal.handle_key(key, &mut app.clipboard) {
                 FileBrowserKeyResult::Submit => {
                     app.submit_file_browser();
                     InputResult::Consumed
@@ -270,6 +217,42 @@ impl UiLayer for ModalLayer {
                 }
                 InputResult::Consumed
             }
+            Modal::Find(modal) => {
+                let outer = modal.outer_rect(frame);
+                match mouse.kind {
+                    MouseEventKind::Down(MouseButton::Left) => {
+                        modal.handle_mouse(&mouse, outer);
+                    }
+                    MouseEventKind::Up(MouseButton::Left) => {
+                        modal.handle_mouse(&mouse, outer);
+                        if let Some(cmd) = modal.take_pending_command() {
+                            app.apply_find_command(cmd);
+                        }
+                    }
+                    _ => {
+                        modal.handle_mouse(&mouse, outer);
+                    }
+                }
+                InputResult::Consumed
+            }
+            Modal::GoToLine(modal) => {
+                let outer = modal.outer_rect(frame);
+                match mouse.kind {
+                    MouseEventKind::Down(MouseButton::Left) => {
+                        modal.handle_mouse(&mouse, outer);
+                    }
+                    MouseEventKind::Up(MouseButton::Left) => {
+                        modal.handle_mouse(&mouse, outer);
+                        if let Some(cmd) = modal.take_pending_command() {
+                            app.apply_go_to_line_command(cmd);
+                        }
+                    }
+                    _ => {
+                        modal.handle_mouse(&mouse, outer);
+                    }
+                }
+                InputResult::Consumed
+            }
             Modal::Help(modal) => {
                 let outer = modal.outer_rect(frame);
                 if matches!(mouse.kind, MouseEventKind::Down(MouseButton::Left)) {
@@ -311,6 +294,8 @@ impl UiLayer for ModalLayer {
         match &app.modal {
             Modal::ConvertTabulation(modal) => modal.focused_help().map(str::to_string),
             Modal::FileBrowser(modal) => modal.focused_help(),
+            Modal::Find(modal) => modal.focused_help(),
+            Modal::GoToLine(modal) => modal.focused_help(),
             Modal::Help(modal) => modal.focused_help().map(str::to_string),
             _ => app
                 .modal
@@ -336,8 +321,6 @@ fn activate_button(app: &mut crate::app::App, index: usize) {
         (Modal::Help(_), Some(DialogButtonAction::Primary)) => app.cancel_modal(),
         (_, Some(DialogButtonAction::Primary)) => match &app.modal {
             Modal::PathInput { .. } => app.submit_path_input(),
-            Modal::Find { .. } => app.submit_find(),
-            Modal::GoToLine { .. } => app.submit_go_to_line(),
             _ => {}
         },
         _ => app.cancel_modal(),

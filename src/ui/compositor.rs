@@ -73,7 +73,11 @@ impl Compositor {
             && !app.menu_state.is_open()
             && app.input_focus != InputFocus::Terminal
         {
-            app.request_quit();
+            if app.has_active_search() {
+                app.clear_search();
+            } else {
+                app.request_quit();
+            }
             return;
         }
 
@@ -191,6 +195,11 @@ fn footer_active_focus(app: &App) -> &'static str {
         "Menu"
     } else if app.view.terminal && app.input_focus == InputFocus::Terminal {
         "Terminal"
+    } else if app.split_active() {
+        match app.editor_split.focused_pane {
+            crate::editor_split::SplitPane::Left => "Editor 1",
+            crate::editor_split::SplitPane::Right => "Editor 2",
+        }
     } else {
         "Editor"
     }
@@ -394,7 +403,7 @@ fn handle_global_function_keys(app: &mut App, key: KeyEvent) -> bool {
             if key.modifiers.contains(KeyModifiers::SHIFT) {
                 app.find_prev();
             } else {
-                app.find_next();
+                app.request_find_next();
             }
             true
         }
@@ -518,6 +527,17 @@ mod tests {
         app.input_focus = InputFocus::Terminal;
         let status = footer_status_right(&app);
         assert!(status.starts_with("Terminal |"));
+    }
+
+    #[test]
+    fn footer_focus_label_shows_editor_pane_in_split() {
+        let mut app = App::new(false);
+        app.editor_split.mode = crate::editor_split::SplitMode::Horizontal;
+        app.editor_split.left_tab = 0;
+        app.editor_split.right_tab = Some(1);
+        app.editor_split.focused_pane = crate::editor_split::SplitPane::Right;
+        let status = footer_status_right(&app);
+        assert!(status.starts_with("Editor 2 |"));
     }
 
     #[test]

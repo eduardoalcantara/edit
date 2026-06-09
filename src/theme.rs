@@ -218,6 +218,17 @@ impl ThemePalette {
         Style::default().fg(self.editor_fg).bg(self.selection)
     }
 
+    pub fn search_match_style(self) -> Style {
+        Style::default().fg(self.status).bg(self.selection)
+    }
+
+    pub fn search_match_current_style(self) -> Style {
+        Style::default()
+            .fg(self.editor_bg)
+            .bg(self.status)
+            .add_modifier(Modifier::BOLD)
+    }
+
     pub fn placeholder_style(self) -> Style {
         Style::default()
             .fg(self.border)

@@ -2,7 +2,7 @@
 
 **Autor:** Perplexity AI  
 **Data:** 2026-06-08  
-**Versão:** 3.5
+**Versão:** 3.6
 
 ## Estado atual
 
@@ -141,6 +141,18 @@
   - `PathInput` mantido apenas para Renomear (`F2`).
   - Specs: `specs/done/SPEC-MODAL-ARQUIVO.md`, `specs/done/SPEC-MENU-AJUDA.md` (TV7 fechado).
   - **138 testes** unitários passando (`cargo test`).
+- **Editor split view (2026-06-09, branch `editor-split`):**
+  - Dois painéis horizontais 50/50; `Ctrl+1` editor único / foco esquerdo; `Ctrl+2` split / foco direito.
+  - Borda dupla no painel com foco; persistência `exibir.split_editor` em `edit.json`.
+  - Módulos: `src/editor_split.rs`, `src/app_editor_split.rs`, `src/ui/layers/editor.rs`, `src/ui/layout.rs`
+  - Spec: `specs/done/SPEC-EDITOR-SPLIT-VIEW.md`
+- **Modais Buscar / Substituir / Ir para linha + TextInput (2026-06-09):**
+  - Componente `TextInput` reutilizável com edição padrão (cursor, seleção, Del, setas, Home/End, Ctrl+C/V/X/A).
+  - Modais dedicados `find_replace.rs`, `go_to_line.rs`; `form_controls.rs` para pintura.
+  - Busca destaca todas as ocorrências; navegação `F3`/`Shift+F3`; cache `search_match_positions`.
+  - **Esc** em modal fecha diálogo; **Esc** no editor limpa busca ativa ou sai; **[Limpar]** só pelo botão.
+  - Spec: `specs/done/SPEC-MODAL-TEXT-INPUT-BUSCA.md`
+  - **157 testes** unitários passando (`cargo test`).
 
 ### Em andamento
 - **Múltiplos arquivos — fase 2:** barra de abas visual; serialização `undo.json`/`redo.json`; modal recarregar arquivo alterado externamente.

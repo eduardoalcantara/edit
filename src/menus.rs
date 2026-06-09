@@ -57,6 +57,7 @@ pub enum ActionId {
     MarginOneLine,
     MarginTwoLines,
     BorderToggle,
+    ToggleSplitEditor,
     EncodingUtf8,
     EncodingUtf8NoBom,
     EncodingUtf16Le,
@@ -168,7 +169,7 @@ impl MenuState {
 
     /// Abre **Formatar → Codificação** (ex.: clique no encoding no rodapé).
     pub fn open_format_encoding_menu(&mut self, bar: &MenuBar) {
-        const FORMAT_TOP: usize = 4;
+        const FORMAT_TOP: usize = 3;
         const ENCODING_SUB: usize = 0;
         if FORMAT_TOP >= bar.tops.len() {
             return;
@@ -195,6 +196,7 @@ impl MenuBar {
         tab: Tabulation,
         clip: &Clipboard,
         workspace: &Workspace,
+        split_editor: bool,
     ) -> Self {
         Self {
             tops: vec![
@@ -204,11 +206,6 @@ impl MenuBar {
                     children: file_menu(recent),
                 },
                 MenuTopItem {
-                    label: " Abas ",
-                    mnemonic: 'S',
-                    children: tabs_menu(workspace),
-                },
-                MenuTopItem {
                     label: " Editar ",
                     mnemonic: 'E',
                     children: edit_menu(clip),
@@ -216,12 +213,17 @@ impl MenuBar {
                 MenuTopItem {
                     label: " Exibir ",
                     mnemonic: 'X',
-                    children: view_menu(view),
+                    children: view_menu(view, split_editor),
                 },
                 MenuTopItem {
                     label: " Formatar ",
                     mnemonic: 'F',
                     children: format_menu(enc, tab),
+                },
+                MenuTopItem {
+                    label: " Abas ",
+                    mnemonic: 'S',
+                    children: tabs_menu(workspace),
                 },
                 MenuTopItem {
                     label: " Ajuda ",
@@ -365,7 +367,7 @@ fn file_menu(recent: &RecentFiles) -> Vec<MenuNode> {
             "Cria um novo documento em branco",
         ),
         item(
-            "Abrir",
+            "Abrir...",
             Some("Ctrl+O"),
             ActionId::Open,
             true,
@@ -406,7 +408,7 @@ fn file_menu(recent: &RecentFiles) -> Vec<MenuNode> {
     nodes.extend([
         MenuNode::Separator,
         item(
-            "Salvar",
+            "Salvar...",
             Some("Ctrl+S / F10"),
             ActionId::Save,
             true,
@@ -414,7 +416,7 @@ fn file_menu(recent: &RecentFiles) -> Vec<MenuNode> {
             "Salva o documento atual no arquivo em disco",
         ),
         item(
-            "Salvar Como",
+            "Salvar Como...",
             Some("Ctrl+Shift+S"),
             ActionId::SaveAs,
             true,
@@ -422,7 +424,7 @@ fn file_menu(recent: &RecentFiles) -> Vec<MenuNode> {
             "Salva o documento com um novo nome ou caminho",
         ),
         item(
-            "Renomear",
+            "Renomear...",
             Some("F2"),
             ActionId::Rename,
             true,
@@ -541,7 +543,7 @@ fn edit_menu(clip: &Clipboard) -> Vec<MenuNode> {
             "Seleciona todo o texto do documento",
         ),
         item(
-            "Buscar",
+            "Buscar...",
             Some("Ctrl+F"),
             ActionId::Find,
             true,
@@ -549,8 +551,8 @@ fn edit_menu(clip: &Clipboard) -> Vec<MenuNode> {
             "Busca um texto no documento",
         ),
         item(
-            "Substituir",
-            Some("Ctrl+H"),
+            "Substituir...",
+            Some("Ctrl+R"),
             ActionId::Replace,
             true,
             None,
@@ -567,8 +569,14 @@ fn edit_menu(clip: &Clipboard) -> Vec<MenuNode> {
     ]
 }
 
-fn view_menu(view: &ViewState) -> Vec<MenuNode> {
+fn view_menu(view: &ViewState, split_editor: bool) -> Vec<MenuNode> {
     vec![
+        toggle_item(
+            "Dividir editor",
+            ActionId::ToggleSplitEditor,
+            split_editor,
+            "Dois arquivos lado a lado (Ctrl+1 único | Ctrl+2 direita)",
+        ),
         toggle_item(
             "Terminal",
             ActionId::ToggleTerminal,
@@ -733,7 +741,7 @@ fn view_menu(view: &ViewState) -> Vec<MenuNode> {
 fn help_menu() -> Vec<MenuNode> {
     vec![
         item(
-            "Funcionalidades",
+            "Funcionalidades...",
             Some("F1"),
             ActionId::HelpFeatures,
             true,
@@ -741,7 +749,7 @@ fn help_menu() -> Vec<MenuNode> {
             "Lista resumida das capacidades do editor",
         ),
         item(
-            "Atalhos",
+            "Atalhos...",
             None,
             ActionId::HelpShortcuts,
             true,
@@ -749,7 +757,7 @@ fn help_menu() -> Vec<MenuNode> {
             "Referência de teclado agrupada por categoria",
         ),
         item(
-            "Sobre",
+            "Sobre...",
             None,
             ActionId::HelpAbout,
             true,
@@ -832,7 +840,7 @@ fn format_menu(enc: FileEncoding, tab: Tabulation) -> Vec<MenuNode> {
                     "Insere o caractere de tabulação literal ao pressionar Tab",
                 ),
                 item(
-                    "Converter Tabulação",
+                    "Converter Tabulação...",
                     None,
                     ActionId::ConvertTabulation,
                     true,
@@ -1528,6 +1536,7 @@ mod tests {
             Tabulation::Spaces4,
             &Clipboard::default(),
             &empty_workspace(),
+            false,
         );
         assert!(bar.tops.iter().any(|t| t.mnemonic == 'H'));
         let help = bar.tops.iter().find(|t| t.mnemonic == 'H').unwrap();

@@ -1,8 +1,10 @@
-use crossterm::event::{KeyEvent, MouseEvent};
+use crossterm::event::{KeyEvent, MouseButton, MouseEvent, MouseEventKind};
+use ratatui::layout::Rect;
 use ratatui::style::Style;
 use ratatui::widgets::Paragraph;
 
 use crate::editor::EditorCommand;
+use crate::editor_split::{pane_at_column, SplitPane};
 use crate::input::{keyboard, mouse};
 use crate::modal::Modal;
 use crate::theme::ThemePalette;
@@ -12,6 +14,7 @@ use crate::terminal::{
 use crate::view_state::EditorBorder;
 use crate::ui::layer::{InputResult, LayerId, UiLayer};
 use crate::ui::layout::UiLayout;
+use crate::widgets::panel::{self, PanelBorder};
 
 pub struct EditorLayer;
 
@@ -40,61 +43,88 @@ impl UiLayer for EditorLayer {
         let terminal_block = layout.terminal_panel_rows.map(|rows| {
             terminal_reserved_rows(shell, rows)
         });
-        let text_viewport = crate::editor::editor_viewport_rect(
-            shell,
-            app.view.border,
-            terminal_block,
-            app.view.margin,
-        );
-        let (_, _, left_margin, _) = app.view.margin.insets();
-        let left_inset = if border_visible { 1u16 } else { 0 };
-        let gutter_w = if app.view.show_line_numbers {
-            let line_count = app.editor.engine().text.len_lines().max(1);
-            crate::editor::line_numbers::layout(line_count, app.view.margin).total_width as u16
+        let pane_terminal = if app.split_active() {
+            None
         } else {
-            0
+            terminal_block
         };
-        let content = text_viewport;
-        if let Some(col) = app.view.guide_column.column() {
-            let guide_x = shell
-                .x
-                .saturating_add(left_inset)
-                .saturating_add(left_margin as u16)
-                .saturating_add(gutter_w)
-                .saturating_add(col as u16);
-            if guide_x < shell.x.saturating_add(shell.width) {
-                frame.render_widget(
-                    Paragraph::new(" ").style(
-                        Style::default()
-                            .fg(palette.border)
-                            .bg(palette.editor_bg),
-                    ),
-                    ratatui::layout::Rect {
-                        x: guide_x,
-                        y: content.y,
-                        width: 1,
-                        height: content.height,
-                    },
-                );
-            }
-        }
-        let title = app.document_title();
         let show_cursor = !app.menu_state.is_open()
             && !app.modal.is_active()
             && app.input_focus == crate::view_state::InputFocus::Editor;
-        app.editor.render(
-            frame,
-            shell,
-            &title,
-            palette,
-            app.view.margin,
-            app.view.border,
-            terminal_block,
-            Some(text_viewport),
-            show_cursor,
-            app.view.show_tabs,
-            app.view.show_line_numbers,
-        );
+
+        if let Some(split) = layout.editor_split {
+            let focused = app.editor_split.focused_pane;
+            let left_idx = Some(app.editor_split.left_tab);
+            let right_idx = app.editor_split.right_tab;
+
+            if focused != SplitPane::Left && split.left.width > 0 {
+                paint_pane(
+                    app,
+                    frame,
+                    split.left,
+                    left_idx,
+                    palette,
+                    pane_terminal,
+                    false,
+                    false,
+                    PanelBorder::Plain,
+                );
+            }
+            if focused != SplitPane::Right && split.right.width > 0 {
+                paint_pane(
+                    app,
+                    frame,
+                    split.right,
+                    right_idx,
+                    palette,
+                    pane_terminal,
+                    false,
+                    false,
+                    PanelBorder::Plain,
+                );
+            }
+
+            let (active_area, active_tab) = match focused {
+                SplitPane::Left => (split.left, left_idx),
+                SplitPane::Right => (split.right, right_idx),
+            };
+            if active_area.width > 0 {
+                paint_pane(
+                    app,
+                    frame,
+                    active_area,
+                    active_tab,
+                    palette,
+                    pane_terminal,
+                    show_cursor,
+                    true,
+                    PanelBorder::Double,
+                );
+            }
+        } else {
+            let text_viewport = crate::editor::editor_viewport_rect(
+                shell,
+                app.view.border,
+                terminal_block,
+                app.view.margin,
+            );
+            paint_guide_column(app, frame, shell, text_viewport, palette, border_visible);
+            let title = app.document_title();
+            app.editor.render(
+                frame,
+                shell,
+                &title,
+                palette,
+                app.view.margin,
+                app.view.border,
+                terminal_block,
+                Some(text_viewport),
+                show_cursor,
+                app.view.show_tabs,
+                app.view.show_line_numbers,
+                PanelBorder::Plain,
+            );
+        }
 
         if let Some(div_y) = layout.terminal_divider_y {
             let border_style = Style::default()
@@ -218,10 +248,25 @@ impl UiLayer for EditorLayer {
         InputResult::Unhandled
     }
 
-    fn on_mouse(&self, mouse: MouseEvent, app: &mut crate::app::App, _: UiLayout) -> InputResult {
+    fn on_mouse(&self, mouse: MouseEvent, app: &mut crate::app::App, layout: UiLayout) -> InputResult {
         if !app.mouse_enabled {
             return InputResult::Unhandled;
         }
+
+        if let Some(split) = layout.editor_split {
+            if let Some(pane) = pane_at_column(split, mouse.column) {
+                if pane != app.editor_split.focused_pane {
+                    match mouse.kind {
+                        MouseEventKind::Down(MouseButton::Left) => {
+                            app.focus_editor_pane(pane);
+                            return InputResult::Consumed;
+                        }
+                        _ => return InputResult::Unhandled,
+                    }
+                }
+            }
+        }
+
         let content = app.editor.content_area();
         if !mouse::is_in_editor(&mouse, content) {
             return InputResult::Unhandled;
@@ -231,10 +276,126 @@ impl UiLayer for EditorLayer {
     }
 }
 
+fn paint_pane(
+    app: &mut crate::app::App,
+    frame: &mut ratatui::Frame<'_>,
+    area: Rect,
+    tab_index: Option<usize>,
+    palette: ThemePalette,
+    terminal_block: Option<u16>,
+    show_cursor: bool,
+    use_active_editor: bool,
+    pane_border: PanelBorder,
+) {
+    let border_visible = app.view.border == EditorBorder::Visible;
+    let text_viewport = crate::editor::editor_viewport_rect(
+        area,
+        app.view.border,
+        terminal_block,
+        app.view.margin,
+    );
+    if use_active_editor {
+        paint_guide_column(app, frame, area, text_viewport, palette, border_visible);
+    }
+    let title = app.tab_pane_title(tab_index);
+    if use_active_editor {
+        app.editor.render(
+            frame,
+            area,
+            &title,
+            palette,
+            app.view.margin,
+            app.view.border,
+            terminal_block,
+            Some(text_viewport),
+            show_cursor,
+            app.view.show_tabs,
+            app.view.show_line_numbers,
+            pane_border,
+        );
+    } else if let Some(index) = tab_index {
+        if index < app.workspace.tabs.len() {
+            app.workspace.tabs[index].editor.render(
+                frame,
+                area,
+                &title,
+                palette,
+                app.view.margin,
+                app.view.border,
+                terminal_block,
+                Some(text_viewport),
+                false,
+                app.view.show_tabs,
+                app.view.show_line_numbers,
+                pane_border,
+            );
+        }
+    } else {
+        panel::render_editor_frame_with_border(
+            frame,
+            area,
+            &title,
+            palette.editor_text_style(),
+            Style::default().fg(palette.border).bg(palette.editor_bg),
+            Style::default().fg(palette.editor_fg).bg(palette.editor_bg),
+            border_visible,
+            terminal_block,
+            pane_border,
+        );
+    }
+}
+
+fn paint_guide_column(
+    app: &crate::app::App,
+    frame: &mut ratatui::Frame<'_>,
+    shell: Rect,
+    text_viewport: Rect,
+    palette: ThemePalette,
+    border_visible: bool,
+) {
+    let (_, _, left_margin, _) = app.view.margin.insets();
+    let left_inset = if border_visible { 1u16 } else { 0 };
+    let gutter_w = if app.view.show_line_numbers {
+        let line_count = app.editor.engine().text.len_lines().max(1);
+        crate::editor::line_numbers::layout(line_count, app.view.margin).total_width as u16
+    } else {
+        0
+    };
+    if let Some(col) = app.view.guide_column.column() {
+        let guide_x = shell
+            .x
+            .saturating_add(left_inset)
+            .saturating_add(left_margin as u16)
+            .saturating_add(gutter_w)
+            .saturating_add(col as u16);
+        if guide_x < shell.x.saturating_add(shell.width) {
+            frame.render_widget(
+                Paragraph::new(" ").style(
+                    Style::default()
+                        .fg(palette.border)
+                        .bg(palette.editor_bg),
+                ),
+                ratatui::layout::Rect {
+                    x: guide_x,
+                    y: text_viewport.y,
+                    width: 1,
+                    height: text_viewport.height,
+                },
+            );
+        }
+    }
+}
+
 fn handle_ctrl_key(app: &mut crate::app::App, key: KeyEvent) -> InputResult {
     use crossterm::event::KeyCode;
 
     match key.code {
+        KeyCode::Char('1') => {
+            app.chord_editor_single_or_left();
+        }
+        KeyCode::Char('2') => {
+            app.chord_editor_split_or_right();
+        }
         KeyCode::Char('q' | 'Q') => app.request_quit(),
         KeyCode::Char('s' | 'S') => app.request_save(),
         KeyCode::Char('o' | 'O') => app.request_open(),
@@ -245,7 +406,7 @@ fn handle_ctrl_key(app: &mut crate::app::App, key: KeyEvent) -> InputResult {
         KeyCode::Char('y' | 'Y') => app.editor.execute(EditorCommand::Redo),
         KeyCode::Char('a' | 'A') => app.editor.execute(EditorCommand::SelectAll),
         KeyCode::Char('f' | 'F') => app.modal = Modal::find("Buscar", &app.find_pattern),
-        KeyCode::Char('h' | 'H') => {
+        KeyCode::Char('r' | 'R') => {
             app.modal = Modal::find_replace("Substituir", &app.find_pattern, "");
         }
         KeyCode::Char('c' | 'C') => {

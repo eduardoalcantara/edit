@@ -213,7 +213,7 @@ pub const PATH_RENAME: [DialogButton; 2] = [
 
 pub const FIND: [DialogButton; 2] = [
     DialogButton::new(
-        "OK",
+        "Buscar",
         "Busca a próxima ocorrência do texto",
         DialogButtonAction::Primary,
     ),
@@ -226,7 +226,7 @@ pub const FIND: [DialogButton; 2] = [
 
 pub const FIND_REPLACE: [DialogButton; 2] = [
     DialogButton::new(
-        "OK",
+        "Substituir",
         "Busca o texto e aplica a substituição",
         DialogButtonAction::Primary,
     ),

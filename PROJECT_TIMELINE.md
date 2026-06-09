@@ -2,7 +2,7 @@
 
 **Autor:** Perplexity AI  
 **Data:** 2026-06-08  
-**Versão:** 3.5
+**Versão:** 3.6
 
 ## Registro
 
@@ -154,3 +154,10 @@
   - Módulos: `src/modal/{file_browser,help,help_content}.rs`, `src/ui/layers/modal.rs`, `src/menus.rs`, `src/app.rs`, `src/config.rs`
   - Specs: `specs/done/SPEC-MODAL-ARQUIVO.md`, `specs/done/SPEC-MENU-AJUDA.md`
   - Testes: **138** total (`cargo test`); branch **`fase2`**
+- 2026-06-09 — **Editor split view** — dois painéis 50/50; `Ctrl+1`/`Ctrl+2`; borda dupla no foco; persistência `exibir.split_editor`.
+  - Módulos: `src/editor_split.rs`, `src/app_editor_split.rs`, `src/ui/{layers/editor,layout}.rs`, `src/config.rs`
+  - Spec: `specs/done/SPEC-EDITOR-SPLIT-VIEW.md` (movido de `to-do/`)
+- 2026-06-09 — **TextInput + modais Buscar/Substituir/Ir para linha** — edição padrão em campos de modal; destaque múltiplo de busca; Esc corrigido (modal fecha, editor limpa busca ou sai).
+  - Módulos: `src/modal/{text_input,find_replace,go_to_line,form_controls}.rs`, `src/editor/{search,render,engine}.rs`, `src/ui/compositor.rs`
+  - Spec: `specs/done/SPEC-MODAL-TEXT-INPUT-BUSCA.md`
+  - Testes: **157** total (`cargo test`); branch **`editor-split`**

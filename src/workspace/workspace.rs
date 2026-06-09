@@ -22,6 +22,7 @@ pub enum PromptReason {
     EvictTail,
     Quit,
     CloseAll,
+    OpenInPane,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

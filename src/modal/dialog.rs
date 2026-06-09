@@ -178,6 +178,11 @@ pub(crate) fn dialog_content_rect(area: Rect) -> Rect {
     content_rect(area)
 }
 
+/// Linhas úteis dentro da moldura (borda dupla + margens internas = 4 linhas).
+pub(crate) fn dialog_outer_height(content_rows: u16) -> u16 {
+    content_rows.saturating_add(4)
+}
+
 pub(crate) fn dialog_button_row_y(content: Rect) -> u16 {
     button_row_y(content)
 }
