@@ -5,8 +5,6 @@ use crate::modal::{
     convert_tab::ConvertTabKeyResult, file_browser::FileBrowserKeyResult, help::HelpKeyResult,
     DialogButtonAction, DialogKeyResult, Modal,
 };
-use crate::modal::dialog::hit_dialog_button;
-use crate::modal::file_browser::FileBrowserModal;
 use crate::theme::ThemePalette;
 use crate::ui::layer::{InputResult, LayerId, UiLayer};
 use crate::ui::layout::UiLayout;
@@ -260,10 +258,12 @@ impl UiLayer for ModalLayer {
             Modal::FileBrowser(modal) => {
                 let outer = modal.outer_rect(frame);
                 if matches!(mouse.kind, MouseEventKind::Down(MouseButton::Left)) {
-                    if modal.handle_mouse(&mouse, outer) && modal.pending_submit {
-                        app.submit_file_browser();
-                    } else if let Some(idx) = hit_dialog_button_file_browser(modal, &mouse, outer) {
-                        activate_button(app, idx);
+                    if modal.handle_mouse(&mouse, outer) {
+                        if modal.pending_submit {
+                            app.submit_file_browser();
+                        } else if let Some(idx) = modal.hit_inline_button(&mouse, outer) {
+                            activate_button(app, idx);
+                        }
                     }
                 } else {
                     modal.handle_mouse(&mouse, outer);
@@ -310,7 +310,7 @@ impl UiLayer for ModalLayer {
     fn footer_hint(&self, app: &crate::app::App) -> Option<String> {
         match &app.modal {
             Modal::ConvertTabulation(modal) => modal.focused_help().map(str::to_string),
-            Modal::FileBrowser(modal) => modal.focused_help().map(str::to_string),
+            Modal::FileBrowser(modal) => modal.focused_help(),
             Modal::Help(modal) => modal.focused_help().map(str::to_string),
             _ => app
                 .modal
@@ -342,12 +342,4 @@ fn activate_button(app: &mut crate::app::App, index: usize) {
         },
         _ => app.cancel_modal(),
     }
-}
-
-fn hit_dialog_button_file_browser(
-    modal: &FileBrowserModal,
-    mouse: &MouseEvent,
-    outer: ratatui::layout::Rect,
-) -> Option<usize> {
-    hit_dialog_button(mouse, outer, modal.dialog.buttons)
 }

@@ -1,7 +1,7 @@
 mod listing;
 mod path_resolve;
 
-pub use listing::{FileEntry, FileEntryKind, format_metadata_line, list_directory};
+pub use listing::{FileEntry, FileEntryKind, list_directory};
 pub use path_resolve::{
     infer_filter_from_path, initial_directory, resolve_open_target, resolve_save_target,
     suggest_file_name,
@@ -13,21 +13,22 @@ use std::time::Instant;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseEvent, MouseEventKind};
 use ratatui::layout::Rect;
 use ratatui::style::{Modifier, Style};
-use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 use ratatui::Frame;
 
 use crate::modal::buttons::{FILE_BROWSER_OPEN, FILE_BROWSER_SAVE};
 use crate::modal::dialog::{
-    centered_dialog_rect, dialog_button_row_y, dialog_content_rect, hit_dialog_button,
-    paint_dialog_buttons, paint_titled_dialog_content, Dialog, DialogKeyResult,
+    centered_dialog_rect, dialog_content_rect, paint_titled_dialog_content, Dialog,
 };
 use crate::theme::ThemePalette;
 use crate::widgets::panel::{self, PanelBorder};
 
-const MIN_WIDTH: u16 = 60;
-const MIN_HEIGHT: u16 = 18;
-const LIST_MIN_ROWS: u16 = 6;
+const DIALOG_WIDTH: u16 = 50;
+/// Altura máxima da moldura (sem contar a sombra de 1 linha abaixo).
+const MAX_OUTER_HEIGHT: u16 = 24;
+const MIN_OUTER_HEIGHT: u16 = 16;
+const FIELD_HEIGHT: u16 = 1;
+const LIST_MIN_ROWS: u16 = 3;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FileBrowserMode {
@@ -39,8 +40,16 @@ pub enum FileBrowserMode {
 impl FileBrowserMode {
     pub fn title(self) -> &'static str {
         match self {
-            FileBrowserMode::Open => "Open File",
-            FileBrowserMode::Save | FileBrowserMode::SaveAs => "Save File As",
+            FileBrowserMode::Open => "Abrir",
+            FileBrowserMode::Save => "Salvar",
+            FileBrowserMode::SaveAs => "Salvar Como",
+        }
+    }
+
+    fn primary_label(self) -> &'static str {
+        match self {
+            FileBrowserMode::Open => "Abrir",
+            FileBrowserMode::Save | FileBrowserMode::SaveAs => "Salvar",
         }
     }
 }
@@ -51,7 +60,8 @@ pub enum FileBrowserFocus {
     List,
     Filter,
     HiddenToggle,
-    Buttons,
+    PrimaryButton,
+    CancelButton,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -65,13 +75,13 @@ pub enum FileBrowserKeyResult {
 struct Layout {
     name_label: Rect,
     name_field: Rect,
+    primary_btn: Rect,
     files_label: Rect,
+    hidden_toggle: Rect,
     list_box: Rect,
     filter_label: Rect,
     filter_field: Rect,
-    hidden_row: Rect,
-    status_bar: Rect,
-    button_y: u16,
+    cancel_btn: Rect,
 }
 
 #[derive(Debug, Clone)]
@@ -141,10 +151,14 @@ impl FileBrowserModal {
     }
 
     pub fn resolved_path(&self) -> PathBuf {
-        let selected = self.entries.get(self.list_cursor).map(|e| e.path.as_path());
         match self.mode {
             FileBrowserMode::Open => {
-                resolve_open_target(&self.current_dir, &self.name_input, selected)
+                if let Some(entry) = self.entries.get(self.list_cursor) {
+                    if entry.kind == FileEntryKind::File {
+                        return entry.path.clone();
+                    }
+                }
+                resolve_open_target(&self.current_dir, &self.name_input)
             }
             FileBrowserMode::Save | FileBrowserMode::SaveAs => {
                 resolve_save_target(&self.current_dir, &self.name_input)
@@ -153,9 +167,20 @@ impl FileBrowserModal {
     }
 
     pub fn outer_rect(&self, area: Rect) -> Rect {
-        let width = area.width.saturating_mul(78).saturating_div(100).max(MIN_WIDTH);
-        let height = area.height.saturating_mul(72).saturating_div(100).max(MIN_HEIGHT);
-        centered_dialog_rect(area, width.min(area.width), height.min(area.height))
+        let width = DIALOG_WIDTH.min(area.width);
+        let proportional = area.height.saturating_mul(65).saturating_div(100);
+        let height = proportional
+            .max(MIN_OUTER_HEIGHT)
+            .min(MAX_OUTER_HEIGHT)
+            .min(area.height);
+        centered_dialog_rect(area, width, height)
+    }
+
+    /// Linhas da moldura + 1 linha de sombra horizontal (quando cabe no terminal).
+    pub fn total_footprint_rows(&self, area: Rect) -> u16 {
+        let outer = self.outer_rect(area);
+        let shadow = u16::from(outer.y.saturating_add(outer.height) < area.height);
+        outer.height.saturating_add(shadow)
     }
 
     pub fn paint(&self, frame: &mut Frame<'_>, area: Rect, palette: ThemePalette) {
@@ -163,7 +188,7 @@ impl FileBrowserModal {
         let content = paint_titled_dialog_content(frame, area, self.mode.title(), palette);
         let layout = self.layout(content);
 
-        self.paint_label(frame, layout.name_label, "Name", palette);
+        self.paint_label(frame, layout.name_label, "Nome", palette);
         self.paint_field(
             frame,
             layout.name_field,
@@ -171,11 +196,19 @@ impl FileBrowserModal {
             self.focus == FileBrowserFocus::Name,
             palette,
         );
+        self.paint_button(
+            frame,
+            layout.primary_btn,
+            self.mode.primary_label(),
+            self.focus == FileBrowserFocus::PrimaryButton,
+            palette,
+        );
 
-        self.paint_label(frame, layout.files_label, "Files", palette);
+        self.paint_label(frame, layout.files_label, "Arquivos", palette);
+        self.paint_hidden_toggle(frame, layout.hidden_toggle, palette);
         self.paint_list(frame, layout.list_box, palette);
 
-        self.paint_label(frame, layout.filter_label, "Filter", palette);
+        self.paint_label(frame, layout.filter_label, "Filtro", palette);
         self.paint_field(
             frame,
             layout.filter_field,
@@ -183,20 +216,11 @@ impl FileBrowserModal {
             self.focus == FileBrowserFocus::Filter,
             palette,
         );
-
-        self.paint_hidden_toggle(frame, layout.hidden_row, palette);
-        self.paint_status(frame, layout.status_bar, palette);
-
-        paint_dialog_buttons(
+        self.paint_button(
             frame,
-            content,
-            layout.button_y,
-            if self.focus == FileBrowserFocus::Buttons {
-                self.dialog.selected
-            } else {
-                self.dialog.selected
-            },
-            self.dialog.buttons,
+            layout.cancel_btn,
+            "Cancelar",
+            self.focus == FileBrowserFocus::CancelButton,
             palette,
         );
     }
@@ -204,6 +228,21 @@ impl FileBrowserModal {
     fn paint_label(&self, frame: &mut Frame<'_>, area: Rect, text: &str, palette: ThemePalette) {
         frame.render_widget(
             Paragraph::new(text).style(palette.status_style()),
+            area,
+        );
+    }
+
+    fn paint_button(
+        &self,
+        frame: &mut Frame<'_>,
+        area: Rect,
+        label: &str,
+        focused: bool,
+        palette: ThemePalette,
+    ) {
+        let text = format!("[{label}]");
+        frame.render_widget(
+            Paragraph::new(text).style(palette.button_style(focused)),
             area,
         );
     }
@@ -216,46 +255,33 @@ impl FileBrowserModal {
         focused: bool,
         palette: ThemePalette,
     ) {
-        let inner = panel::render_titled_frame(
-            frame,
-            area,
-            "",
-            palette.editor_text_style(),
-            if focused {
-                palette.convert_field_border_style(true)
-            } else {
-                palette.menu_border_style()
-            },
-            palette.menu_panel_style(),
-            false,
-            PanelBorder::Plain,
-        );
+        let mut field_style = palette.editor_text_style();
+        if focused {
+            field_style = field_style.add_modifier(Modifier::BOLD);
+        }
+        panel::fill_rect(frame, area, field_style);
         let display = if focused {
-            format!("{text}▌")
+            format!(" {text}▌")
         } else {
-            text.to_string()
+            format!(" {text}")
         };
-        frame.render_widget(
-            Paragraph::new(display).style(palette.editor_text_style()),
-            inner,
-        );
+        frame.render_widget(Paragraph::new(display).style(field_style), area);
     }
 
     fn paint_list(&self, frame: &mut Frame<'_>, area: Rect, palette: ThemePalette) {
-        let inner = panel::render_titled_frame(
+        let border_style = if self.focus == FileBrowserFocus::List {
+            palette.convert_field_border_style(true)
+        } else {
+            palette.menu_border_style()
+        };
+        panel::render_frame(
             frame,
             area,
-            "",
-            Style::default().bg(ratatui::style::Color::Cyan).fg(ratatui::style::Color::Black),
-            if self.focus == FileBrowserFocus::List {
-                palette.convert_field_border_style(true)
-            } else {
-                palette.menu_border_style()
-            },
             Style::default().bg(ratatui::style::Color::Cyan),
-            false,
+            border_style,
             PanelBorder::Plain,
         );
+        let inner = panel::inner_rect(area);
         let visible = inner.height as usize;
         for row in 0..visible {
             let idx = self.list_scroll + row;
@@ -311,46 +337,19 @@ impl FileBrowserModal {
         );
     }
 
-    fn paint_status(&self, frame: &mut Frame<'_>, area: Rect, palette: ThemePalette) {
-        let line1 = if self.status_msg.is_empty() {
-            format!(
-                "{} / {}",
-                self.current_dir.display(),
-                self.filter_input
-            )
-        } else {
-            self.status_msg.clone()
-        };
-        let line2 = self
-            .entries
-            .get(self.list_cursor)
-            .map(format_metadata_line)
-            .unwrap_or_default();
-        let text = vec![
-            Line::from(Span::styled(line1, palette.editor_text_style())),
-            Line::from(Span::styled(line2, palette.editor_text_style())),
-        ];
-        let inner = panel::render_titled_frame(
-            frame,
-            area,
-            "",
-            palette.editor_text_style(),
-            palette.menu_border_style(),
-            palette.menu_panel_style(),
-            false,
-            PanelBorder::Plain,
-        );
-        frame.render_widget(Paragraph::new(text), inner);
-    }
-
-    pub fn focused_help(&self) -> Option<&'static str> {
-        match self.focus {
-            FileBrowserFocus::Name => Some("Nome ou caminho do arquivo"),
-            FileBrowserFocus::List => Some("↑/↓ navega; Enter abre pasta ou confirma arquivo"),
-            FileBrowserFocus::Filter => Some("Máscara de arquivos, ex.: *.rs ou *.*"),
-            FileBrowserFocus::HiddenToggle => Some("Mostra arquivos/pastas ocultos"),
-            FileBrowserFocus::Buttons => self.dialog.focused_help(),
+    pub fn focused_help(&self) -> Option<String> {
+        if !self.status_msg.is_empty() {
+            return Some(self.status_msg.clone());
         }
+        let help = match self.focus {
+            FileBrowserFocus::Name => "Nome ou caminho do arquivo",
+            FileBrowserFocus::List => "↑/↓ navega; Enter abre pasta ou confirma arquivo",
+            FileBrowserFocus::Filter => "Máscara de arquivos, ex.: *.rs ou *.*",
+            FileBrowserFocus::HiddenToggle => "Mostra arquivos/pastas ocultos",
+            FileBrowserFocus::PrimaryButton => self.dialog.buttons[0].help,
+            FileBrowserFocus::CancelButton => self.dialog.buttons[1].help,
+        };
+        Some(help.to_string())
     }
 
     pub fn handle_key(&mut self, key: KeyEvent) -> FileBrowserKeyResult {
@@ -374,25 +373,30 @@ impl FileBrowserModal {
             FileBrowserFocus::List => self.handle_list_key(key),
             FileBrowserFocus::Filter => self.handle_filter_key(key),
             FileBrowserFocus::HiddenToggle => self.handle_hidden_key(key),
-            FileBrowserFocus::Buttons => match self.dialog.handle_button_keys(key) {
-                DialogKeyResult::Activate(_) => FileBrowserKeyResult::Submit,
-                DialogKeyResult::Cancel => FileBrowserKeyResult::Cancel,
-                DialogKeyResult::Consumed => FileBrowserKeyResult::Consumed,
-                DialogKeyResult::Ignored => FileBrowserKeyResult::Consumed,
-            },
+            FileBrowserFocus::PrimaryButton => self.handle_primary_button_key(key),
+            FileBrowserFocus::CancelButton => self.handle_cancel_button_key(key),
+        }
+    }
+
+    fn handle_tab_navigation(&mut self, key: KeyEvent) -> Option<FileBrowserKeyResult> {
+        match key.code {
+            KeyCode::Tab => {
+                self.cycle_focus(1);
+                Some(FileBrowserKeyResult::Consumed)
+            }
+            KeyCode::BackTab => {
+                self.cycle_focus(-1);
+                Some(FileBrowserKeyResult::Consumed)
+            }
+            _ => None,
         }
     }
 
     fn handle_name_key(&mut self, key: KeyEvent) -> FileBrowserKeyResult {
+        if let Some(result) = self.handle_tab_navigation(key) {
+            return result;
+        }
         match key.code {
-            KeyCode::Tab => {
-                self.cycle_focus(1);
-                FileBrowserKeyResult::Consumed
-            }
-            KeyCode::BackTab => {
-                self.cycle_focus(-1);
-                FileBrowserKeyResult::Consumed
-            }
             KeyCode::Enter => FileBrowserKeyResult::Submit,
             KeyCode::Backspace => {
                 self.name_input.pop();
@@ -407,15 +411,10 @@ impl FileBrowserModal {
     }
 
     fn handle_filter_key(&mut self, key: KeyEvent) -> FileBrowserKeyResult {
+        if let Some(result) = self.handle_tab_navigation(key) {
+            return result;
+        }
         match key.code {
-            KeyCode::Tab => {
-                self.cycle_focus(1);
-                FileBrowserKeyResult::Consumed
-            }
-            KeyCode::BackTab => {
-                self.cycle_focus(-1);
-                FileBrowserKeyResult::Consumed
-            }
             KeyCode::Enter => {
                 self.refresh_listing();
                 FileBrowserKeyResult::Consumed
@@ -433,17 +432,13 @@ impl FileBrowserModal {
     }
 
     fn handle_hidden_key(&mut self, key: KeyEvent) -> FileBrowserKeyResult {
+        if let Some(result) = self.handle_tab_navigation(key) {
+            return result;
+        }
         match key.code {
-            KeyCode::Tab | KeyCode::Enter | KeyCode::Char(' ') => {
+            KeyCode::Enter | KeyCode::Char(' ') => {
                 self.show_hidden = !self.show_hidden;
                 self.refresh_listing();
-                if matches!(key.code, KeyCode::Tab) {
-                    self.cycle_focus(1);
-                }
-                FileBrowserKeyResult::Consumed
-            }
-            KeyCode::BackTab => {
-                self.cycle_focus(-1);
                 FileBrowserKeyResult::Consumed
             }
             _ => FileBrowserKeyResult::Consumed,
@@ -451,15 +446,10 @@ impl FileBrowserModal {
     }
 
     fn handle_list_key(&mut self, key: KeyEvent) -> FileBrowserKeyResult {
+        if let Some(result) = self.handle_tab_navigation(key) {
+            return result;
+        }
         match key.code {
-            KeyCode::Tab => {
-                self.cycle_focus(1);
-                FileBrowserKeyResult::Consumed
-            }
-            KeyCode::BackTab => {
-                self.cycle_focus(-1);
-                FileBrowserKeyResult::Consumed
-            }
             KeyCode::Up => {
                 self.move_list_cursor(-1);
                 FileBrowserKeyResult::Consumed
@@ -479,6 +469,46 @@ impl FileBrowserModal {
                 FileBrowserKeyResult::Consumed
             }
             KeyCode::Enter => self.activate_list_entry(),
+            _ => FileBrowserKeyResult::Consumed,
+        }
+    }
+
+    fn handle_primary_button_key(&mut self, key: KeyEvent) -> FileBrowserKeyResult {
+        if let Some(result) = self.handle_tab_navigation(key) {
+            return result;
+        }
+        match key.code {
+            KeyCode::Enter | KeyCode::Char(' ') => FileBrowserKeyResult::Submit,
+            KeyCode::Left => {
+                self.focus = FileBrowserFocus::CancelButton;
+                self.dialog.set_selected(1);
+                FileBrowserKeyResult::Consumed
+            }
+            KeyCode::Right => {
+                self.focus = FileBrowserFocus::CancelButton;
+                self.dialog.set_selected(1);
+                FileBrowserKeyResult::Consumed
+            }
+            _ => FileBrowserKeyResult::Consumed,
+        }
+    }
+
+    fn handle_cancel_button_key(&mut self, key: KeyEvent) -> FileBrowserKeyResult {
+        if let Some(result) = self.handle_tab_navigation(key) {
+            return result;
+        }
+        match key.code {
+            KeyCode::Enter | KeyCode::Char(' ') => FileBrowserKeyResult::Cancel,
+            KeyCode::Left => {
+                self.focus = FileBrowserFocus::PrimaryButton;
+                self.dialog.set_selected(0);
+                FileBrowserKeyResult::Consumed
+            }
+            KeyCode::Right => {
+                self.focus = FileBrowserFocus::PrimaryButton;
+                self.dialog.set_selected(0);
+                FileBrowserKeyResult::Consumed
+            }
             _ => FileBrowserKeyResult::Consumed,
         }
     }
@@ -506,6 +536,17 @@ impl FileBrowserModal {
         }
     }
 
+    pub fn hit_inline_button(&self, mouse: &MouseEvent, outer: Rect) -> Option<usize> {
+        let layout = self.layout(dialog_content_rect(outer));
+        if rect_contains(layout.primary_btn, mouse) {
+            return Some(0);
+        }
+        if rect_contains(layout.cancel_btn, mouse) {
+            return Some(1);
+        }
+        None
+    }
+
     pub fn handle_mouse(&mut self, mouse: &MouseEvent, outer: Rect) -> bool {
         let content = dialog_content_rect(outer);
         let layout = self.layout(content);
@@ -515,11 +556,24 @@ impl FileBrowserModal {
                     self.focus = FileBrowserFocus::Name;
                     return true;
                 }
+                if rect_contains(layout.primary_btn, mouse) {
+                    self.focus = FileBrowserFocus::PrimaryButton;
+                    self.dialog.set_selected(0);
+                    if matches!(mouse.kind, MouseEventKind::Down(_)) {
+                        self.pending_submit = true;
+                    }
+                    return true;
+                }
                 if rect_contains(layout.filter_field, mouse) {
                     self.focus = FileBrowserFocus::Filter;
                     return true;
                 }
-                if rect_contains(layout.hidden_row, mouse) {
+                if rect_contains(layout.cancel_btn, mouse) {
+                    self.focus = FileBrowserFocus::CancelButton;
+                    self.dialog.set_selected(1);
+                    return true;
+                }
+                if rect_contains(layout.hidden_toggle, mouse) {
                     self.focus = FileBrowserFocus::HiddenToggle;
                     if matches!(mouse.kind, MouseEventKind::Down(_)) {
                         self.show_hidden = !self.show_hidden;
@@ -527,46 +581,49 @@ impl FileBrowserModal {
                     }
                     return true;
                 }
-                if let Some(idx) = self.hit_list(mouse, layout.list_box) {
+                if rect_contains(layout.list_box, mouse) {
                     self.focus = FileBrowserFocus::List;
-                    if idx != self.list_cursor {
-                        self.list_cursor = idx;
-                        self.sync_name_from_selection();
-                        self.last_click = Some((Instant::now(), idx));
-                    } else if matches!(mouse.kind, MouseEventKind::Down(_)) {
-                        if let Some((t, i)) = self.last_click {
-                            if i == idx && t.elapsed().as_millis() < 400 {
-                                self.pending_submit = matches!(
-                                    self.activate_list_entry(),
-                                    FileBrowserKeyResult::Submit
-                                );
-                                self.last_click = None;
-                                return true;
+                    if let Some(idx) = self.hit_list_item(mouse, layout.list_box) {
+                        if idx != self.list_cursor {
+                            self.list_cursor = idx;
+                            self.sync_name_from_selection();
+                            self.last_click = Some((Instant::now(), idx));
+                        } else if matches!(mouse.kind, MouseEventKind::Down(_)) {
+                            if let Some((t, i)) = self.last_click {
+                                if i == idx && t.elapsed().as_millis() < 400 {
+                                    self.pending_submit = matches!(
+                                        self.activate_list_entry(),
+                                        FileBrowserKeyResult::Submit
+                                    );
+                                    self.last_click = None;
+                                    return true;
+                                }
                             }
+                            self.last_click = Some((Instant::now(), idx));
                         }
-                        self.last_click = Some((Instant::now(), idx));
                     }
-                    return true;
-                }
-                if let Some(idx) = hit_dialog_button(mouse, outer, self.dialog.buttons) {
-                    self.focus = FileBrowserFocus::Buttons;
-                    self.dialog.set_selected(idx);
                     return true;
                 }
             }
             MouseEventKind::Moved => {
-                if let Some(idx) = hit_dialog_button(mouse, outer, self.dialog.buttons) {
-                    self.dialog.set_selected(idx);
+                if rect_contains(layout.primary_btn, mouse) {
+                    self.focus = FileBrowserFocus::PrimaryButton;
+                    self.dialog.set_selected(0);
+                } else if rect_contains(layout.cancel_btn, mouse) {
+                    self.focus = FileBrowserFocus::CancelButton;
+                    self.dialog.set_selected(1);
                 }
             }
             MouseEventKind::ScrollUp => {
                 if rect_contains(layout.list_box, mouse) {
+                    self.focus = FileBrowserFocus::List;
                     self.move_list_cursor(-3);
                     return true;
                 }
             }
             MouseEventKind::ScrollDown => {
                 if rect_contains(layout.list_box, mouse) {
+                    self.focus = FileBrowserFocus::List;
                     self.move_list_cursor(3);
                     return true;
                 }
@@ -581,14 +638,11 @@ impl FileBrowserModal {
             self.pending_submit = false;
             return true;
         }
-        self.focus == FileBrowserFocus::Buttons
-            && self.dialog.selected_action()
-                == Some(crate::modal::DialogButtonAction::Primary)
+        false
     }
 
-    fn hit_list(&self, mouse: &MouseEvent, list_box: Rect) -> Option<usize> {
+    fn hit_list_item(&self, mouse: &MouseEvent, list_box: Rect) -> Option<usize> {
         let inner = panel::inner_rect(list_box);
-        let inner = panel::inset_rect(inner, 1, 1, 1, 1);
         if !rect_contains(inner, mouse) {
             return None;
         }
@@ -602,49 +656,82 @@ impl FileBrowserModal {
     }
 
     fn layout(&self, content: Rect) -> Layout {
-        let mut y = content.y;
         let w = content.width;
+        let primary_w = button_width(self.mode.primary_label());
+        let cancel_w = button_width("Cancelar");
+        let hidden_w = hidden_toggle_width();
+
+        let mut y = content.y;
+
         let name_label = Rect { x: content.x, y, width: w, height: 1 };
         y += 1;
-        let name_field = Rect { x: content.x, y, width: w.saturating_sub(12), height: 3 };
-        y += 3;
+
+        let name_field = Rect {
+            x: content.x,
+            y,
+            width: w.saturating_sub(primary_w.saturating_add(1)),
+            height: FIELD_HEIGHT,
+        };
+        let primary_btn = Rect {
+            x: name_field.x.saturating_add(name_field.width.saturating_add(1)),
+            y,
+            width: primary_w,
+            height: 1,
+        };
+        y += FIELD_HEIGHT;
+
+        let files_label = Rect {
+            x: content.x,
+            y,
+            width: w.saturating_sub(hidden_w),
+            height: 1,
+        };
+        let hidden_toggle = Rect {
+            x: content.x.saturating_add(w.saturating_sub(hidden_w)),
+            y,
+            width: hidden_w,
+            height: 1,
+        };
         y += 1;
-        let files_label = Rect { x: content.x, y, width: w, height: 1 };
-        y += 1;
-        let list_height = content
-            .height
-            .saturating_sub(16)
-            .max(LIST_MIN_ROWS);
+
+        let filter_label = Rect {
+            x: content.x,
+            y: content.y.saturating_add(content.height.saturating_sub(FIELD_HEIGHT + 1)),
+            width: w,
+            height: 1,
+        };
+        let filter_field = Rect {
+            x: content.x,
+            y: filter_label.y.saturating_add(1),
+            width: w.saturating_sub(cancel_w.saturating_add(1)),
+            height: FIELD_HEIGHT,
+        };
+        let cancel_btn = Rect {
+            x: filter_field.x.saturating_add(filter_field.width.saturating_add(1)),
+            y: filter_field.y,
+            width: cancel_w,
+            height: 1,
+        };
+
+        let available_list = filter_label.y.saturating_sub(y);
+        let list_height = available_list.max(LIST_MIN_ROWS);
         let list_box = Rect {
             x: content.x,
             y,
-            width: w.saturating_sub(12),
+            width: w,
             height: list_height,
         };
-        y += list_height;
-        y += 1;
-        let filter_label = Rect { x: content.x, y, width: w, height: 1 };
-        y += 1;
-        let filter_field = Rect { x: content.x, y, width: w.saturating_sub(12), height: 3 };
-        y += 3;
-        let hidden_row = Rect { x: content.x, y, width: w, height: 1 };
-        y += 1;
-        let status_bar = Rect {
-            x: content.x,
-            y,
-            width: w,
-            height: 2,
-        };
+
         Layout {
             name_label,
             name_field,
+            primary_btn,
             files_label,
+            hidden_toggle,
             list_box,
             filter_label,
             filter_field,
-            hidden_row,
-            status_bar,
-            button_y: dialog_button_row_y(content),
+            cancel_btn,
         }
     }
 
@@ -654,7 +741,8 @@ impl FileBrowserModal {
             FileBrowserFocus::List,
             FileBrowserFocus::Filter,
             FileBrowserFocus::HiddenToggle,
-            FileBrowserFocus::Buttons,
+            FileBrowserFocus::PrimaryButton,
+            FileBrowserFocus::CancelButton,
         ];
         let current = order
             .iter()
@@ -663,6 +751,11 @@ impl FileBrowserModal {
         let len = order.len() as i32;
         let next = (current + delta).rem_euclid(len) as usize;
         self.focus = order[next];
+        match self.focus {
+            FileBrowserFocus::PrimaryButton => self.dialog.set_selected(0),
+            FileBrowserFocus::CancelButton => self.dialog.set_selected(1),
+            _ => {}
+        }
     }
 
     fn move_list_cursor(&mut self, delta: i32) {
@@ -677,7 +770,7 @@ impl FileBrowserModal {
     }
 
     fn ensure_list_visible(&mut self) {
-        let visible = LIST_MIN_ROWS as usize;
+        let visible = estimated_list_viewport();
         if self.list_cursor < self.list_scroll {
             self.list_scroll = self.list_cursor;
         } else if self.list_cursor >= self.list_scroll.saturating_add(visible) {
@@ -687,8 +780,9 @@ impl FileBrowserModal {
 
     fn sync_name_from_selection(&mut self) {
         if let Some(entry) = self.entries.get(self.list_cursor) {
-            if entry.kind == FileEntryKind::File {
-                self.name_input = entry.name.clone();
+            match entry.kind {
+                FileEntryKind::File => self.name_input = entry.name.clone(),
+                FileEntryKind::Dir | FileEntryKind::Parent => self.name_input.clear(),
             }
         }
     }
@@ -699,6 +793,28 @@ impl FileBrowserModal {
         self.list_scroll = 0;
         self.refresh_listing();
     }
+}
+
+fn button_width(label: &str) -> u16 {
+    label.chars().count() as u16 + 2
+}
+
+fn hidden_toggle_width() -> u16 {
+    "[ ] Mostrar arquivos ocultos".chars().count() as u16
+}
+
+/// Linhas visíveis dentro da lista (estimativa conservadora para scroll).
+fn estimated_list_viewport() -> usize {
+    let content_h = MAX_OUTER_HEIGHT.saturating_sub(4);
+    let fixed = 1 + FIELD_HEIGHT + 1 + 1 + FIELD_HEIGHT;
+    panel::inner_rect(Rect {
+        x: 0,
+        y: 0,
+        width: 1,
+        height: content_h.saturating_sub(fixed).max(LIST_MIN_ROWS),
+    })
+    .height
+    .max(1) as usize
 }
 
 fn rect_contains(r: Rect, mouse: &MouseEvent) -> bool {
@@ -714,9 +830,58 @@ mod tests {
     use std::fs;
 
     #[test]
+    fn parent_entry_navigates_on_enter() {
+        let base = std::env::temp_dir().join(format!("edit-fb-parent-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&base);
+        fs::create_dir_all(&base).unwrap();
+        fs::create_dir_all(base.join("sub")).unwrap();
+
+        let mut modal = FileBrowserModal::new(
+            FileBrowserMode::Open,
+            base.join("sub"),
+            String::new(),
+            "*.*".to_string(),
+            true,
+        );
+        assert_eq!(modal.entries.first().map(|e| e.name.as_str()), Some(".."));
+        modal.list_cursor = 0;
+        assert!(matches!(
+            modal.activate_list_entry(),
+            FileBrowserKeyResult::Consumed
+        ));
+        assert_eq!(modal.current_dir, base);
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn resolved_path_ignores_directory_selection() {
+        let base = std::env::temp_dir().join(format!("edit-fb-resolve-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&base);
+        fs::create_dir_all(&base).unwrap();
+        fs::create_dir_all(base.join("sub")).unwrap();
+
+        let mut modal = FileBrowserModal::new(
+            FileBrowserMode::Open,
+            base.clone(),
+            String::new(),
+            "*.*".to_string(),
+            true,
+        );
+        let sub_idx = modal
+            .entries
+            .iter()
+            .position(|e| e.name == "sub")
+            .expect("subdir");
+        modal.list_cursor = sub_idx;
+        assert_eq!(modal.resolved_path(), base);
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    #[test]
     fn enter_directory_updates_listing() {
         let base = std::env::temp_dir().join(format!("edit-fb-enter-{}", std::process::id()));
         let _ = fs::remove_dir_all(&base);
+        fs::create_dir_all(&base).unwrap();
         fs::create_dir_all(base.join("sub")).unwrap();
         fs::write(base.join("sub/a.txt"), b"hi").unwrap();
 
@@ -732,5 +897,57 @@ mod tests {
         modal.enter_directory(sub);
         assert!(modal.entries.iter().any(|e| e.name == "a.txt"));
         let _ = fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn outer_rect_never_exceeds_max_height() {
+        let modal = FileBrowserModal::new(
+            FileBrowserMode::Open,
+            std::env::temp_dir(),
+            String::new(),
+            "*.*".to_string(),
+            false,
+        );
+        for term_h in [25u16, 30, 40, 80] {
+            let area = Rect {
+                x: 0,
+                y: 0,
+                width: 80,
+                height: term_h,
+            };
+            assert!(
+                modal.outer_rect(area).height <= MAX_OUTER_HEIGHT,
+                "outer height on {term_h}-row terminal"
+            );
+            assert!(
+                modal.total_footprint_rows(area) <= 25,
+                "footprint on {term_h}-row terminal"
+            );
+        }
+    }
+
+    #[test]
+    fn tab_cycles_all_focus_targets() {
+        let modal = FileBrowserModal::new(
+            FileBrowserMode::Open,
+            std::env::temp_dir(),
+            String::new(),
+            "*.*".to_string(),
+            false,
+        );
+        let mut modal = modal;
+        modal.focus = FileBrowserFocus::Name;
+        modal.cycle_focus(1);
+        assert_eq!(modal.focus, FileBrowserFocus::List);
+        modal.cycle_focus(1);
+        assert_eq!(modal.focus, FileBrowserFocus::Filter);
+        modal.cycle_focus(1);
+        assert_eq!(modal.focus, FileBrowserFocus::HiddenToggle);
+        modal.cycle_focus(1);
+        assert_eq!(modal.focus, FileBrowserFocus::PrimaryButton);
+        modal.cycle_focus(1);
+        assert_eq!(modal.focus, FileBrowserFocus::CancelButton);
+        modal.cycle_focus(1);
+        assert_eq!(modal.focus, FileBrowserFocus::Name);
     }
 }

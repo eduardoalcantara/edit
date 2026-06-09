@@ -61,10 +61,7 @@ pub fn resolve_name(current_dir: &Path, name: &str) -> PathBuf {
     }
 }
 
-pub fn resolve_open_target(current_dir: &Path, name: &str, selected: Option<&Path>) -> PathBuf {
-    if let Some(path) = selected {
-        return path.to_path_buf();
-    }
+pub fn resolve_open_target(current_dir: &Path, name: &str) -> PathBuf {
     resolve_name(current_dir, name)
 }
 

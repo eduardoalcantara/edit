@@ -733,7 +733,7 @@ fn view_menu(view: &ViewState) -> Vec<MenuNode> {
 fn help_menu() -> Vec<MenuNode> {
     vec![
         item(
-            "Features",
+            "Funcionalidades",
             Some("F1"),
             ActionId::HelpFeatures,
             true,

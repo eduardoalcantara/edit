@@ -232,7 +232,7 @@ mod tests {
     fn parent_entry_first_when_parent_exists() {
         let dir = temp_dir("parent");
         let sub = dir.join("sub");
-        fs::create_dir(&sub).unwrap();
+        fs::create_dir_all(&sub).unwrap();
         let entries = list_directory(&sub, "*.*", true).unwrap();
         assert_eq!(entries.first().map(|e| e.kind), Some(FileEntryKind::Parent));
         let _ = fs::remove_dir_all(&dir);

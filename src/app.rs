@@ -775,21 +775,42 @@ impl App {
     }
 
     pub fn submit_file_browser(&mut self) {
-        let Modal::FileBrowser(modal) = &self.modal else {
+        use crate::modal::file_browser::FileEntryKind;
+
+        let Modal::FileBrowser(modal) = &mut self.modal else {
             return;
         };
+
+        if modal.mode == FileBrowserMode::Open {
+            if let Some(entry) = modal.entries.get(modal.list_cursor).cloned() {
+                if matches!(entry.kind, FileEntryKind::Parent | FileEntryKind::Dir) {
+                    modal.enter_directory(entry.path);
+                    return;
+                }
+            }
+        }
+
         let mode = modal.mode;
         let path = modal.resolved_path();
-        if modal.name_input.trim().is_empty() {
+
+        let has_file_selection = modal
+            .entries
+            .get(modal.list_cursor)
+            .is_some_and(|e| e.kind == FileEntryKind::File);
+
+        if modal.name_input.trim().is_empty() && !has_file_selection {
             self.set_status("Informe um nome de arquivo");
             return;
         }
-        match mode {
-            FileBrowserMode::Open if !path.is_file() => {
-                self.set_status("Arquivo não encontrado");
-                return;
-            }
-            _ => {}
+
+        if mode == FileBrowserMode::Open && path.is_dir() {
+            modal.enter_directory(path);
+            return;
+        }
+
+        if mode == FileBrowserMode::Open && !path.is_file() {
+            self.set_status("Arquivo não encontrado");
+            return;
         }
 
         let show_hidden = modal.show_hidden;

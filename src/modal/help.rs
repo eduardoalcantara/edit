@@ -22,7 +22,7 @@ pub enum HelpKind {
 impl HelpKind {
     fn title(self) -> &'static str {
         match self {
-            HelpKind::Features => "Features",
+            HelpKind::Features => "Funcionalidades",
             HelpKind::Shortcuts => "Atalhos",
             HelpKind::About => "Sobre",
         }

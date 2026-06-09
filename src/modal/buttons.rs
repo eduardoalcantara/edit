@@ -166,8 +166,31 @@ pub const PATH_SAVE_AS: [DialogButton; 2] = [
     ),
 ];
 
-pub const FILE_BROWSER_OPEN: [DialogButton; 2] = PATH_OPEN;
-pub const FILE_BROWSER_SAVE: [DialogButton; 2] = PATH_SAVE_AS;
+pub const FILE_BROWSER_OPEN: [DialogButton; 2] = [
+    DialogButton::new(
+        "Abrir",
+        "Abre o arquivo selecionado ou indicado no campo Nome",
+        DialogButtonAction::Primary,
+    ),
+    DialogButton::new(
+        "Cancelar",
+        "Fecha o diálogo sem alterar o documento",
+        DialogButtonAction::Cancel,
+    ),
+];
+
+pub const FILE_BROWSER_SAVE: [DialogButton; 2] = [
+    DialogButton::new(
+        "Salvar",
+        "Grava o documento no caminho indicado",
+        DialogButtonAction::Primary,
+    ),
+    DialogButton::new(
+        "Cancelar",
+        "Fecha o diálogo sem alterar o documento",
+        DialogButtonAction::Cancel,
+    ),
+];
 
 pub const HELP_CLOSE: [DialogButton; 1] = [DialogButton::new(
     "Fechar",

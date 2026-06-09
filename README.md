@@ -110,7 +110,7 @@ edit --workspace -- main.rs tests/mod.rs
 | `Esc` | Sair (editor, sem menu/modal) |
 | `Alt+A` | Menu Arquivo |
 | `Alt+H` | Menu Ajuda |
-| **`F1`** | Ajuda → Features |
+| **`F1`** | Ajuda → Funcionalidades |
 | `Ctrl+T` / `Ctrl+'` | Do editor: abre/foca terminal; do terminal: fecha painel |
 | **`Ctrl+E`** | Foco no editor |
 | **`Ctrl+G`** | Ir para linha... |
