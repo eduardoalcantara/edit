@@ -530,7 +530,7 @@ impl App {
         let old_session = self.workspace.tabs[index].session_id.clone();
         let _ = purge_tab(&old_session);
         self.workspace.tabs[index] = new_tab;
-        self.focus_tab(index);
+        self.focus_tab_unchecked(index);
         if self.split_active() {
             self.editor_split
                 .set_pane_tab(self.editor_split.focused_pane, index);
@@ -551,7 +551,7 @@ impl App {
             }
         } else {
             self.workspace.insert_tab_at_top(tab);
-            self.focus_tab(0);
+            self.focus_tab_unchecked(0);
             self.on_tab_count_changed();
         }
         self.recent.remove_path(path);
@@ -1144,6 +1144,19 @@ mod tests {
     }
 
     #[test]
+    #[test]
+    fn cli_open_loads_file_content_into_editor() {
+        let path =
+            std::env::temp_dir().join(format!("edit-cli-open-{}.txt", std::process::id()));
+        std::fs::write(&path, "conteudo cli").unwrap();
+
+        let mut app = App::new(false, false);
+        app.open_cli_files(&[path.clone()]);
+        assert_eq!(app.editor_text_for_test(), "conteudo cli");
+        assert!(app.workspace.tabs[0].filepath().is_some());
+        let _ = std::fs::remove_file(path);
+    }
+
     fn cli_skips_session_restore() {
         let config = sample_config(
             false,

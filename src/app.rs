@@ -204,6 +204,11 @@ impl App {
         self.refresh_menu();
     }
 
+    #[cfg(test)]
+    pub(crate) fn editor_text_for_test(&self) -> String {
+        self.editor.content_string()
+    }
+
     pub(crate) fn persist_user_config(&mut self) {
         self.sync_active_tab();
         let ultimo = self.user_config.arquivo.ultimo_diretorio.clone();
