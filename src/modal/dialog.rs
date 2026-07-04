@@ -14,6 +14,7 @@ use crate::widgets::panel::{self, PanelBorder, DIALOG_MARGIN};
 pub enum DialogButtonAction {
     Primary,
     Secondary,
+    Tertiary,
     Cancel,
 }
 
@@ -136,7 +137,7 @@ impl Dialog {
         }
     }
 
-    pub fn paint(&self, frame: &mut Frame<'_>, area: Rect, palette: ThemePalette) {
+    pub fn paint(&self, frame: &mut Frame<'_>, area: Rect, palette: ThemePalette, use_paren_mnemonics: bool) {
         panel::render_drop_shadow(frame, area, palette);
         let content = draw_titled_content(frame, area, &self.title, palette);
         let body_lines = wrapped_line_count(&self.body, content.width as usize);
@@ -157,7 +158,15 @@ impl Dialog {
             },
         );
         let button_y = content.y.saturating_add(content.height.saturating_sub(1));
-        paint_dialog_buttons(frame, content, button_y, self.selected, self.buttons, palette);
+        paint_dialog_buttons(
+            frame,
+            content,
+            button_y,
+            self.selected,
+            self.buttons,
+            palette,
+            use_paren_mnemonics,
+        );
     }
 
     pub fn hit_button(&self, mouse: &MouseEvent, dialog: Rect) -> Option<usize> {
@@ -235,10 +244,16 @@ pub(crate) fn paint_dialog_buttons(
     selected: usize,
     buttons: &[DialogButton],
     palette: ThemePalette,
+    use_paren_mnemonics: bool,
 ) {
     let mut x = content.x;
     for (i, button) in buttons.iter().enumerate() {
-        let width = button.label.chars().count() as u16 + 2;
+        let label = if use_paren_mnemonics {
+            crate::view_state::format_button_label_paren(button.label)
+        } else {
+            button.label.to_string()
+        };
+        let width = label.chars().count() as u16 + 2;
         let area = Rect {
             x,
             y,
@@ -246,7 +261,7 @@ pub(crate) fn paint_dialog_buttons(
             height: 1,
         };
         let focused = i == selected;
-        let text = format!("[{}]", button.label);
+        let text = format!("[{label}]");
         frame.render_widget(
             Paragraph::new(text).style(palette.button_style(focused)),
             area,

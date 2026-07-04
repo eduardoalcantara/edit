@@ -141,6 +141,7 @@ impl ConvertTabulationModal {
             self.dialog.selected,
             self.dialog.buttons,
             palette,
+            false,
         );
     }
 

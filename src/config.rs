@@ -154,6 +154,13 @@ pub struct ExibirConfig {
     /// `esquerda` ou `direita` — painel com foco ao restaurar.
     #[serde(default = "default_split_foco")]
     pub split_foco: String,
+    /// Mnemônicos entre parênteses em terminais monocromáticos: `auto`, `ligado`, `desligado`.
+    #[serde(default = "default_mnemonico_parenteses")]
+    pub mnemonico_parenteses: String,
+}
+
+fn default_mnemonico_parenteses() -> String {
+    "auto".to_string()
 }
 
 fn default_split_foco() -> String {
@@ -231,6 +238,8 @@ pub struct ViewSettingsSnapshot {
     pub margin: EditorMargin,
     pub border: EditorBorder,
     pub theme: ThemeId,
+    pub use_paren_mnemonics: bool,
+    pub mnemonic_parentheses: crate::view_state::MnemonicParenthesesMode,
 }
 
 pub fn config_from_view(
@@ -242,13 +251,16 @@ pub fn config_from_view(
     editor_split: &EditorSplit,
     workspace: &crate::workspace::Workspace,
 ) -> EditConfig {
+    let effective_right = editor_split
+        .reference
+        .as_ref()
+        .and_then(|r| r.stashed_right_tab)
+        .or(editor_split.right_tab);
     let (split_mode, split_left, split_right) = if editor_split.is_active() {
         (
             split_mode_to_str(editor_split.mode).to_string(),
             tab_path_at(workspace, editor_split.left_tab),
-            editor_split
-                .right_tab
-                .and_then(|i| tab_path_at(workspace, i)),
+            effective_right.and_then(|i| tab_path_at(workspace, i)),
         )
     } else {
         (
@@ -296,6 +308,7 @@ pub fn config_from_view(
             split_left_caminho: split_left,
             split_right_caminho: split_right,
             split_foco: split_pane_to_str(editor_split.focused_pane).to_string(),
+            mnemonico_parenteses: mnemonic_parentheses_mode_to_str(view.mnemonic_parentheses).to_string(),
         },
         formatar: FormatarConfig {
             codificacao: encoding_to_str(encoding).to_string(),
@@ -338,6 +351,7 @@ impl Default for EditConfig {
                 split_left_caminho: None,
                 split_right_caminho: None,
                 split_foco: default_split_foco(),
+                mnemonico_parenteses: default_mnemonico_parenteses(),
             },
             formatar: FormatarConfig {
                 codificacao: encoding_to_str(FileEncoding::Utf8).to_string(),
@@ -404,6 +418,10 @@ impl EditConfig {
             margin: parse_margin(&self.exibir.margem),
             border: parse_border(&self.exibir.borda),
             theme: parse_theme(&self.exibir.tema),
+            use_paren_mnemonics: crate::view_state::resolve_paren_mnemonics(parse_mnemonico_parenteses(
+                &self.exibir.mnemonico_parenteses,
+            )),
+            mnemonic_parentheses: parse_mnemonico_parenteses(&self.exibir.mnemonico_parenteses),
         }
     }
 
@@ -428,12 +446,15 @@ impl EditConfig {
         let left_tab = left_from_path.unwrap_or(active);
 
         if mode != SplitMode::Horizontal || workspace.tabs.len() < 2 {
-            return EditorSplit {
+            let mut split = EditorSplit {
                 mode: SplitMode::Off,
                 left_tab,
                 right_tab: None,
                 focused_pane: foco,
+                reference: None,
             };
+            split.enforce_focus_invariant();
+            return split;
         }
 
         let right_tab = self
@@ -457,6 +478,7 @@ impl EditConfig {
             left_tab,
             right_tab,
             focused_pane: foco,
+            reference: None,
         };
         split.ensure_distinct_tabs();
         if split.right_tab.is_none() {
@@ -727,6 +749,22 @@ fn parse_tabulation(value: &str) -> Tabulation {
     }
 }
 
+fn parse_mnemonico_parenteses(value: &str) -> crate::view_state::MnemonicParenthesesMode {
+    match value.trim().to_ascii_lowercase().as_str() {
+        "ligado" | "on" | "true" | "1" => crate::view_state::MnemonicParenthesesMode::On,
+        "desligado" | "off" | "false" | "0" => crate::view_state::MnemonicParenthesesMode::Off,
+        _ => crate::view_state::MnemonicParenthesesMode::Auto,
+    }
+}
+
+fn mnemonic_parentheses_mode_to_str(mode: crate::view_state::MnemonicParenthesesMode) -> &'static str {
+    match mode {
+        crate::view_state::MnemonicParenthesesMode::On => "ligado",
+        crate::view_state::MnemonicParenthesesMode::Off => "desligado",
+        crate::view_state::MnemonicParenthesesMode::Auto => "auto",
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -866,5 +904,18 @@ mod tests {
         assert_eq!(view.theme, ThemeId::Matrix);
         assert_eq!(config.default_encoding(), FileEncoding::Ansi);
         assert_eq!(config.default_tabulation(), Tabulation::TabLiteral);
+    }
+
+    #[test]
+    fn mnemonico_parenteses_config_roundtrip() {
+        let _guard = TestConfigGuard::new("mnemonico");
+        let mut config = EditConfig::default();
+        config.exibir.mnemonico_parenteses = "ligado".to_string();
+        let view = config.view_settings();
+        assert!(view.use_paren_mnemonics);
+        assert_eq!(
+            view.mnemonic_parentheses,
+            crate::view_state::MnemonicParenthesesMode::On
+        );
     }
 }

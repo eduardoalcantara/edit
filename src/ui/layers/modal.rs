@@ -59,7 +59,7 @@ impl UiLayer for ModalLayer {
                     return;
                 };
                 let area = dialog.outer_rect(frame.area());
-                dialog.paint(frame, area, palette);
+                dialog.paint(frame, area, palette, app.view.use_paren_mnemonics);
             }
         }
     }

@@ -2,7 +2,7 @@
 
 **Autor:** Perplexity AI  
 **Data:** 2026-06-09  
-**Versão:** 4.0
+**Versão:** 4.1
 
 **Branch:** `main` (desenvolvimento integrado; branches de feature removidas após merge em 2026-06-09).
 
@@ -184,6 +184,12 @@
   - `persist_user_config` após fechar não copiava mais o documento removido para a aba seguinte (`sync_active_tab` antes de `focus_tab_unchecked`).
   - **Não Salvar** remove a aba correta (`discard_dirty_tab`); `close_tab_by_index` unificado com `remove_tab_at`.
   - **181 testes** unitários passando (`cargo test`).
+- **Features SideKick UX (2026-06-09):**
+  - **Painel de referência** no split direito: Funcionalidades (`F1`), Atalhos, Tabela ASCII — read-only, stash/restore da aba direita, botão **Fechar** na borda (`Esc` / `F`).
+  - **Sair da tela** (`Ctrl+Shift+Alt+E`): suspende TUI e retorna ao prompt; mesmo atalho retoma.
+  - **Mnemônicos monocromáticos:** `exibir.mnemonico_parenteses` (`auto`|`ligado`|`desligado`); menus `(F) Arquivo`, itens `(N)ovo`, botões `(O)K`.
+  - Spec: `specs/to-do/SPEC-REFERENCE-PANE-SIDEKICK.md`
+  - **190 testes** unitários passando (`cargo test -- --test-threads=1`).
 - **Integração em `main` (2026-06-09):** merge de `workspace-fase1` (fast-forward `e1d0f8a` → `aa8d3e2`); branches locais/remotas de feature removidas.
 
 ### Em andamento

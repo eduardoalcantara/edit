@@ -23,7 +23,7 @@ use crate::encoding::FileEncoding;
 use crate::workspace::PromptReason;
 
 use buttons::{
-    CONVERT, DISCARD_CLOSE, DISCARD_NEW, DISCARD_OPEN,
+    CONVERT, DISCARD_CLOSE, DISCARD_NEW, DISCARD_OPEN, OPEN_UNSAVED_FULL, OPEN_UNSAVED_NO_IGNORE,
     OVERWRITE,
     FILE_MISSING, PATH_OPEN, PATH_RENAME, PATH_SAVE_AS, PURGE_UNDO, QUIT_UNSAVED, REINTERPRET,
     RELOAD_EXTERNAL, TAB_UNSAVED,
@@ -100,6 +100,23 @@ impl Modal {
             Modal::FileBrowser(modal) => Some(&mut modal.dialog),
             Modal::Help(modal) => Some(&mut modal.dialog),
             Modal::None => None,
+        }
+    }
+
+    pub fn confirm_open_unsaved(show_ignore: bool) -> Self {
+        let buttons: &[DialogButton] = if show_ignore {
+            &OPEN_UNSAVED_FULL
+        } else {
+            &OPEN_UNSAVED_NO_IGNORE
+        };
+        Modal::Confirm {
+            dialog: Dialog::message(
+                "Abrir arquivo",
+                "O documento atual tem alterações não salvas.\n\
+                 Salvar, descartar, ignorar (se disponível) ou cancelar.",
+                buttons,
+            ),
+            kind: ConfirmKind::DiscardForOpen,
         }
     }
 
@@ -258,7 +275,7 @@ fn confirm_buttons(kind: &ConfirmKind) -> &'static [DialogButton] {
     match kind {
         ConfirmKind::QuitUnsaved => &QUIT_UNSAVED,
         ConfirmKind::DiscardForNew => &DISCARD_NEW,
-        ConfirmKind::DiscardForOpen => &DISCARD_OPEN,
+        ConfirmKind::DiscardForOpen => &OPEN_UNSAVED_FULL,
         ConfirmKind::CloseDocument => &DISCARD_CLOSE,
         ConfirmKind::OverwriteSave { .. } => &OVERWRITE,
         ConfirmKind::ChangeEncoding { .. } => &REINTERPRET,

@@ -63,8 +63,13 @@ pub struct App {
     pub pending_dirty_save: Option<(usize, PromptReason)>,
     pub pending_save_all: bool,
     pub pending_open_path: Option<PathBuf>,
+    /// `Some(path)` abre caminho após salvar; `None` abre diálogo Abrir.
+    pub pending_open_after_save: Option<Option<PathBuf>>,
     pub(crate) pending_fs_checks: Vec<PendingFsCheck>,
     pub(crate) pending_focus_tab: Option<usize>,
+    pub reference_close_hit: Option<ratatui::layout::Rect>,
+    pub ui_suspended: bool,
+    pub suspend_requested: bool,
     user_config: EditConfig,
 }
 
@@ -98,6 +103,8 @@ impl App {
             margin: view_snapshot.margin,
             border: view_snapshot.border,
             theme: view_snapshot.theme,
+            use_paren_mnemonics: view_snapshot.use_paren_mnemonics,
+            mnemonic_parentheses: view_snapshot.mnemonic_parentheses,
         };
         let abas = &user_config.arquivo.abas;
         if abas.fechar_tudo_ao_sair {
@@ -115,8 +122,17 @@ impl App {
             pending_fs_checks,
         } = workspace_from_config(&user_config, &palette, word_wrap, restore_session);
         let mut editor_split = user_config.resolve_editor_split(&workspace);
-        if editor_split.is_active() && !editor_split.can_activate(workspace.tabs.len()) {
+        if workspace.tabs.is_empty() {
             editor_split = EditorSplit::default();
+        } else if editor_split.is_active() {
+            if editor_split.left_tab >= workspace.tabs.len() {
+                editor_split.left_tab = workspace.active_index;
+            }
+            if let Some(r) = editor_split.right_tab {
+                if r >= workspace.tabs.len() {
+                    editor_split.right_tab = None;
+                }
+            }
         }
         let mut editor = editor;
         let document = document;
@@ -159,8 +175,12 @@ impl App {
             pending_dirty_save: None,
             pending_save_all: false,
             pending_open_path: None,
+            pending_open_after_save: None,
             pending_fs_checks,
             pending_focus_tab: None,
+            reference_close_hit: None,
+            ui_suspended: false,
+            suspend_requested: false,
             user_config,
         };
         app.refresh_menu();
@@ -343,11 +363,36 @@ impl App {
     }
 
     pub fn is_dirty(&self) -> bool {
+        if self.reference_pane_active() {
+            return self
+                .workspace
+                .tabs
+                .get(self.workspace.active_index)
+                .is_some_and(|tab| tab.is_dirty());
+        }
         self.document.is_dirty(&self.editor.content_string())
     }
 
-    pub fn run(&mut self, terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>) -> io::Result<()> {
+    pub fn run(
+        &mut self,
+        terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
+        guard: &crate::TerminalGuard,
+    ) -> io::Result<()> {
         while !self.should_quit {
+            if self.ui_suspended {
+                if events::poll(Duration::from_millis(200))? {
+                    let event = events::read()?;
+                    if let crossterm::event::Event::Key(key) = event {
+                        if crate::input::keyboard::is_suspend_screen_chord(&key) {
+                            guard.resume(terminal)?;
+                            self.ui_suspended = false;
+                            self.set_status("Editor retomado");
+                        }
+                    }
+                }
+                continue;
+            }
+
             self.process_pending_fs_checks();
             self.memory.refresh_if_due();
             self.terminal.drain_all();
@@ -360,9 +405,30 @@ impl App {
                 let event = events::read()?;
                 events::dispatch(self, event);
             }
+
+            if self.suspend_requested {
+                self.suspend_requested = false;
+                guard.suspend(terminal)?;
+                #[cfg(unix)]
+                {
+                    guard.resume(terminal)?;
+                    self.set_status("Editor retomado");
+                }
+                #[cfg(not(unix))]
+                {
+                    self.ui_suspended = true;
+                }
+            }
         }
 
         Ok(())
+    }
+
+    pub fn request_suspend_screen(&mut self) {
+        if !crate::platform::terminal_suspend_to_shell_supported() {
+            return;
+        }
+        self.suspend_requested = true;
     }
 
     pub fn shutdown(&mut self) {
@@ -409,16 +475,85 @@ impl App {
         self.refresh_menu();
     }
 
+    /// `Ignorar` no diálogo de abrir: oculto só quando todas as abas (até o limite) estão dirty.
+    pub(crate) fn can_ignore_and_open_with_dirty_tab(&self) -> bool {
+        if self.workspace.tabs.len() < self.workspace.max_tabs {
+            return true;
+        }
+        !self.workspace.tabs.iter().all(|tab| tab.is_dirty())
+    }
+
+    fn prompt_open_with_unsaved_changes(&mut self) {
+        let show_ignore = self.can_ignore_and_open_with_dirty_tab();
+        self.modal = Modal::confirm_open_unsaved(show_ignore);
+    }
+
     pub fn request_open(&mut self) {
         if self.is_dirty() {
-            self.modal = Modal::confirm(
-                "Abrir arquivo",
-                "Existem alterações não salvas. Descartar e abrir outro arquivo?",
-                ConfirmKind::DiscardForOpen,
-            );
+            self.prompt_open_with_unsaved_changes();
             return;
         }
         self.open_file_browser(FileBrowserMode::Open);
+    }
+
+    pub(crate) fn complete_pending_open(&mut self) {
+        if let Some(path) = self.pending_open_path.take() {
+            self.open_path(path);
+        } else {
+            self.open_file_browser(FileBrowserMode::Open);
+        }
+    }
+
+    fn save_then_pending_open(&mut self) {
+        self.pending_open_after_save = Some(self.pending_open_path.take());
+        if self.document.path().is_some() {
+            self.request_save();
+        } else {
+            self.open_file_browser(FileBrowserMode::SaveAs);
+        }
+    }
+
+    fn try_finish_pending_open_after_save(&mut self) {
+        if self.pending_open_after_save.is_none() || self.is_dirty() {
+            return;
+        }
+        let open_target = self
+            .pending_open_after_save
+            .take()
+            .expect("pending open after save");
+        self.pending_open_path = open_target;
+        self.complete_pending_open();
+    }
+
+    fn resolve_close_tab_index(&self) -> Option<usize> {
+        if self.split_active() {
+            if let Some(index) = self.focused_editor_tab_index() {
+                return Some(index);
+            }
+            let left = self.editor_split.left_tab;
+            if left < self.workspace.tabs.len() {
+                return Some(left);
+            }
+            return None;
+        }
+        Some(self.workspace.active_index)
+    }
+
+    fn close_tab_after_sync(&mut self, index: usize) {
+        if index != self.workspace.active_index {
+            self.focus_tab_unchecked(index);
+        } else {
+            self.sync_active_tab();
+        }
+        if self.workspace.tabs[index].is_dirty() {
+            self.begin_dirty_flow(
+                vec![index],
+                PromptReason::CloseTab,
+                AfterDirtyResolved::CloseTab,
+            );
+            return;
+        }
+        self.close_tab_at_index(index);
     }
 
     pub fn request_save(&mut self) {
@@ -462,9 +597,6 @@ impl App {
         self.modal = Modal::file_browser(mode, dir, name, filter, show_hidden);
     }
 
-    pub fn open_help_features(&mut self) {
-        self.modal = Modal::help(HelpKind::Features);
-    }
 
     pub fn request_rename(&mut self) {
         let Some(path) = self.document.path().map(Path::to_path_buf) else {
@@ -718,19 +850,20 @@ impl App {
     }
 
     pub fn request_close(&mut self) {
-        self.sync_active_tab();
-        if self.is_dirty() {
-            self.begin_dirty_flow(
-                vec![self.workspace.active_index],
-                PromptReason::CloseTab,
-                AfterDirtyResolved::CloseTab,
-            );
-            return;
+        self.prepare_file_tab_operations();
+
+        if self.has_reference_pane() {
+            self.close_reference_pane();
         }
-        self.close_active_tab_final();
+
+        match self.resolve_close_tab_index() {
+            Some(index) => self.close_tab_after_sync(index),
+            None => self.disable_editor_split(),
+        }
     }
 
     pub fn request_close_all(&mut self) {
+        self.prepare_file_tab_operations();
         self.sync_active_tab();
         let dirty = self.workspace.dirty_indices_menu_order();
         if dirty.is_empty() {
@@ -798,6 +931,7 @@ impl App {
                 if self.pending_save_all && !self.is_dirty() {
                     self.save_all_remaining();
                 }
+                self.try_finish_pending_open_after_save();
             }
             Err(error) => {
                 self.set_status(format!("Erro ao salvar: {error}"));
@@ -862,16 +996,25 @@ impl App {
                 }
             }
             (ConfirmKind::QuitUnsaved, DialogButtonAction::Secondary) => self.should_quit = true,
+            (ConfirmKind::DiscardForOpen, DialogButtonAction::Primary) => {
+                self.save_then_pending_open();
+            }
+            (ConfirmKind::DiscardForOpen, DialogButtonAction::Secondary) => {
+                self.discard_focused_tab_changes();
+                self.complete_pending_open();
+            }
+            (ConfirmKind::DiscardForOpen, DialogButtonAction::Tertiary) => {
+                self.sync_active_tab();
+                self.complete_pending_open();
+            }
+            (ConfirmKind::DiscardForOpen, DialogButtonAction::Cancel) => {
+                self.pending_open_path = None;
+                self.pending_open_after_save = None;
+                self.set_status("Abertura cancelada");
+            }
             (_, DialogButtonAction::Cancel) => self.set_status("Ação cancelada"),
             (ConfirmKind::DiscardForNew, DialogButtonAction::Primary) => self.request_new_document(),
             (ConfirmKind::CloseDocument, DialogButtonAction::Primary) => self.request_close(),
-            (ConfirmKind::DiscardForOpen, DialogButtonAction::Primary) => {
-                if let Some(path) = self.pending_open_path.take() {
-                    self.open_path(path);
-                } else {
-                    self.open_file_browser(FileBrowserMode::Open);
-                }
-            }
             (ConfirmKind::OverwriteSave { path }, DialogButtonAction::Primary) => {
                 self.save_to_path(path, true)
             }
@@ -1376,11 +1519,7 @@ impl App {
                     self.sync_active_tab();
                     if self.is_dirty() {
                         self.pending_open_path = Some(path);
-                        self.modal = Modal::confirm(
-                            "Abrir recente",
-                            "Descartar alterações e abrir arquivo recente?",
-                            ConfirmKind::DiscardForOpen,
-                        );
+                        self.prompt_open_with_unsaved_changes();
                     } else {
                         self.open_path(path);
                     }
@@ -1427,9 +1566,11 @@ impl App {
                 self.remap_editor_split_indices();
                 self.focus_tab(self.workspace.active_index);
             }
-            ActionId::HelpFeatures => self.modal = Modal::help(HelpKind::Features),
-            ActionId::HelpShortcuts => self.modal = Modal::help(HelpKind::Shortcuts),
+            ActionId::HelpFeatures => self.open_help_features(),
+            ActionId::HelpShortcuts => self.open_help_shortcuts(),
+            ActionId::HelpAsciiTable => self.open_ascii_table(),
             ActionId::HelpAbout => self.modal = Modal::help(HelpKind::About),
+            ActionId::SuspendScreen => self.request_suspend_screen(),
             ActionId::Recent | ActionId::PastePrevious | ActionId::NoOp => {}
         }
         if persist {

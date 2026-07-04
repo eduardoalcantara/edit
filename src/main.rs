@@ -1,5 +1,6 @@
 mod app;
 mod app_editor_split;
+mod app_reference_pane;
 mod app_workspace;
 mod cli;
 mod clipboard;
@@ -15,7 +16,9 @@ mod input;
 mod memory;
 mod menus;
 mod modal;
+mod platform;
 mod recent;
+mod reference_pane;
 mod session;
 mod terminal;
 mod theme;
@@ -38,12 +41,12 @@ use ratatui::Terminal;
 use app::App;
 use cli::{CliError, LaunchOptions};
 
-struct TerminalGuard {
+pub struct TerminalGuard {
     mouse_enabled: bool,
 }
 
 impl TerminalGuard {
-    fn enter() -> io::Result<(Terminal<CrosstermBackend<io::Stdout>>, Self)> {
+    pub fn enter() -> io::Result<(Terminal<CrosstermBackend<io::Stdout>>, Self)> {
         if !stdout().is_terminal() {
             eprintln!("Erro: Editor Linux requer um terminal interativo (TTY).");
             eprintln!("Execute diretamente em um terminal local ou via SSH com TTY alocado.");
@@ -62,7 +65,47 @@ impl TerminalGuard {
         Ok((terminal, Self { mouse_enabled }))
     }
 
-    fn leave(self) -> io::Result<()> {
+    pub fn suspend(&self, terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> io::Result<()> {
+        disable_raw_mode()?;
+        let mut out = stdout();
+        if self.mouse_enabled {
+            let _ = execute!(out, DisableMouseCapture);
+        }
+        execute!(out, LeaveAlternateScreen)?;
+        #[cfg(unix)]
+        writeln!(
+            out,
+            "Editor suspenso — digite fg no shell para retomar (ou Ctrl+Shift+Alt+E)"
+        )?;
+        #[cfg(not(unix))]
+        writeln!(
+            out,
+            "Editor suspenso — Ctrl+Shift+Alt+E para retomar"
+        )?;
+        out.flush()?;
+        #[cfg(unix)]
+        unsafe {
+            libc::raise(libc::SIGTSTP);
+        }
+        let _ = terminal;
+        Ok(())
+    }
+
+    pub fn resume(&self, terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> io::Result<()> {
+        enable_raw_mode()?;
+        let mut out = stdout();
+        execute!(out, EnterAlternateScreen)?;
+        if self.mouse_enabled {
+            let _ = execute!(out, EnableMouseCapture);
+        }
+        terminal.clear()?;
+        if let Ok(size) = terminal.size() {
+            let _ = terminal.resize(size.into());
+        }
+        Ok(())
+    }
+
+    pub fn leave(self) -> io::Result<()> {
         disable_raw_mode()?;
         let mut out = stdout();
         if self.mouse_enabled {
@@ -79,7 +122,7 @@ fn run_app(opts: &LaunchOptions) -> io::Result<()> {
     let mut app = App::new(guard.mouse_enabled, true);
     app.open_cli_files(&opts.files);
 
-    let result = app.run(&mut terminal);
+    let result = app.run(&mut terminal, &guard);
     app.shutdown();
 
     guard.leave()?;
@@ -98,29 +141,24 @@ fn main() {
             return;
         }
         Err(error) => {
-            eprintln!("Erro: {error}");
-            eprintln!("Use {program} --help para ajuda.");
-            std::process::exit(1);
+            eprintln!("{error}");
+            std::process::exit(2);
         }
     };
 
-    if let Err(error) = cli::prepare_launch(&opts) {
-        eprintln!("Erro: {error}");
-        std::process::exit(1);
-    }
-
     if let Err(error) = run_app(&opts) {
-        let _ = restore_terminal_on_error();
-        eprintln!("Erro: {error}");
+        eprintln!("Erro fatal: {error}");
         std::process::exit(1);
     }
 }
 
-fn restore_terminal_on_error() -> io::Result<()> {
-    disable_raw_mode()?;
-    let mut out = stdout();
-    let _ = execute!(out, DisableMouseCapture);
-    execute!(out, LeaveAlternateScreen)?;
-    out.flush()?;
-    Ok(())
+#[cfg(test)]
+mod cli_tests {
+    use super::cli;
+
+    #[test]
+    fn help_flag_exits_cleanly() {
+        let err = cli::parse_args(["edit".to_string(), "--help".to_string()].into_iter());
+        assert!(matches!(err, Err(cli::CliError::HelpRequested)));
+    }
 }

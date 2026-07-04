@@ -2,6 +2,8 @@
 
 use ratatui::layout::Rect;
 
+use crate::reference_pane::ReferencePane;
+
 pub const MIN_PANE_WIDTH: u16 = 20;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -24,12 +26,13 @@ pub struct EditorSplitLayout {
     pub right: Rect,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct EditorSplit {
     pub mode: SplitMode,
     pub left_tab: usize,
     pub right_tab: Option<usize>,
     pub focused_pane: SplitPane,
+    pub reference: Option<ReferencePane>,
 }
 
 impl Default for EditorSplit {
@@ -39,6 +42,7 @@ impl Default for EditorSplit {
             left_tab: 0,
             right_tab: None,
             focused_pane: SplitPane::Left,
+            reference: None,
         }
     }
 }
@@ -51,8 +55,18 @@ impl EditorSplit {
     pub fn tab_for_pane(&self, pane: SplitPane) -> Option<usize> {
         match pane {
             SplitPane::Left => Some(self.left_tab),
-            SplitPane::Right => self.right_tab,
+            SplitPane::Right => {
+                if self.reference.is_some() {
+                    None
+                } else {
+                    self.right_tab
+                }
+            }
         }
+    }
+
+    pub fn has_reference(&self) -> bool {
+        self.reference.is_some()
     }
 
     pub fn pane_tab_index(&self, pane: SplitPane) -> Option<usize> {
@@ -65,7 +79,10 @@ impl EditorSplit {
     pub fn focused_tab(&self) -> usize {
         match self.focused_pane {
             SplitPane::Left => self.left_tab,
-            SplitPane::Right => self.right_tab.unwrap_or(self.left_tab),
+            SplitPane::Right => self
+                .right_tab
+                .or(self.reference.as_ref().and_then(|r| r.stashed_right_tab))
+                .unwrap_or(self.left_tab),
         }
     }
 
@@ -87,7 +104,14 @@ impl EditorSplit {
     }
 
     pub fn can_activate(&self, tab_count: usize) -> bool {
-        tab_count >= 2
+        tab_count >= 1
+    }
+
+    /// Com split desligado não existe painel direito — o foco interno deve ser sempre esquerdo.
+    pub fn enforce_focus_invariant(&mut self) {
+        if !self.is_active() {
+            self.focused_pane = SplitPane::Left;
+        }
     }
 }
 
@@ -200,5 +224,15 @@ mod tests {
         split.right_tab = Some(1);
         split.ensure_distinct_tabs();
         assert_eq!(split.right_tab, None);
+    }
+
+    #[test]
+    fn focus_invariant_resets_right_when_split_off() {
+        let mut split = EditorSplit {
+            focused_pane: SplitPane::Right,
+            ..EditorSplit::default()
+        };
+        split.enforce_focus_invariant();
+        assert_eq!(split.focused_pane, SplitPane::Left);
     }
 }

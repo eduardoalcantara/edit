@@ -56,6 +56,7 @@ impl UiLayer for EditorLayer {
             let focused = app.editor_split.focused_pane;
             let left_idx = Some(app.editor_split.left_tab);
             let right_idx = app.editor_split.right_tab;
+            let right_reference = app.editor_split.has_reference();
 
             if focused != SplitPane::Left && split.left.width > 0 {
                 paint_pane(
@@ -68,6 +69,7 @@ impl UiLayer for EditorLayer {
                     false,
                     false,
                     PanelBorder::Plain,
+                    SplitPane::Left,
                 );
             }
             if focused != SplitPane::Right && split.right.width > 0 {
@@ -75,18 +77,23 @@ impl UiLayer for EditorLayer {
                     app,
                     frame,
                     split.right,
-                    right_idx,
+                    if right_reference { None } else { right_idx },
                     palette,
                     pane_terminal,
                     false,
                     false,
                     PanelBorder::Plain,
+                    SplitPane::Right,
                 );
             }
 
-            let (active_area, active_tab) = match focused {
-                SplitPane::Left => (split.left, left_idx),
-                SplitPane::Right => (split.right, right_idx),
+            let (active_area, active_tab, active_pane) = match focused {
+                SplitPane::Left => (split.left, left_idx, SplitPane::Left),
+                SplitPane::Right => (
+                    split.right,
+                    if right_reference { None } else { right_idx },
+                    SplitPane::Right,
+                ),
             };
             if active_area.width > 0 {
                 paint_pane(
@@ -99,6 +106,7 @@ impl UiLayer for EditorLayer {
                     show_cursor,
                     true,
                     PanelBorder::Double,
+                    active_pane,
                 );
             }
         } else {
@@ -123,6 +131,7 @@ impl UiLayer for EditorLayer {
                 app.view.show_tabs,
                 app.view.show_line_numbers,
                 PanelBorder::Plain,
+                None,
             );
         }
 
@@ -158,6 +167,26 @@ impl UiLayer for EditorLayer {
         }
         if app.input_focus == crate::view_state::InputFocus::Terminal {
             return InputResult::Unhandled;
+        }
+
+        if matches!(key.code, crossterm::event::KeyCode::Esc)
+            && !key.modifiers.intersects(
+                crossterm::event::KeyModifiers::CONTROL | crossterm::event::KeyModifiers::ALT,
+            )
+            && app.reference_pane_active()
+        {
+            app.close_reference_pane();
+            return InputResult::Consumed;
+        }
+
+        if app.reference_pane_active()
+            && matches!(key.code, crossterm::event::KeyCode::Char('f' | 'F'))
+            && !key.modifiers.intersects(
+                crossterm::event::KeyModifiers::CONTROL | crossterm::event::KeyModifiers::ALT,
+            )
+        {
+            app.close_reference_pane();
+            return InputResult::Consumed;
         }
 
         let ctrl = key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL);
@@ -253,6 +282,15 @@ impl UiLayer for EditorLayer {
             return InputResult::Unhandled;
         }
 
+        if let Some(hit) = app.reference_close_hit {
+            if mouse::point_in_rect(&mouse, hit)
+                && matches!(mouse.kind, MouseEventKind::Down(MouseButton::Left))
+            {
+                app.close_reference_pane();
+                return InputResult::Consumed;
+            }
+        }
+
         if let Some(split) = layout.editor_split {
             if let Some(pane) = pane_at_column(split, mouse.column) {
                 if pane != app.editor_split.focused_pane {
@@ -286,6 +324,7 @@ fn paint_pane(
     show_cursor: bool,
     use_active_editor: bool,
     pane_border: PanelBorder,
+    pane: SplitPane,
 ) {
     let border_visible = app.view.border == EditorBorder::Visible;
     let text_viewport = crate::editor::editor_viewport_rect(
@@ -294,12 +333,26 @@ fn paint_pane(
         terminal_block,
         app.view.margin,
     );
-    if use_active_editor {
+    let is_reference = pane == SplitPane::Right && app.editor_split.has_reference();
+    let has_file_tab = tab_index.is_some_and(|index| index < app.workspace.tabs.len());
+    if use_active_editor && has_file_tab && !is_reference {
         paint_guide_column(app, frame, area, text_viewport, palette, border_visible);
     }
-    let title = app.tab_pane_title(tab_index);
-    if use_active_editor {
-        app.editor.render(
+    let title = if is_reference {
+        app.reference_title()
+            .unwrap_or_else(|| "Referência".to_string())
+    } else {
+        app.tab_pane_title(tab_index)
+    };
+    let trailing = if is_reference && use_active_editor {
+        Some(app.reference_close_label())
+    } else {
+        None
+    };
+    let trailing_ref = trailing.as_deref();
+
+    if use_active_editor && (is_reference || has_file_tab) {
+        let action_hit = app.editor.render(
             frame,
             area,
             &title,
@@ -312,7 +365,29 @@ fn paint_pane(
             app.view.show_tabs,
             app.view.show_line_numbers,
             pane_border,
+            trailing_ref,
         );
+        if is_reference {
+            app.set_reference_close_hit(action_hit);
+        }
+    } else if is_reference {
+        if let Some(reference) = app.editor_split.reference.as_mut() {
+            reference.editor.render(
+                frame,
+                area,
+                &title,
+                palette,
+                app.view.margin,
+                app.view.border,
+                terminal_block,
+                Some(text_viewport),
+                false,
+                app.view.show_tabs,
+                app.view.show_line_numbers,
+                pane_border,
+                trailing_ref,
+            );
+        }
     } else if let Some(index) = tab_index {
         if index < app.workspace.tabs.len() {
             app.workspace.tabs[index].editor.render(
@@ -328,6 +403,7 @@ fn paint_pane(
                 app.view.show_tabs,
                 app.view.show_line_numbers,
                 pane_border,
+                None,
             );
         }
     } else {

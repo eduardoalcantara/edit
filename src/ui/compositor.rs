@@ -59,6 +59,10 @@ impl Compositor {
     }
 
     fn dispatch_key(app: &mut App, key: KeyEvent, layout: UiLayout) {
+        if crate::input::keyboard::is_suspend_screen_chord(&key) {
+            app.request_suspend_screen();
+            return;
+        }
         if key.code == KeyCode::F(4) && key.modifiers.contains(KeyModifiers::ALT) {
             app.request_quit();
             return;
@@ -75,6 +79,8 @@ impl Compositor {
         {
             if app.has_active_search() {
                 app.clear_search();
+            } else if app.reference_pane_active() {
+                app.close_reference_pane();
             } else {
                 app.request_quit();
             }

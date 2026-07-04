@@ -34,6 +34,7 @@ impl UiLayer for MenuBarLayer {
             &app.menu_bar,
             &mut app.menu_state,
             palette,
+            app.view.use_paren_mnemonics,
         );
     }
 

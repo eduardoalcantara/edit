@@ -2,7 +2,7 @@
 
 **Autor:** Perplexity AI  
 **Data:** 2026-06-09  
-**Versão:** 4.0
+**Versão:** 4.1
 
 ## Registro
 
@@ -171,3 +171,7 @@
   - Módulos: `src/{app_workspace,workspace/workspace}.rs`
   - Testes: **181** total (`cargo test`); docs STATUS **v4.0**
 - 2026-06-09 — **Merge `workspace-fase1` → `main`** — fast-forward até `aa8d3e2`; push `main`; remoção de branches `workspace-fase1`, `editor-split`, `fase2` (local e remoto).
+- 2026-06-09 — **SideKick UX** — painel de referência no split (Ajuda + Tabela ASCII read-only, stash/restore); **Sair da tela** (`Ctrl+Shift+Alt+E`); mnemônicos monocromáticos (`exibir.mnemonico_parenteses`).
+  - Módulos: `src/{reference_pane,app_reference_pane,editor_split,editor/{mod,commands,engine,render},widgets/panel,ui/layers/{editor,menu_bar,menu_dropdown,modal},menus,config,view_state,main}.rs`
+  - Spec: `specs/to-do/SPEC-REFERENCE-PANE-SIDEKICK.md`
+  - Testes: **190** total (`cargo test -- --test-threads=1`); docs STATUS **v4.1**, README **v2.5**

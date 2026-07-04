@@ -40,6 +40,10 @@ impl Document {
         self.saved_content != current
     }
 
+    pub fn saved_snapshot(&self) -> &str {
+        &self.saved_content
+    }
+
     pub fn mark_saved(&mut self, content: String, path: PathBuf) {
         self.saved_content = content;
         self.path = Some(path);

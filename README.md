@@ -2,7 +2,7 @@
 
 **Autor:** Perplexity AI  
 **Data:** 2026-06-09  
-**Versão:** 2.4
+**Versão:** 2.5
 
 Editor TUI para Linux/Windows com menus estilo **Turbo Vision**, núcleo **ropey**, UX previsível e proteção contra perda de trabalho.
 
@@ -76,11 +76,19 @@ edit --workspace -- main.rs tests/mod.rs
 
 | Menu | Destaques |
 |------|-------------|
-| **Arquivo** | Novo, Abrir, **Recentes** (10 fechados), Salvar, Salvar Como, **Salvar Todos**, Fechar, Sair |
+| **Arquivo** | Novo, Abrir, **Recentes** (10 fechados), Salvar, Salvar Como, **Salvar Todos**, Fechar, **Sair da tela**, Sair |
 | **Editar** | Recortar/Copiar/Colar, clipboard 5 itens, Buscar/Substituir (modal), Selecionar tudo |
 | **Exibir** | Temas, word wrap, símbolos/espaços/tabs/EOL, colunas, margem, borda, **Dividir editor**, terminal, rodapé, **memória** |
 | **Formatar** | Codificação (UTF-8, ANSI, UTF-16…), tabulação, converter tabulação |
 | **Abas** | Lista dinâmica (até 10, radio na ativa), Fechar Todos, toggles sessão, Ordenar por |
+| **Ajuda** | **Funcionalidades** e **Atalhos** no painel direito (split); **Tabela ASCII**; **Sobre** (modal) |
+
+### Referência no split (estilo SideKick)
+
+- **F1** / Ajuda → Funcionalidades abre conteúdo **read-only** no editor 2 (split automático).
+- **Atalhos** e **Tabela ASCII** usam o mesmo painel; seleção + `Ctrl+C` funcionam; digitar não altera o buffer.
+- A aba que estava no painel direito é **guardada em stash** e restaurada ao fechar (**Fechar**, `Esc` ou `F`).
+- Conteúdo virtual **não** aparece no menu Abas nem em `edit.json`.
 
 ### Interface
 
@@ -95,7 +103,7 @@ edit --workspace -- main.rs tests/mod.rs
 
 ### Persistência
 
-- **`edit.json`** ao lado do executável — `arquivo` (recentes + **abas**), `exibir`, `formatar`.
+- **`edit.json`** ao lado do executável — `arquivo` (recentes + **abas**), `exibir` (incl. `mnemonico_parenteses`: `auto`|`ligado`|`desligado`), `formatar`.
 - Migração automática de `.edit/recent.json` legado.
 - **`.edit-session/`** — conteúdo temporário de abas `NovoN`; purge ao fechar aba.
 
@@ -119,7 +127,8 @@ edit --workspace -- main.rs tests/mod.rs
 | `F3` / `Shift+F3` | Próxima / anterior ocorrência de busca |
 | `Alt+A` | Menu Arquivo |
 | `Alt+H` | Menu Ajuda |
-| **`F1`** | Ajuda → Funcionalidades |
+| **`F1`** | Ajuda → Funcionalidades (painel direito) |
+| **`Ctrl+Shift+Alt+E`** | Sair da tela / retornar ao editor (toggle prompt) |
 | `Ctrl+T` / `Ctrl+'` | Do editor: abre/foca terminal; do terminal: fecha painel |
 | **`Ctrl+E`** | Foco no editor |
 | **`Ctrl+G`** | Ir para linha... |
@@ -156,4 +165,4 @@ Ver `PROJECT_RULES.md` para lista completa.
 cargo test
 ```
 
-**181** testes unitários (`cargo test -- --test-threads=1` recomendado no Windows).
+**190** testes unitários (`cargo test -- --test-threads=1` recomendado no Windows).

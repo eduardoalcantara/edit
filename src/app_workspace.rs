@@ -6,7 +6,7 @@ use crate::app::App;
 use crate::config::{
     encoding_to_config_str, tabulation_to_config_str, AbasConfig, SessaoTabEntry,
 };
-use crate::editor_split::EditorSplit;
+use crate::editor_split::{EditorSplit, SplitPane};
 use crate::modal::Modal;
 use crate::modal::dialog::DialogButtonAction;
 use crate::session::{
@@ -58,6 +58,9 @@ pub struct DirtyFlow {
 
 impl App {
     pub(crate) fn sync_active_tab(&mut self) {
+        if self.reference_pane_active() {
+            return;
+        }
         if self.workspace.tabs.is_empty() {
             return;
         }
@@ -216,6 +219,7 @@ impl App {
                     self.focus_tab_unchecked(tab_index);
                 }
             }
+            DialogButtonAction::Tertiary => {}
             DialogButtonAction::Cancel => {
                 if from_focus {
                     self.pending_focus_tab = None;
@@ -248,6 +252,7 @@ impl App {
                     self.focus_tab_unchecked(tab_index);
                 }
             }
+            DialogButtonAction::Tertiary => {}
             DialogButtonAction::Cancel => {
                 if from_focus {
                     self.pending_focus_tab = None;
@@ -390,7 +395,7 @@ impl App {
             name,
         );
         self.workspace.insert_tab_at_top(tab);
-        self.focus_tab(0);
+        self.focus_tab_unchecked(0);
         self.refresh_menu();
         self.set_status("Novo documento");
     }
@@ -402,6 +407,7 @@ impl App {
     }
 
     pub(crate) fn remove_tab_at(&mut self, index: usize) {
+        self.prepare_file_tab_operations();
         self.sync_active_tab();
         let removed = self.workspace.remove_tab_at(index);
         let _ = purge_tab(&removed.session_id);
@@ -409,7 +415,16 @@ impl App {
         self.workspace.after_close_tab(index);
         self.on_tab_closed(index);
         if self.workspace.tabs.is_empty() {
+            self.editor_split = EditorSplit::default();
             self.create_new_tab_at_top();
+        } else if self.split_active() {
+            let pane = self.editor_split.focused_pane;
+            if let Some(idx) = self.editor_split.pane_tab_index(pane) {
+                self.focus_tab_unchecked(idx);
+            } else {
+                self.editor_split.focused_pane = SplitPane::Left;
+                self.focus_tab_unchecked(self.editor_split.left_tab);
+            }
         } else {
             let focus = self.workspace.active_index.min(self.workspace.tabs.len() - 1);
             self.focus_tab_unchecked(focus);
@@ -422,6 +437,13 @@ impl App {
 
     pub(crate) fn close_active_tab_final(&mut self) {
         let index = self.workspace.active_index;
+        self.close_tab_at_index(index);
+    }
+
+    pub(crate) fn close_tab_at_index(&mut self, index: usize) {
+        if index >= self.workspace.tabs.len() {
+            return;
+        }
         self.remove_tab_at(index);
         self.set_status("Aba fechada");
     }
@@ -797,6 +819,7 @@ impl App {
                 }
             }
             DialogButtonAction::Secondary => self.discard_dirty_tab(tab_index),
+            DialogButtonAction::Tertiary => {}
             DialogButtonAction::Cancel => {
                 self.cancel_dirty_flow();
                 self.set_status("Ação cancelada");
@@ -1019,6 +1042,7 @@ pub fn workspace_from_config(
 mod tests {
     use super::*;
     use crate::app::App;
+    use crate::editor_split::SplitPane;
     use crate::config::{
         clear_config_path_override, set_config_path_for_tests, AbasConfig, EditConfig,
         SessaoTabEntry,
@@ -1473,6 +1497,317 @@ mod tests {
         assert_eq!(app.workspace.active_index, 0);
         assert_eq!(app.editor_text_for_test(), "");
         assert_eq!(app.document_title(), "Segunda");
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn reference_pane_stashes_and_restores_right_tab() {
+        use crate::editor_split::SplitMode;
+        use crate::reference_pane::ReferenceKind;
+
+        let _guard = IsolatedConfigGuard::new("ref-stash");
+        let mut app = App::new(false, true);
+        let palette = crate::theme::ThemeId::ClassicBlue.palette();
+        let tab_b = create_tab_from_defaults(
+            &palette,
+            app.user_config().default_encoding(),
+            app.user_config().default_tabulation(),
+            false,
+            new_session_id(),
+            "Segunda".to_string(),
+        );
+        app.workspace.tabs.push(tab_b);
+        app.editor_split.mode = SplitMode::Horizontal;
+        app.editor_split.left_tab = 0;
+        app.editor_split.right_tab = Some(1);
+        app.open_reference_pane(ReferenceKind::HelpFeatures);
+        assert_eq!(app.editor_split.right_tab, None);
+        assert!(app.editor_split.reference.is_some());
+        assert_eq!(
+            app.editor_split
+                .reference
+                .as_ref()
+                .unwrap()
+                .stashed_right_tab,
+            Some(1)
+        );
+        app.close_reference_pane();
+        assert_eq!(app.editor_split.right_tab, Some(1));
+        assert!(!app.editor_split.has_reference());
+    }
+
+    #[test]
+    fn reference_pane_is_read_only_in_app() {
+        use crate::editor::EditorCommand;
+        use crate::reference_pane::ReferenceKind;
+
+        let _guard = IsolatedConfigGuard::new("ref-readonly");
+        let mut app = App::new(false, true);
+        app.open_reference_pane(ReferenceKind::AsciiTable);
+        let before = app.editor.content_string();
+        app.editor.execute(EditorCommand::InsertChar('X'));
+        assert_eq!(app.editor.content_string(), before);
+        app.close_reference_pane();
+    }
+
+    #[test]
+    fn request_close_works_while_reference_pane_focused() {
+        use crate::reference_pane::ReferenceKind;
+
+        let _guard = IsolatedConfigGuard::new("ref-close-tab");
+        let mut app = App::new(false, true);
+        let tab_b = create_tab_from_defaults(
+            &crate::theme::ThemeId::ClassicBlue.palette(),
+            app.user_config().default_encoding(),
+            app.user_config().default_tabulation(),
+            false,
+            new_session_id(),
+            "Segunda".to_string(),
+        );
+        app.workspace.tabs.push(tab_b);
+        app.open_reference_pane(ReferenceKind::HelpFeatures);
+        assert!(app.reference_pane_active());
+        app.request_close();
+        assert!(!app.reference_pane_active());
+        assert_eq!(app.workspace.tabs.len(), 1);
+        assert_eq!(app.workspace.tabs[0].display_name, "Segunda");
+    }
+
+    #[test]
+    fn discard_after_help_close_removes_dirty_tab() {
+        use crate::reference_pane::ReferenceKind;
+
+        let _guard = IsolatedConfigGuard::new("ref-discard-close");
+        let path =
+            std::env::temp_dir().join(format!("edit-ref-discard-{}.md", std::process::id()));
+        std::fs::write(&path, "original").unwrap();
+
+        let mut app = App::new(false, false);
+        app.open_path(path.clone());
+        let idx = app.workspace.find_open_path(&path).unwrap();
+        app.editor.replace_content("editado");
+        app.sync_active_tab();
+
+        app.open_reference_pane(ReferenceKind::HelpFeatures);
+        app.close_reference_pane();
+        assert!(!app.reference_pane_active());
+        assert_eq!(app.editor_split.focused_pane, SplitPane::Left);
+
+        app.begin_dirty_flow(
+            vec![idx],
+            PromptReason::CloseTab,
+            AfterDirtyResolved::CloseTab,
+        );
+        app.discard_dirty_tab(idx);
+        assert!(
+            !app
+                .workspace
+                .tabs
+                .iter()
+                .any(|t| t.filepath().is_some_and(|p| crate::file_io::same_file_path(p, &path)))
+        );
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn enable_split_with_single_tab() {
+        let _guard = IsolatedConfigGuard::new("split-one-tab");
+        let mut app = App::new(false, true);
+        app.enable_editor_split();
+        assert!(app.split_active());
+        assert_eq!(app.editor_split.right_tab, None);
+        assert_eq!(app.editor_split.focused_pane, SplitPane::Left);
+    }
+
+    #[test]
+    fn close_respects_focused_pane_in_split() {
+        let _guard = IsolatedConfigGuard::new("close-split-pane");
+        let left_path =
+            std::env::temp_dir().join(format!("edit-close-left-{}.md", std::process::id()));
+        let right_path =
+            std::env::temp_dir().join(format!("edit-close-right-{}.md", std::process::id()));
+        std::fs::write(&left_path, "esquerda").unwrap();
+        std::fs::write(&right_path, "direita").unwrap();
+
+        let mut app = App::new(false, false);
+        app.open_path(left_path.clone());
+        app.open_path(right_path.clone());
+        let left_idx = app.workspace.find_open_path(&left_path).unwrap();
+        let right_idx = app.workspace.find_open_path(&right_path).unwrap();
+
+        app.editor_split.mode = crate::editor_split::SplitMode::Horizontal;
+        app.editor_split.left_tab = left_idx;
+        app.editor_split.right_tab = Some(right_idx);
+        app.focus_editor_pane(SplitPane::Right);
+        assert_eq!(app.editor_split.focused_pane, SplitPane::Right);
+
+        app.request_close();
+        assert!(app.workspace.find_open_path(&left_path).is_some());
+        assert!(app.workspace.find_open_path(&right_path).is_none());
+
+        let _ = std::fs::remove_file(left_path);
+        let _ = std::fs::remove_file(right_path);
+    }
+
+    #[test]
+    fn prepare_file_ops_keeps_split_right_focus() {
+        let _guard = IsolatedConfigGuard::new("prepare-split-right");
+        let mut app = App::new(false, true);
+        let tab_b = create_tab_from_defaults(
+            &crate::theme::ThemeId::ClassicBlue.palette(),
+            app.user_config().default_encoding(),
+            app.user_config().default_tabulation(),
+            false,
+            new_session_id(),
+            "Segunda".to_string(),
+        );
+        app.workspace.tabs.push(tab_b);
+        app.editor_split.mode = crate::editor_split::SplitMode::Horizontal;
+        app.editor_split.left_tab = 0;
+        app.editor_split.right_tab = Some(1);
+        app.editor_split.focused_pane = SplitPane::Right;
+        app.focus_tab_unchecked(1);
+
+        app.prepare_file_tab_operations();
+        assert_eq!(app.editor_split.focused_pane, SplitPane::Right);
+        assert_eq!(app.workspace.active_index, 1);
+    }
+
+    #[test]
+    fn discard_active_tab_changes_reverts_dirty() {
+        let _guard = IsolatedConfigGuard::new("discard-active");
+        let path =
+            std::env::temp_dir().join(format!("edit-discard-active-{}.md", std::process::id()));
+        std::fs::write(&path, "salvo").unwrap();
+
+        let mut app = App::new(false, false);
+        app.open_path(path.clone());
+        app.editor.replace_content("editado");
+        app.sync_active_tab();
+        assert!(app.is_dirty());
+
+        app.discard_focused_tab_changes();
+        assert!(!app.is_dirty());
+        assert_eq!(app.editor.content_string(), "salvo");
+        assert!(!app.workspace.tabs[0].is_dirty());
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn ignore_open_allowed_when_below_tab_limit() {
+        let _guard = IsolatedConfigGuard::new("ignore-below-limit");
+        let mut app = App::new(false, false);
+        assert!(app.can_ignore_and_open_with_dirty_tab());
+    }
+
+    #[test]
+    fn ignore_open_hidden_when_all_tabs_dirty_at_limit() {
+        let _guard = IsolatedConfigGuard::new("ignore-all-dirty");
+        let mut app = App::new(false, true);
+        app.workspace.max_tabs = 3;
+        while app.workspace.tabs.len() < 3 {
+            let tab = create_tab_from_defaults(
+                &crate::theme::ThemeId::ClassicBlue.palette(),
+                app.user_config().default_encoding(),
+                app.user_config().default_tabulation(),
+                false,
+                new_session_id(),
+                format!("T{}", app.workspace.tabs.len()),
+            );
+            app.workspace.tabs.push(tab);
+        }
+        for i in 0..3 {
+            app.workspace.tabs[i]
+                .editor
+                .replace_content("alterado");
+        }
+        assert!(!app.can_ignore_and_open_with_dirty_tab());
+    }
+
+    #[test]
+    fn ignore_open_keeps_dirty_tab_when_opening_another() {
+        let _guard = IsolatedConfigGuard::new("ignore-keeps-dirty");
+        let path_a =
+            std::env::temp_dir().join(format!("edit-ignore-a-{}.md", std::process::id()));
+        let path_b =
+            std::env::temp_dir().join(format!("edit-ignore-b-{}.md", std::process::id()));
+        std::fs::write(&path_a, "a").unwrap();
+        std::fs::write(&path_b, "b").unwrap();
+
+        let mut app = App::new(false, false);
+        app.open_path(path_a.clone());
+        let idx_a = app.workspace.find_open_path(&path_a).unwrap();
+        for i in (0..app.workspace.tabs.len()).rev() {
+            if i != idx_a {
+                app.remove_tab_at(i);
+            }
+        }
+        app.editor.replace_content("a*");
+        app.sync_active_tab();
+        assert!(app.workspace.tabs[0].is_dirty());
+
+        app.pending_open_path = Some(path_b.clone());
+        app.sync_active_tab();
+        app.complete_pending_open();
+
+        assert_eq!(app.workspace.tabs.len(), 2);
+        assert!(app.workspace.tabs.iter().any(|t| {
+            t.filepath().is_some_and(|p| crate::file_io::same_file_path(p, &path_a))
+                && t.is_dirty()
+        }));
+        assert!(app.workspace.find_open_path(&path_b).is_some());
+
+        let _ = std::fs::remove_file(path_a);
+        let _ = std::fs::remove_file(path_b);
+    }
+
+    #[test]
+    fn closing_last_file_tab_creates_pristine_novo() {
+        let _guard = IsolatedConfigGuard::new("close-last-novo");
+        let path =
+            std::env::temp_dir().join(format!("edit-close-last-{}.md", std::process::id()));
+        std::fs::write(&path, "conteudo").unwrap();
+
+        let mut app = App::new(false, false);
+        app.open_path(path.clone());
+        app.close_tab_at_index(app.workspace.active_index);
+
+        assert_eq!(app.workspace.tabs.len(), 1);
+        assert!(app.workspace.tabs[0].filepath().is_none());
+        assert!(!app.split_active());
+        assert_eq!(
+            app.editor.content_string(),
+            crate::editor::EMPTY_DOCUMENT_TEXT
+        );
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn close_with_empty_right_pane_closes_left_tab() {
+        let _guard = IsolatedConfigGuard::new("close-empty-right");
+        let path =
+            std::env::temp_dir().join(format!("edit-close-er-{}.md", std::process::id()));
+        std::fs::write(&path, "unico").unwrap();
+
+        let mut app = App::new(false, false);
+        app.open_path(path.clone());
+        let file_idx = app.workspace.find_open_path(&path).unwrap();
+        for i in (0..app.workspace.tabs.len()).rev() {
+            if i != file_idx {
+                app.remove_tab_at(i);
+            }
+        }
+        app.enable_editor_split();
+        app.editor_split.focused_pane = SplitPane::Right;
+        assert_eq!(app.focused_editor_tab_index(), None);
+
+        app.request_close();
+        assert!(app.workspace.find_open_path(&path).is_none());
+        assert_eq!(app.workspace.tabs.len(), 1);
+        assert!(app.workspace.tabs[0].filepath().is_none());
+
         let _ = std::fs::remove_file(path);
     }
 }

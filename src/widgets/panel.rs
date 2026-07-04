@@ -140,14 +140,44 @@ pub fn render_editor_frame_with_border(
     terminal_block: Option<u16>,
     panel_border: PanelBorder,
 ) -> Rect {
+    render_editor_frame_with_border_and_action(
+        frame,
+        outer,
+        title,
+        None,
+        title_style,
+        fill,
+        border_style,
+        title_style,
+        border_visible,
+        terminal_block,
+        panel_border,
+    )
+    .0
+}
+
+/// Desenha moldura do editor; `trailing_action` aparece à direita do título (ex.: Fechar).
+pub fn render_editor_frame_with_border_and_action(
+    frame: &mut Frame,
+    outer: Rect,
+    title: &str,
+    trailing_action: Option<&str>,
+    trailing_style: Style,
+    fill: Style,
+    border_style: Style,
+    title_style: Style,
+    border_visible: bool,
+    terminal_block: Option<u16>,
+    panel_border: PanelBorder,
+) -> (Rect, Option<Rect>) {
     if outer.width == 0 || outer.height == 0 {
-        return outer;
+        return (outer, None);
     }
 
     fill_rect(frame, outer, fill);
     let c = panel_border.chars();
 
-    if border_visible {
+    let action_hit = if border_visible {
         render_titled_top_row(
             frame,
             outer.x,
@@ -161,8 +191,30 @@ pub fn render_editor_frame_with_border(
             title_style,
             false,
             true,
+            trailing_action,
+            trailing_style,
+        )
+    } else {
+        render_titled_top_row(
+            frame,
+            outer.x,
+            outer.y,
+            outer.width as usize,
+            title,
+            c.bl,
+            c.br,
+            c.h,
+            border_style,
+            title_style,
+            false,
+            true,
+            trailing_action,
+            trailing_style,
         );
+        None
+    };
 
+    if border_visible {
         let side_end = outer.height.saturating_sub(1);
         for row in 1..side_end {
             let y = outer.y.saturating_add(row);
@@ -188,24 +240,12 @@ pub fn render_editor_frame_with_border(
                 border_style,
             );
         }
-    } else {
-        render_titled_top_row(
-            frame,
-            outer.x,
-            outer.y,
-            outer.width as usize,
-            title,
-            c.bl,
-            c.br,
-            c.h,
-            border_style,
-            title_style,
-            false,
-            true,
-        );
     }
 
-    editor_content_rect(outer, border_visible, terminal_block)
+    (
+        editor_content_rect(outer, border_visible, terminal_block),
+        action_hit,
+    )
 }
 
 /// Tamanho externo dado largura de conteúdo e número de linhas internas.
@@ -282,6 +322,8 @@ pub fn render_titled_frame(
         title_style,
         center_title,
         false,
+        None,
+        title_style,
     );
 
     for row in 1..h.saturating_sub(1) {
@@ -506,15 +548,20 @@ fn render_titled_top_row(
     title_style: Style,
     center_title: bool,
     lead_line_before_title: bool,
-) {
+    trailing_action: Option<&str>,
+    trailing_style: Style,
+) -> Option<Rect> {
     if width == 0 {
-        return;
+        return None;
     }
     if width == 1 {
         render_cell(frame, x, y, left, border_style);
-        return;
+        return None;
     }
 
+    let action_len = trailing_action
+        .map(|t| 1 + t.chars().count() + 1)
+        .unwrap_or(0);
     let prefix_len = if lead_line_before_title && !center_title {
         1
     } else {
@@ -523,6 +570,7 @@ fn render_titled_top_row(
     let interior = width.saturating_sub(2);
     let max_inner = interior
         .saturating_sub(prefix_len)
+        .saturating_sub(action_len)
         .saturating_sub(2);
     let mut inner = format!(" {label} ");
     if inner.chars().count() > max_inner {
@@ -531,15 +579,12 @@ fn render_titled_top_row(
     let inner_len = inner.chars().count();
     let title_core_len = 2 + inner_len;
 
+    let title_block_len = prefix_len + title_core_len + action_len;
     let (left_fill, right_fill) = if center_title {
-        let total_fill = interior.saturating_sub(title_core_len);
+        let total_fill = interior.saturating_sub(title_block_len);
         (total_fill / 2, total_fill - total_fill / 2)
     } else {
-        (
-            0,
-            interior
-                .saturating_sub(prefix_len + title_core_len),
-        )
+        (0, interior.saturating_sub(title_block_len))
     };
 
     let mut spans = vec![Span::styled(left.to_string(), border_style)];
@@ -551,6 +596,11 @@ fn render_titled_top_row(
     spans.push(Span::styled("[".to_string(), border_style));
     spans.push(Span::styled(inner, title_style));
     spans.push(Span::styled("]".to_string(), border_style));
+    if let Some(action) = trailing_action {
+        spans.push(Span::styled(" ".to_string(), border_style));
+        spans.push(Span::styled(action.to_string(), trailing_style));
+        spans.push(Span::styled(" ".to_string(), border_style));
+    }
     spans.push(Span::styled(h.to_string().repeat(right_fill), border_style));
     spans.push(Span::styled(right.to_string(), border_style));
 
@@ -563,6 +613,21 @@ fn render_titled_top_row(
             height: 1,
         },
     );
+
+    trailing_action.map(|action| {
+        let action_len = action.chars().count() as u16;
+        let start = x
+            .saturating_add(1)
+            .saturating_add(prefix_len as u16)
+            .saturating_add(title_core_len as u16)
+            .saturating_add(1);
+        Rect {
+            x: start,
+            y,
+            width: action_len,
+            height: 1,
+        }
+    })
 }
 
 fn render_hline(

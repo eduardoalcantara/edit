@@ -31,3 +31,18 @@ pub enum EditorCommand {
     Click { line: usize, col: usize },
     ExtendSelection { line: usize, col: usize },
 }
+
+impl EditorCommand {
+    pub fn is_mutating(&self) -> bool {
+        matches!(
+            self,
+            EditorCommand::InsertChar(_)
+                | EditorCommand::Backspace
+                | EditorCommand::Delete
+                | EditorCommand::Undo
+                | EditorCommand::Redo
+                | EditorCommand::Tab
+                | EditorCommand::Paste(_)
+        )
+    }
+}

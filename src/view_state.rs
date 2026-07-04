@@ -145,6 +145,70 @@ pub fn parse_terminal_color_scheme(raw: &str) -> TerminalColorScheme {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum MnemonicParenthesesMode {
+    #[default]
+    Auto,
+    On,
+    Off,
+}
+
+pub fn detect_monochrome_terminal() -> bool {
+    if std::env::var_os("NO_COLOR").is_some() {
+        return true;
+    }
+    if std::env::var("TERM")
+        .map(|t| t.eq_ignore_ascii_case("dumb"))
+        .unwrap_or(false)
+    {
+        return true;
+    }
+    if std::env::var_os("COLORTERM").is_some() {
+        return false;
+    }
+    match std::env::var("TERM") {
+        Ok(term) if term.contains("color") || term.contains("256") => false,
+        Ok(_) => false,
+        Err(_) => false,
+    }
+}
+
+pub fn resolve_paren_mnemonics(mode: MnemonicParenthesesMode) -> bool {
+    match mode {
+        MnemonicParenthesesMode::On => true,
+        MnemonicParenthesesMode::Off => false,
+        MnemonicParenthesesMode::Auto => detect_monochrome_terminal(),
+    }
+}
+
+pub fn format_top_menu_label(label: &str, mnemonic: char, use_paren: bool) -> String {
+    if use_paren {
+        format!("{}{}({mnemonic})", label.trim_end(), if label.ends_with(' ') { " " } else { "" })
+    } else {
+        label.to_string()
+    }
+}
+
+pub fn format_item_label_paren(label: &str) -> String {
+    let trimmed = label.trim_start();
+    if let Some(first) = trimmed.chars().next() {
+        let rest: String = trimmed.chars().skip(1).collect();
+        format!("({first}){rest}")
+    } else {
+        label.to_string()
+    }
+}
+
+pub fn format_button_label_paren(label: &str) -> String {
+    if label.is_empty() {
+        return label.to_string();
+    }
+    let mut chars = label.chars();
+    let first = chars.next().unwrap();
+    let rest: String = chars.collect();
+    format!("({first}){rest}")
+}
+
 #[derive(Debug, Clone)]
 pub struct ViewState {
     pub word_wrap: bool,
@@ -164,6 +228,8 @@ pub struct ViewState {
     pub margin: EditorMargin,
     pub border: EditorBorder,
     pub theme: ThemeId,
+    pub use_paren_mnemonics: bool,
+    pub mnemonic_parentheses: MnemonicParenthesesMode,
 }
 
 impl Default for ViewState {
@@ -184,6 +250,8 @@ impl Default for ViewState {
             margin: EditorMargin::None,
             border: EditorBorder::Visible,
             theme: ThemeId::Dark,
+            use_paren_mnemonics: false,
+            mnemonic_parentheses: MnemonicParenthesesMode::Auto,
         }
     }
 }
@@ -225,5 +293,16 @@ mod tests {
     #[test]
     fn show_memory_enabled_by_default() {
         assert!(ViewState::default().show_memory);
+    }
+
+    #[test]
+    fn resolve_paren_mnemonics_respects_mode() {
+        assert!(resolve_paren_mnemonics(MnemonicParenthesesMode::On));
+        assert!(!resolve_paren_mnemonics(MnemonicParenthesesMode::Off));
+    }
+
+    #[test]
+    fn format_item_label_paren_prefixes_first_char() {
+        assert_eq!(format_item_label_paren("Novo"), "(N)ovo");
     }
 }

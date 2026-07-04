@@ -61,7 +61,8 @@ pub fn draw(
     show_tabs: bool,
     show_line_numbers: bool,
     pane_border: panel::PanelBorder,
-) -> (Rect, Rect) {
+    trailing_action: Option<&str>,
+) -> (Rect, Rect, Option<Rect>) {
     let border_style = Style::default()
         .fg(palette.border)
         .bg(palette.editor_bg);
@@ -69,18 +70,41 @@ pub fn draw(
         .fg(palette.editor_fg)
         .bg(palette.editor_bg)
         .add_modifier(Modifier::BOLD);
+    let action_style = Style::default()
+        .fg(palette.menu_hotkey)
+        .bg(palette.editor_bg)
+        .add_modifier(Modifier::BOLD);
 
-    let inner = panel::render_editor_frame_with_border(
-        frame,
-        area,
-        title,
-        palette.editor_text_style(),
-        border_style,
-        title_style,
-        border == EditorBorder::Visible,
-        terminal_block,
-        pane_border,
-    );
+    let (inner, action_hit) = if trailing_action.is_some() {
+        panel::render_editor_frame_with_border_and_action(
+            frame,
+            area,
+            title,
+            trailing_action,
+            action_style,
+            palette.editor_text_style(),
+            border_style,
+            title_style,
+            border == EditorBorder::Visible,
+            terminal_block,
+            pane_border,
+        )
+    } else {
+        (
+            panel::render_editor_frame_with_border(
+                frame,
+                area,
+                title,
+                palette.editor_text_style(),
+                border_style,
+                title_style,
+                border == EditorBorder::Visible,
+                terminal_block,
+                pane_border,
+            ),
+            None,
+        )
+    };
     let content = text_viewport.unwrap_or_else(|| text_area(inner, margin));
 
     panel::fill_rect(frame, inner, palette.editor_text_style());
@@ -206,7 +230,7 @@ pub fn draw(
         word_wrap,
     );
     engine.refresh_footer_size_stats(top_visual, visible_h, visible_w, show_tabs);
-    (text_rect, content)
+    (text_rect, content, action_hit)
 }
 
 fn styled_line(

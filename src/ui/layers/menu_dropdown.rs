@@ -28,7 +28,13 @@ impl UiLayer for MenuDropdownLayer {
         _: UiLayout,
         palette: ThemePalette,
     ) {
-        menus::render_dropdown(frame, &app.menu_bar, &mut app.menu_state, palette);
+        menus::render_dropdown(
+            frame,
+            &app.menu_bar,
+            &mut app.menu_state,
+            palette,
+            app.view.use_paren_mnemonics,
+        );
     }
 
     fn on_key(&self, key: KeyEvent, app: &mut crate::app::App, _: UiLayout) -> InputResult {

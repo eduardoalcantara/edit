@@ -81,7 +81,9 @@ pub enum ActionId {
     SortStatus,
     HelpFeatures,
     HelpShortcuts,
+    HelpAsciiTable,
     HelpAbout,
+    SuspendScreen,
 }
 
 #[derive(Clone)]
@@ -448,15 +450,25 @@ fn file_menu(recent: &RecentFiles) -> Vec<MenuNode> {
             None,
             "Fecha o documento atual",
         ),
-        item(
-            "Sair",
-            Some("Ctrl+Q / Alt+F4 / Esc"),
-            ActionId::Quit,
+    ]);
+    if crate::platform::terminal_suspend_to_shell_supported() {
+        nodes.push(item(
+            "Sair da tela",
+            Some("Ctrl+Shift+Alt+E"),
+            ActionId::SuspendScreen,
             true,
             None,
-            "Encerra o editor",
-        ),
-    ]);
+            "Suspende a interface e retorna ao prompt do terminal",
+        ));
+    }
+    nodes.push(item(
+        "Sair",
+        Some("Ctrl+Q / Alt+F4 / Esc"),
+        ActionId::Quit,
+        true,
+        None,
+        "Encerra o editor",
+    ));
     nodes
 }
 
@@ -755,6 +767,14 @@ fn help_menu() -> Vec<MenuNode> {
             true,
             None,
             "Referência de teclado agrupada por categoria",
+        ),
+        item(
+            "Tabela ASCII...",
+            None,
+            ActionId::HelpAsciiTable,
+            true,
+            None,
+            "Caracteres de desenho CP437 / Unicode para referência",
         ),
         item(
             "Sobre...",
@@ -1196,7 +1216,14 @@ fn action_at_path(bar: &MenuBar, state: &MenuState, path: &[usize]) -> Option<Ac
     }
 }
 
-pub fn render_bar(frame: &mut Frame, area: Rect, bar: &MenuBar, state: &mut MenuState, palette: ThemePalette) {
+pub fn render_bar(
+    frame: &mut Frame,
+    area: Rect,
+    bar: &MenuBar,
+    state: &mut MenuState,
+    palette: ThemePalette,
+    use_paren_mnemonics: bool,
+) {
     state.bar_area = area;
     state.top_hit_areas.clear();
 
@@ -1220,7 +1247,14 @@ pub fn render_bar(frame: &mut Frame, area: Rect, bar: &MenuBar, state: &mut Menu
         };
         panel::fill_rect(frame, item_area, style);
         frame.render_widget(
-            Paragraph::new(Line::from(menu_top_spans(top.label, top.mnemonic, style, palette))).style(style),
+            Paragraph::new(Line::from(menu_top_spans(
+                top.label,
+                top.mnemonic,
+                style,
+                palette,
+                use_paren_mnemonics,
+            )))
+            .style(style),
             item_area,
         );
         x = x.saturating_add(width);
@@ -1241,9 +1275,15 @@ pub fn render_bar(frame: &mut Frame, area: Rect, bar: &MenuBar, state: &mut Menu
 }
 
 /// Dropdown renderizado **por cima** do editor (chamar após `draw_editor`).
-pub fn render_dropdown(frame: &mut Frame, bar: &MenuBar, state: &mut MenuState, palette: ThemePalette) {
+pub fn render_dropdown(
+    frame: &mut Frame,
+    bar: &MenuBar,
+    state: &mut MenuState,
+    palette: ThemePalette,
+    use_paren_mnemonics: bool,
+) {
     if let Some(top_idx) = state.open_top {
-        render_panels(frame, bar, state, top_idx, state.bar_area, palette);
+        render_panels(frame, bar, state, top_idx, state.bar_area, palette, use_paren_mnemonics);
     }
 }
 
@@ -1254,6 +1294,7 @@ fn render_panels(
     top_idx: usize,
     bar_area: Rect,
     palette: ThemePalette,
+    use_paren_mnemonics: bool,
 ) {
     state.panel_areas.clear();
     state.item_hit_areas.clear();
@@ -1339,6 +1380,7 @@ fn render_panels(
                         style,
                         palette.menu_marker_style(focused),
                         palette.menu_shortcut_style(focused),
+                        use_paren_mnemonics,
                     );
                     panel::render_content_line(frame, area, i as u16, line);
                 }
@@ -1365,7 +1407,13 @@ fn menu_top_spans(
     mnemonic: char,
     base: ratatui::style::Style,
     palette: ThemePalette,
+    use_paren_mnemonics: bool,
 ) -> Vec<Span<'static>> {
+    if use_paren_mnemonics {
+        return vec![
+            Span::styled(format!(" {}({mnemonic}) ", label.trim()), base),
+        ];
+    }
     let trimmed = label.trim();
     let hot = palette.menu_hotkey_style();
     let mut out = vec![Span::styled(" ", base)];
@@ -1447,6 +1495,7 @@ fn menu_node_line(
     base_style: ratatui::style::Style,
     marker_style: ratatui::style::Style,
     shortcut_style: ratatui::style::Style,
+    use_paren_mnemonics: bool,
 ) -> Line<'static> {
     match node {
         MenuNode::Separator => Line::from(""),
@@ -1455,8 +1504,13 @@ fn menu_node_line(
             checked,
             ..
         } => {
-            let left_len = menu_left_text(label, *checked).chars().count();
-            let left_spans = menu_left_spans(label, *checked, base_style, marker_style);
+            let display_label = if use_paren_mnemonics {
+                crate::view_state::format_item_label_paren(label)
+            } else {
+                label.clone()
+            };
+            let left_len = menu_left_text(&display_label, *checked).chars().count();
+            let left_spans = menu_left_spans(&display_label, *checked, base_style, marker_style);
             let (right_text, right_style) = match item_right_slot(node) {
                 Some(MenuRightSlot::Shortcut(s)) => (Some(s), shortcut_style),
                 None | Some(MenuRightSlot::SubmenuArrow) => (None, base_style),
@@ -1541,6 +1595,69 @@ mod tests {
         assert!(bar.tops.iter().any(|t| t.mnemonic == 'H'));
         let help = bar.tops.iter().find(|t| t.mnemonic == 'H').unwrap();
         assert!(help.label.contains("Ajuda"));
+    }
+
+    #[test]
+    fn menu_top_spans_paren_mode_shows_mnemonic() {
+        use ratatui::style::Style;
+        use crate::theme::ThemeId;
+        let palette = ThemeId::Dark.palette();
+        let spans = menu_top_spans(" Arquivo ", 'F', Style::default(), palette, true);
+        let text: String = spans.into_iter().map(|s| s.content.to_string()).collect();
+        assert!(text.contains("(F)"));
+    }
+
+    #[test]
+    fn build_includes_ascii_table_in_help() {
+        let bar = MenuBar::build(
+            &RecentFiles::default(),
+            &ViewState::default(),
+            FileEncoding::Utf8,
+            Tabulation::Spaces4,
+            &Clipboard::default(),
+            &empty_workspace(),
+            false,
+        );
+        let help = bar.tops.iter().find(|t| t.mnemonic == 'H').unwrap();
+        let has_ascii = help.children.iter().any(|node| {
+            matches!(
+                node,
+                MenuNode::Item {
+                    action: ActionId::HelpAsciiTable,
+                    ..
+                }
+            )
+        });
+        assert!(has_ascii);
+    }
+
+    fn file_menu_has_action(bar: &MenuBar, action: ActionId) -> bool {
+        let file = bar.tops.iter().find(|t| t.mnemonic == 'A').unwrap();
+        fn walk(nodes: &[MenuNode], action: ActionId) -> bool {
+            nodes.iter().any(|node| match node {
+                MenuNode::Item { action: a, .. } => *a == action,
+                MenuNode::SubMenu { children, .. } => walk(children, action),
+                MenuNode::Separator => false,
+            })
+        }
+        walk(&file.children, action)
+    }
+
+    #[test]
+    fn suspend_screen_menu_matches_platform() {
+        let bar = MenuBar::build(
+            &RecentFiles::default(),
+            &ViewState::default(),
+            FileEncoding::Utf8,
+            Tabulation::Spaces4,
+            &Clipboard::default(),
+            &empty_workspace(),
+            false,
+        );
+        assert_eq!(
+            file_menu_has_action(&bar, ActionId::SuspendScreen),
+            crate::platform::terminal_suspend_to_shell_supported()
+        );
     }
 }
 

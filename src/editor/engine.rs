@@ -34,6 +34,8 @@ pub struct EditorEngine {
     /// Cache de ocorrências do padrão atual (reconstruído no render e na navegação).
     pub search_match_positions: Vec<usize>,
     history: EditHistory,
+    /// Quando true, bloqueia mutações (painel de referência read-only).
+    pub read_only: bool,
     /// Atualizado a cada frame em `render::draw` para o rodapé.
     cached_visible_chars: usize,
     cached_total_chars: usize,
@@ -61,6 +63,7 @@ impl EditorEngine {
             search_match_start: None,
             search_match_positions: Vec::new(),
             history: EditHistory::new(),
+            read_only: false,
             cached_visible_chars: 0,
             cached_total_chars: 0,
         }

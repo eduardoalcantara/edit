@@ -106,6 +106,48 @@ pub const DISCARD_OPEN: [DialogButton; 2] = [
     ),
 ];
 
+pub const OPEN_UNSAVED_FULL: [DialogButton; 4] = [
+    DialogButton::new(
+        "Salvar",
+        "Salva o documento atual e abre o outro arquivo",
+        DialogButtonAction::Primary,
+    ),
+    DialogButton::new(
+        "Não Salvar",
+        "Descarta alterações do documento atual e abre o outro",
+        DialogButtonAction::Secondary,
+    ),
+    DialogButton::new(
+        "Ignorar",
+        "Abre o outro arquivo e mantém este com alterações no menu Abas",
+        DialogButtonAction::Tertiary,
+    ),
+    DialogButton::new(
+        "Cancelar",
+        "Volta ao editor sem abrir o outro arquivo",
+        DialogButtonAction::Cancel,
+    ),
+];
+
+/// Sem Ignorar: todas as abas (até o limite) estão com alterações não salvas.
+pub const OPEN_UNSAVED_NO_IGNORE: [DialogButton; 3] = [
+    DialogButton::new(
+        "Salvar",
+        "Salva o documento atual e abre o outro arquivo",
+        DialogButtonAction::Primary,
+    ),
+    DialogButton::new(
+        "Não Salvar",
+        "Descarta alterações do documento atual e abre o outro",
+        DialogButtonAction::Secondary,
+    ),
+    DialogButton::new(
+        "Cancelar",
+        "Volta ao editor sem abrir o outro arquivo",
+        DialogButtonAction::Cancel,
+    ),
+];
+
 pub const DISCARD_CLOSE: [DialogButton; 2] = [
     DialogButton::new(
         "OK",

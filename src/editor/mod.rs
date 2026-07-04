@@ -79,6 +79,14 @@ impl Editor {
 
     pub fn apply_theme(&mut self, _palette: &ThemePalette) {}
 
+    pub fn is_read_only(&self) -> bool {
+        self.engine.read_only
+    }
+
+    pub fn set_read_only(&mut self, read_only: bool) {
+        self.engine.read_only = read_only;
+    }
+
     pub fn set_word_wrap(&mut self, on: bool) {
         self.engine.word_wrap = on;
     }
@@ -104,6 +112,9 @@ impl Editor {
     }
 
     pub fn execute(&mut self, cmd: EditorCommand) {
+        if self.engine.read_only && cmd.is_mutating() {
+            return;
+        }
         match cmd {
             EditorCommand::InsertChar(ch) => self.engine.insert_char(ch),
             EditorCommand::Backspace => self.engine.backspace(),
@@ -160,9 +171,10 @@ impl Editor {
         show_tabs: bool,
         show_line_numbers: bool,
         pane_border: crate::widgets::panel::PanelBorder,
-    ) {
+        trailing_action: Option<&str>,
+    ) -> Option<Rect> {
         self.engine.render_show_tabs = show_tabs;
-        let (text_area, content_area) = render::draw(
+        let (text_area, content_area, action_hit) = render::draw(
             &mut self.engine,
             frame,
             area,
@@ -176,9 +188,11 @@ impl Editor {
             show_tabs,
             show_line_numbers,
             pane_border,
+            trailing_action,
         );
         self.text_area = text_area;
         self.content_area = content_area;
+        action_hit
     }
 
     pub fn viewport_to_doc(&self, vp_line: usize, vp_col: usize) -> (usize, usize) {
@@ -340,6 +354,9 @@ impl Editor {
     }
 
     pub fn cut_selection(&mut self, clipboard: &mut Clipboard) -> bool {
+        if self.engine.read_only {
+            return false;
+        }
         if let Some(text) = self.engine.cut_selection() {
             if !text.is_empty() {
                 clipboard.push(text);
