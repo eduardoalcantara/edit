@@ -631,6 +631,7 @@ fn theme_to_str(theme: ThemeId) -> &'static str {
         ThemeId::Dark => "escuro",
         ThemeId::Light => "claro",
         ThemeId::ClassicBlue => "azul_classico",
+        ThemeId::Vga => "vga",
         ThemeId::Matrix => "matrix",
     }
 }
@@ -640,6 +641,7 @@ fn parse_theme(value: &str) -> ThemeId {
         "escuro" | "dark" => ThemeId::Dark,
         "claro" | "light" => ThemeId::Light,
         "azul_classico" | "classic_blue" | "azul clássico" => ThemeId::ClassicBlue,
+        "vga" | "vga_16" | "vga16" => ThemeId::Vga,
         "matrix" => ThemeId::Matrix,
         _ => ThemeId::ClassicBlue,
     }

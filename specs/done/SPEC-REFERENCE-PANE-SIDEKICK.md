@@ -1,6 +1,8 @@
 # SPEC — Painel de referência e UX SideKick
 
-**Status:** integrado em `main` (2026-06-09)  
+**Status:** done  
+**Data:** 2026-06-09  
+**Implementado:** 2026-06-09 (integrado em `main`)  
 **Autor:** Perplexity AI
 
 ## Objetivo
@@ -8,7 +10,7 @@
 Trazer três evoluções inspiradas no Borland SideKick:
 
 1. Ajuda e tabela ASCII no **painel direito** do split (conteúdo virtual read-only).
-2. **Sair da tela** — suspende a TUI e volta ao prompt do terminal.
+2. **Sair da tela** — suspende a TUI e volta ao prompt do terminal (**somente Unix/Linux**).
 3. **Mnemônicos entre parênteses** em terminais monocromáticos.
 
 ## 1. Painel de referência
@@ -42,7 +44,8 @@ Trazer três evoluções inspiradas no Borland SideKick:
 
 ## 2. Sair da tela
 
-- Menu **Arquivo → Sair da tela**; atalho global **`Ctrl+Shift+Alt+E`**.
+- Menu **Arquivo → Sair da tela** e atalho **`Ctrl+Shift+Alt+E`** — **visíveis apenas em Unix/Linux** (`src/platform.rs`: `terminal_suspend_to_shell_supported()`).
+- Windows: item oculto e atalho ignorado (sem daemon TSR / SIGTSTP).
 - `TerminalGuard::suspend` / `resume` em `main.rs`.
 - Loop suspenso captura apenas o chord de retorno.
 - Diferente de **Sair** (`Ctrl+Q`): processo continua até quit explícito.
@@ -53,21 +56,28 @@ Trazer três evoluções inspiradas no Borland SideKick:
 - Detecção auto: `NO_COLOR`, `TERM=dumb`, heurística `COLORTERM` / `TERM`.
 - Render: topo ` Arquivo (F) `; dropdown `(N)ovo`; modais `(O)K`; Fechar `(F)echar`.
 
+## 4. Abrir com documento dirty
+
+- Diálogo **Salvar / Não Salvar / Ignorar / Cancelar** (`OPEN_UNSAVED_FULL` em `modal/buttons.rs`).
+- Botão **Ignorar** oculto quando as 10 abas estão dirty (`OPEN_UNSAVED_NO_IGNORE`).
+- Recentes e browser FS preservam path alvo via `pending_open_path`.
+
 ## Arquivos principais
 
 | Área | Arquivos |
 |------|----------|
 | Referência | `reference_pane.rs`, `app_reference_pane.rs`, `editor_split.rs`, `ui/layers/editor.rs` |
 | Read-only | `editor/engine.rs`, `editor/mod.rs`, `editor/commands.rs` |
-| Suspend | `main.rs`, `app.rs`, `ui/compositor.rs`, `input/keyboard.rs` |
+| Suspend | `main.rs`, `platform.rs`, `app.rs`, `ui/compositor.rs`, `input/keyboard.rs`, `menus.rs` |
 | Monocromático | `view_state.rs`, `config.rs`, `menus.rs`, `modal/dialog.rs` |
+| Abrir dirty | `modal/buttons.rs`, `modal/mod.rs`, `app.rs` |
 
 ## Testes
 
 - `reference_pane::tests::reference_editor_is_read_only`
-- `app_workspace`: stash/restore, typing bloqueado
-- `menus`: mnemônico `(F)`, item Tabela ASCII
+- `app_workspace`: stash/restore, typing bloqueado, split com uma aba
+- `menus`: mnemônico `(F)`, item Tabela ASCII, Sair da tela condicional
 - `config`: `mnemonico_parenteses`
 - `view_state`: `resolve_paren_mnemonics`, `format_item_label_paren`
 
-**190** testes (`cargo test -- --test-threads=1`).
+Suite completa: `cargo test -- --test-threads=1`.

@@ -1430,6 +1430,10 @@ impl App {
                 self.apply_theme(ThemeId::ClassicBlue);
                 self.set_status("Tema: Azul Clássico");
             }
+            ActionId::ThemeVga => {
+                self.apply_theme(ThemeId::Vga);
+                self.set_status("Tema: VGA 16 cores");
+            }
             ActionId::ThemeMatrix => {
                 self.apply_theme(ThemeId::Matrix);
                 self.set_status("Tema Matrix");

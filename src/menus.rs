@@ -38,6 +38,7 @@ pub enum ActionId {
     ThemeDark,
     ThemeLight,
     ThemeClassicBlue,
+    ThemeVga,
     ThemeMatrix,
     ToggleTerminal,
     ToggleFooter,
@@ -684,6 +685,12 @@ fn view_menu(view: &ViewState, split_editor: bool) -> Vec<MenuNode> {
                     ActionId::ThemeClassicBlue,
                     view.theme == crate::theme::ThemeId::ClassicBlue,
                     "Aplica o tema azul clássico estilo Turbo Vision",
+                ),
+                radio_item(
+                    "VGA 16 cores",
+                    ActionId::ThemeVga,
+                    view.theme == crate::theme::ThemeId::Vga,
+                    "Paleta fixa DOS VGA (Turbo Vision / Turbo Pascal)",
                 ),
                 radio_item(
                     "Matrix",

@@ -1,9 +1,9 @@
 # Limitações pendentes — Editor Linux
 
 **Autor:** Cursor (documentação pós-implementação menus)  
-**Data:** 2026-06-07  
-**Versão:** 1.0  
-**Origem:** relatórios em `specs/report/` (fases Menu Shell → Formatar), `PROJECT_STATUS.md`, código em `src/`
+**Data:** 2026-06-09 (revisão alinhada ao código)  
+**Versão:** 1.1  
+**Origem:** relatórios em `specs/report/`, `PROJECT_STATUS.md`, código em `src/`
 
 ## Objetivo
 
@@ -17,10 +17,11 @@ Registrar limitações conhecidas da implementação atual como **pontos a resol
 
 | Campo | Valor |
 |-------|--------|
-| **Estado** | UI funcional mas visualmente distante da referência Borland |
-| **Impacto** | Menus transparentes, cores erradas, rodapé ausente, modais texto-only, sem file picker |
-| **Referência** | `specs/to-do/SPEC-UX-FIDELIDADE-TURBO-VISION.md` (itens TV1–TV13) |
-| **Resolução esperada** | Paleta VGA, menus opacos com sombra, rodapé F-keys, botões reais, browser FS |
+| **Estado** | Parcial — shell funcional; gaps visuais e de chrome permanecem |
+| **Progresso** | TV5 (Replace) ✅; TV7 (file browser) ✅; TV11 parcial (tema **VGA 16 cores**); painel referência SideKick ✅ (`specs/done/SPEC-REFERENCE-PANE-SIDEKICK.md`); terminal inferior ✅ |
+| **Impacto** | Menus sem sombra TV, rodapé F-keys incompleto, modais sem botões reais, Find dialog rudimentar |
+| **Referência** | `specs/to-do/SPEC-UX-FIDELIDADE-TURBO-VISION.md` (TV1–TV4, TV6, TV8–TV10, TV12–TV13 pendentes) |
+| **Resolução esperada** | Paleta/menu opaco, rodapé F-keys, botões modais clicáveis, diálogo Find estilo Borland |
 
 ### L1 — Highlight visual de seleção em bloco
 
@@ -55,10 +56,10 @@ Registrar limitações conhecidas da implementação atual como **pontos a resol
 
 | Campo | Valor |
 |-------|--------|
-| **Estado** | `find.rs` — busca literal simples; modal substitui **uma** ocorrência; sem regex; sem highlight de ocorrências |
+| **Estado** | `editor/search.rs` — busca literal; `replace_all` e `replace_one` funcionais; **sem regex**; highlight de ocorrências parcial |
 | **Impacto** | `Ctrl+F` / `Ctrl+H` / `F3` funcionais mas rudimentares |
-| **Módulos** | `src/find.rs`, `src/modal.rs`, `src/app.rs` |
-| **Resolução esperada** | Navegação com wrap documentado, substituir todas, opcional regex, contagem de resultados |
+| **Módulos** | `src/editor/search.rs`, `src/modal.rs`, `src/app.rs` |
+| **Resolução esperada** | Wrap documentado, opcional regex, contagem de resultados, highlight persistente |
 
 ### L6 — Modal de busca/substituição rudimentar
 
@@ -66,20 +67,19 @@ Registrar limitações conhecidas da implementação atual como **pontos a resol
 |-------|--------|
 | **Estado** | Um único campo editável; alternância busca/substituição sem foco real entre campos |
 | **Impacto** | UX de substituição confusa |
-| **Resolução esperada** | Dois campos com Tab; Enter confirma ação contextual |
+| **Resolução esperada** | Dois campos com Tab; Enter confirma ação contextual (ver TV9) |
 
 ---
 
 ## Prioridade média
 
-### L7 — Painel lateral e terminal inferior (placeholders)
+### L7 — Painel lateral e terminal inferior
 
 | Campo | Valor |
 |-------|--------|
-| **Estado** | Toggles em `view_state.rs` / menu Exibir; **sem widget funcional** |
-| **Impacto** | Status bar indica "on" mas não há painel/terminal real |
-| **Referência** | `PROJECT_RULES.md` (`Ctrl+T`), `app.rs` mensagens "placeholder" |
-| **Resolução esperada** | Ver `specs/to-do/SPEC-TERMINAL-INFERIOR.md` — layout PO, PTY, multi-sessão, atalhos |
+| **Estado** | ✅ Resolvido — PTY multi-sessão em `src/ui/layers/terminal.rs` |
+| **Referência** | `specs/done/SPEC-TERMINAL-INFERIOR.md` |
+| **Resolução** | Implementado 2026-06-08 |
 
 ### L8 — Mostrar símbolos, espaços, tabs e EOL
 
@@ -101,8 +101,8 @@ Registrar limitações conhecidas da implementação atual como **pontos a resol
 
 | Campo | Valor |
 |-------|--------|
-| **Estado** | Item menu "Personalizado" → mensagem "em breve" |
-| **Impacto** | `PROJECT_RULES.md` exige tema customizável |
+| **Estado** | Cinco temas fixos (Escuro, Claro, Azul Clássico, **VGA 16 cores**, Matrix); item "Personalizado" → "em breve" |
+| **Impacto** | `PROJECT_RULES.md` exige tema customizável além dos presets |
 | **Resolução esperada** | Arquivo de config local (cores/palette) + reload |
 
 ### L11 — Encoding: escopo mínimo e riscos de perda
@@ -118,17 +118,16 @@ Registrar limitações conhecidas da implementação atual como **pontos a resol
 
 | Campo | Valor |
 |-------|--------|
-| **Estado** | `OpenRecent` dispara modal genérico `DiscardForOpen` sem preservar path alvo |
-| **Impacto** | Após confirmar, usuário precisa reescolher o arquivo recente |
-| **Resolução esperada** | `ConfirmKind::DiscardForRecent { path }` ou fila de intenção pós-modal |
+| **Estado** | ✅ Resolvido — `pending_open_path` + diálogo `OPEN_UNSAVED_FULL` (Salvar / Não Salvar / Ignorar / Cancelar) |
+| **Resolução** | 2026-06-09 (`app.rs`, `modal/buttons.rs`) |
 
 ### L13 — Persistência de `ViewState` e preferências
 
 | Campo | Valor |
 |-------|--------|
-| **Estado** | Wrap, coluna guia, tema etc. vivem só na sessão |
-| **Impacto** | Preferências resetam ao fechar o editor |
-| **Resolução esperada** | JSON em `.edit/config.json` (ou equivalente) |
+| **Estado** | **Parcial** — `edit.json` persiste tema, wrap, terminal, colunas guia, abas, split, recentes (`config.rs` + `persist_user_config`) |
+| **Impacto** | Algumas flags de sessão (ex.: zoom) ainda não serializadas |
+| **Resolução esperada** | Completar campos faltantes; documentar schema v2 |
 
 ---
 
@@ -162,31 +161,30 @@ Registrar limitações conhecidas da implementação atual como **pontos a resol
 
 | Campo | Valor |
 |-------|--------|
-| **Estado** | ~10 warnings (`ActionId` variants, helpers em `find.rs`, `block_highlight_rows`, etc.) |
+| **Estado** | Warnings esporádicos (`ActionId` variants, helpers não usados, etc.) |
 | **Impacto** | Ruído no CI futuro |
 | **Resolução esperada** | Usar APIs ou `#[allow]` justificado + `-D warnings` em CI quando estável |
 
-### L18 — Pipeline de testes inexistente
+### L18 — Pipeline de testes
 
 | Campo | Valor |
 |-------|--------|
-| **Estado** | Validação manual + `cargo build` |
-| **Impacto** | Regressões em bloco, encoding, menus não detectadas automaticamente |
-| **Resolução esperada** | Testes unitários (`find`, `encoding`, `block_select`, `recent`) + smoke TUI opcional |
+| **Estado** | ✅ Resolvido — suite `cargo test -- --test-threads=1` (200+ testes unitários) |
+| **Resolução** | Cobertura em engine, config, menus, workspace, modals, split, referência |
 
 ### L19 — Sistema de abas
 
 | Campo | Valor |
 |-------|--------|
-| **Estado** | Um documento por instância |
-| **Impacto** | Fora do escopo das 4 specs de menu; listado em `PROJECT_STATUS.md` |
-| **Resolução esperada** | Spec dedicada multi-documento |
+| **Estado** | ✅ Resolvido — até 10 abas, menu Abas, sessão `.edit-session/` |
+| **Referência** | `specs/done/SPEC-MULTPLOS-ARQUIVOS.md` |
+| **Resolução** | Implementado 2026-06-09 |
 
 ### L20 — Atalho `Alt+R` para recentes
 
 | Campo | Valor |
 |-------|--------|
-| **Estado** | Spec Arquivo cita `Alt+R`; implementação abre menu Arquivo (`events.rs`) sem foco em Recentes |
+| **Estado** | Spec Arquivo cita `Alt+R`; implementação abre menu Arquivo sem foco em Recentes |
 | **Impacto** | Atalho documentado ≠ comportamento |
 | **Resolução esperada** | Abrir cascata Recentes diretamente ou submenu com foco |
 
@@ -196,16 +194,15 @@ Registrar limitações conhecidas da implementação atual como **pontos a resol
 
 | Módulo | Limitações relacionadas |
 |--------|-------------------------|
-| `src/events.rs` | L2, L20 |
-| `src/editor.rs` | L3, L4 |
-| `src/cursors.rs`, `src/block_select.rs` | L1, L2, L4 |
-| `src/find.rs`, `src/modal.rs` | L5, L6 |
-| `src/view_state.rs`, `src/ui.rs` | L7, L8, L9, L16 |
+| `src/input/` | L2, L20 |
+| `src/editor/` | L3, L4, L5 |
+| `src/modal.rs`, `src/app.rs` | L5, L6, L12 |
+| `src/view_state.rs`, `src/ui/` | L8, L9, L16 |
 | `src/encoding.rs`, `src/file_io.rs` | L11 |
-| `src/recent.rs`, `src/app.rs` | L12, L13 |
+| `src/config.rs`, `src/app.rs` | L13 |
 | `src/clipboard.rs` | L14 |
 | `src/theme.rs`, menus Temas | L10 |
-| Projeto / CI | L17, L18, L19 |
+| Projeto / CI | L17 |
 
 ---
 
@@ -215,8 +212,8 @@ Cada limitação **Li** deve ser riscada ou movida para `specs/done/` quando uma
 
 ## Ordem sugerida de ataque
 
-1. L1 + L2 (bloco visível e mouse correto)  
-2. L3 + L4 + L5 (Editar completo e confiável)  
-3. L7 + L8 (Exibir com efeito real)  
-4. L11 + L13 (Formatar e persistência)  
-5. L18 (testes antes de abas e tema custom)
+1. ~~L1 + L2~~ ✅  
+2. L4 + L5 + L6 (Editar e Find/Replace completos)  
+3. L8 + L9 (Exibir com efeito real)  
+4. L11 + L13 (Formatar e persistência restante)  
+5. L0 / TV1–TV4, TV6, TV8–TV10 (fidelidade visual Turbo Vision)

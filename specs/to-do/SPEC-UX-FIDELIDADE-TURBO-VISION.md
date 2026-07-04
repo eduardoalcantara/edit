@@ -63,12 +63,14 @@ Fechar a lacuna entre a UI implementada e a referência Turbo Vision / EDIT.EXE.
 
 ### TV5 — Modo Replace preso na coluna
 
-| Atual | Esperado |
-|-------|----------|
-| Substitui 1 caractere; cursor **não avança** | Overtype: substituir e **avançar** para próxima coluna (comportamento EDIT.EXE) |
+**Status:** implementado (2026-06-09)
 
-**Módulos:** `src/editor.rs`  
-**Critério de aceite:** digitar sequência em Replace desloca cursor monotonicamente à direita.
+| Antes | Agora |
+|-------|-------|
+| Substitui 1 caractere; cursor **não avança** (modal Replace) | Overtype e `replace_one` **avançam** o cursor após cada substituição |
+
+**Módulos:** `src/editor/engine.rs` (`insert_char` Replace + `replace_one`)  
+**Critério de aceite:** digitar sequência em Replace desloca cursor monotonicamente à direita — **atendido**.
 
 ### TV6 — Diálogos sem botões reais
 
@@ -123,9 +125,11 @@ Fechar a lacuna entre a UI implementada e a referência Turbo Vision / EDIT.EXE.
 
 ## Prioridade média
 
-### TV11 — Tema “Azul Clássico” não replica VGA 16 cores
+### TV11 — Tema VGA 16 cores
 
-Ajustar para paleta fixa DOS: gray(7), blue(1), red(4), green(2), yellow(14), white(15).
+**Status:** parcial — tema **VGA 16 cores** adicionado em `src/theme.rs` (`ThemeId::Vga`); **Azul Clássico** permanece como variante suavizada.
+
+Paleta fixa DOS: gray(7), blue(1), red(4), green(2), yellow(14), white(15).
 
 ### TV12 — Área de trabalho (desktop) azul atrás da janela
 
@@ -148,11 +152,11 @@ TV8–TV10         →  polimento profissional
 
 ## Ordem de implementação sugerida
 
-1. TV5 (Replace) — bug funcional  
+1. ~~TV5 (Replace) — bug funcional~~ ✅  
 2. TV1, TV2, TV4, TV3 — shell visual  
 3. TV6 — botões modais  
-4. TV7 — file picker  
-5. TV8–TV13 — chrome e Find dialog  
+4. ~~TV7 — file picker~~ ✅  
+5. TV8–TV13 — chrome e Find dialog (TV11 parcial: tema VGA)
 
 ## Relação com outros docs
 

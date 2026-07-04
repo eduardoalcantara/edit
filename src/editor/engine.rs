@@ -351,7 +351,8 @@ impl EditorEngine {
         self.delete_selection();
         let before = self.primary().char_idx;
         if self.input_mode == EditMode::Replace && ch != '\n' {
-            let idx = before;
+            let _materialized = self.materialize_virtual_at_primary();
+            let idx = self.primary().char_idx.min(self.text.len_chars());
             if idx < self.text.len_chars() && self.text.get_char(idx) == Some('\n') {
                 self.text.insert_char(idx, ch);
                 self.primary_mut().char_idx = idx + 1;
@@ -360,7 +361,7 @@ impl EditorEngine {
                 self.ensure_visible();
                 return;
             }
-            self.replace_char_at(before, ch);
+            self.replace_char_at(idx, ch);
             return;
         }
         let materialized = self.materialize_virtual_at_primary();
@@ -1018,7 +1019,7 @@ impl EditorEngine {
         self.text.remove(start_char..end_char);
         self.text.insert(start_char, replacement);
         let after = start_char + replacement.chars().count();
-        self.primary_mut().char_idx = start_char;
+        self.primary_mut().char_idx = after;
         self.search_match_start = Some(start_char);
         self.sync_primary_virtual();
         self.record(
@@ -1051,6 +1052,29 @@ mod tests {
         e.insert_char('X');
         assert_eq!(e.text.to_string(), "aXc");
         assert_eq!(e.primary().char_idx, 2);
+    }
+
+    #[test]
+    fn overtype_sequence_advances_monotonically() {
+        let mut e = EditorEngine::new();
+        e.load_text("abc");
+        e.set_cursor_line_col(0, 1);
+        e.input_mode = EditMode::Replace;
+        e.insert_char('X');
+        e.insert_char('Y');
+        assert_eq!(e.text.to_string(), "aXY");
+        assert_eq!(e.primary().char_idx, 3);
+    }
+
+    #[test]
+    fn replace_one_advances_past_replacement() {
+        let mut e = EditorEngine::new();
+        e.load_text("foo bar foo");
+        e.search_pattern = "foo".into();
+        e.set_cursor_line_col(0, 0);
+        assert!(e.replace_one("baz"));
+        assert_eq!(e.text.to_string(), "baz bar foo");
+        assert_eq!(e.primary().char_idx, 3);
     }
 
     #[test]

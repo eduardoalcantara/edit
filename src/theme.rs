@@ -5,6 +5,7 @@ pub enum ThemeId {
     Dark,
     Light,
     ClassicBlue,
+    Vga,
     Matrix,
 }
 
@@ -14,6 +15,7 @@ impl ThemeId {
             ThemeId::Dark => "Escuro",
             ThemeId::Light => "Claro",
             ThemeId::ClassicBlue => "Azul Clássico",
+            ThemeId::Vga => "VGA 16 cores",
             ThemeId::Matrix => "Matrix",
         }
     }
@@ -23,6 +25,7 @@ impl ThemeId {
             ThemeId::Dark => ThemePalette::dark(),
             ThemeId::Light => ThemePalette::light(),
             ThemeId::ClassicBlue => ThemePalette::classic_blue(),
+            ThemeId::Vga => ThemePalette::vga16(),
             ThemeId::Matrix => ThemePalette::matrix(),
         }
     }
@@ -103,7 +106,7 @@ impl ThemePalette {
         }
     }
 
-    /// Paleta inspirada Turbo Pascal / Turbo Vision (VGA 16 cores).
+    /// Paleta inspirada Turbo Pascal / Turbo Vision (variante suavizada).
     pub fn classic_blue() -> Self {
         Self {
             background: Color::Blue,
@@ -126,6 +129,32 @@ impl ThemePalette {
             button_bg: Color::Green,
             button_fg: Color::Black,
             shadow: Color::Black,
+        }
+    }
+
+    /// Paleta fixa DOS VGA 16 cores (índices 0–15): gray(7), blue(1), red(4), green(2), yellow(14), white(15).
+    pub fn vga16() -> Self {
+        Self {
+            background: Color::Rgb(0, 0, 170),
+            foreground: Color::Rgb(255, 255, 255),
+            border: Color::Rgb(255, 255, 255),
+            header_bg: Color::Rgb(170, 170, 170),
+            header_fg: Color::Rgb(0, 0, 0),
+            footer_bg: Color::Rgb(170, 170, 170),
+            footer_fg: Color::Rgb(0, 0, 0),
+            accent: Color::Rgb(255, 255, 85),
+            status: Color::Rgb(255, 255, 85),
+            editor_bg: Color::Rgb(0, 0, 170),
+            editor_fg: Color::Rgb(255, 255, 255),
+            cursor: Color::Rgb(255, 255, 85),
+            selection: Color::Rgb(85, 85, 255),
+            menu_hotkey: Color::Rgb(255, 0, 0),
+            menu_shortcut: Color::Rgb(0, 0, 0),
+            menu_focus_bg: Color::Rgb(0, 170, 0),
+            menu_top_active_bg: Color::Rgb(255, 0, 0),
+            button_bg: Color::Rgb(0, 170, 0),
+            button_fg: Color::Rgb(0, 0, 0),
+            shadow: Color::Rgb(0, 0, 0),
         }
     }
 
