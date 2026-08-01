@@ -1,12 +1,14 @@
 # Editor Linux — Requisitos Mestres
 
 **Autor:** Perplexity AI  
-**Data:** 2026-06-06  
-**Versão:** 1.0
+**Data:** 2026-06-06 (nota de supersessão: 2026-07-31)  
+**Versão:** 1.1
 
 ## Propósito
 
 Este documento consolida todos os requisitos definidos até agora para o Editor Linux. Ele serve como referência permanente para evitar perda de contexto e para originar specs incrementais de implementação para o Cursor.
+
+> **Supersessão (2026-07-31):** o contrato vigente de implementação está em `PROJECT_RULES.md`, `PROJECT_STATUS.md` e `specs/done/`. Em conflito, esses arquivos vencem. Em especial: buffer **`ropey`** (não `tui-textarea`); abas via menu **Abas** (sem barra de abas visual); painel lateral removido; terminal inferior PTY real; tema **Matrix** no lugar de “Personalizado”.
 
 ## Visão do produto
 
@@ -25,8 +27,8 @@ O Editor Linux será um editor de terminal para usuários comuns, com UX previs�
 - Linguagem: Rust.
 - UI TUI: Ratatui.
 - Backend de terminal: Crossterm.
-- Editor de texto base: `tui-textarea` ou equivalente evolutivo.
-- Persistência: filesystem local.
+- Editor de texto: **`ropey`** em `src/editor/` (histórico: `tui-textarea` removido — ver `EDITOR_LINUX_SPEC_ARQUITETURA_GERAL.md`).
+- Persistência: filesystem local (`edit.json` ao lado do executável; sessão em `.edit-session/`).
 - Configuração: arquivos simples e explícitos.
 
 ## Estrutura do repositório
@@ -77,14 +79,12 @@ Os módulos iniciais esperados em `src/` são:
 
 A interface deve conter:
 
-- barra superior com nome do app, documento e tema;
-- menu principal visível;
-- barra de abas;
-- área central de edição;
-- barra de status inferior;
-- painel lateral opcional;
-- terminal inferior opcional;
-- rodapé de ajuda, apenas quando apropriado.
+- barra de menu principal visível (estilo Turbo Vision);
+- área central de edição (split horizontal opcional);
+- rodapé contextual (help à esquerda; estado à direita);
+- terminal inferior opcional (PTY real);
+- abas gerenciadas pelo menu **Abas** (barra de abas visual descartada);
+- ~~painel lateral~~ — removido; substituído pelo terminal inferior.
 
 ## Menus obrigatórios
 
@@ -112,9 +112,9 @@ A interface deve conter:
 - Tema Escuro.
 - Tema Claro.
 - Tema Azul Clássico.
-- Tema Personalizado.
-- Alternar Painel Lateral.
+- Tema Matrix.
 - Alternar Terminal Inferior.
+- (Painel lateral: removido.)
 
 ## Atalhos consolidados
 

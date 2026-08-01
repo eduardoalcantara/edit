@@ -1,8 +1,8 @@
 # PROJECT_STATUS — Editor Linux
 
 **Autor:** Perplexity AI  
-**Data:** 2026-06-09  
-**Versão:** 4.1
+**Data:** 2026-07-31  
+**Versão:** 4.2
 
 **Branch:** `main` (desenvolvimento integrado; branches de feature removidas após merge em 2026-06-09).
 
@@ -191,6 +191,12 @@
   - Spec: `specs/done/SPEC-REFERENCE-PANE-SIDEKICK.md`
   - **190 testes** unitários passando (`cargo test -- --test-threads=1`).
 - **Integração em `main` (2026-06-09):** merge de `workspace-fase1` (fast-forward `e1d0f8a` → `aa8d3e2`); branches locais/remotas de feature removidas.
+- **Host Linux nativo (2026-07-31):**
+  - Repositório desenvolvido originalmente no Windows; alvo do produto sempre foi Linux (alternativa ao Vim).
+  - Verificação neste host Arch Linux: Rust 1.85+ (`rustc`/`cargo`), `cc`, `pkg-config`, `libx11`/`libxcb` presentes.
+  - `cargo build --release` → `target/release/edit`; **204** testes unitários OK (`cargo test -- --test-threads=1`).
+  - Código já era multiplataforma (`cfg(unix)` / `cfg(windows)`): shell via `$SHELL`, PTY `portable-pty`, suspend `SIGTSTP`, paths case-sensitive — **sem alteração de código** necessária para compilar/rodar no Linux.
+  - Docs alinhados: README v2.6 (Linux-first), MASTER/spec v1 com notas de supersessão, contagem de testes e versão RULES (v3.2).
 
 ### Em andamento
 - **Fidelidade Turbo Vision:** `specs/to-do/SPEC-UX-FIDELIDADE-TURBO-VISION.md` (TV1–TV3 paleta/rodapé; demais itens TV8+).

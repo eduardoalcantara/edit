@@ -1,29 +1,32 @@
 # edit — Editor de terminal (Power Edit)
 
 **Autor:** Perplexity AI  
-**Data:** 2026-06-09  
-**Versão:** 2.5
+**Data:** 2026-07-31  
+**Versão:** 2.6
 
-Editor TUI para Linux/Windows com menus estilo **Turbo Vision**, núcleo **ropey**, UX previsível e proteção contra perda de trabalho.
+Editor TUI para **Linux** (alvo principal; alternativa ao Vim) com suporte a Windows. Menus estilo **Turbo Vision**, núcleo **ropey**, UX previsível e proteção contra perda de trabalho.
 
 ## Requisitos
 
-- Rust **1.85+**
+- Rust **1.85+** (`rustc` / `cargo`)
 - Terminal interativo (TTY)
+- **Linux:** compilador C (`cc`) e, para clipboard do SO (`arboard`), libs X11 (`libx11` / `libxcb`). Em Arch: `base-devel libx11 libxcb`.
+- **Windows (opcional):** Visual Studio Build Tools; binário `edit.exe`
 
 ## Build e execução
 
+Desenvolvimento nativo no Linux:
+
 ```bash
-cargo build              # debug
-cargo build --release    # release (Windows: edit.exe; Linux: edit)
+cargo build              # debug → target/debug/edit
+cargo build --release    # release → target/release/edit
 cargo run
 cargo run -- arquivo.txt outro.rs
 cargo run -- --clean
 cargo run -- --workspace src/main.rs
-# binários: target/debug/edit | target/release/edit(.exe)
 ```
 
-Build **Linux** a partir do Windows: `wsl bash -lc "cd /mnt/d/caminho/edit && cargo build --release"`.
+No Windows, o artefato é `edit.exe`. Build cruzado via WSL a partir do Windows (legado): `wsl bash -lc "cd /caminho/edit && cargo build --release"`.
 
 ### Linha de comando
 
@@ -149,7 +152,7 @@ Ver `PROJECT_RULES.md` para lista completa.
 
 ## Documentação
 
-1. [`PROJECT_RULES.md`](PROJECT_RULES.md) — regras estáveis (v3.1)
+1. [`PROJECT_RULES.md`](PROJECT_RULES.md) — regras estáveis (v3.2)
 2. [`PROJECT_STATUS.md`](PROJECT_STATUS.md) — estado e pendências
 3. [`PROJECT_TIMELINE.md`](PROJECT_TIMELINE.md) — histórico
 4. [`.cursorrules`](.cursorrules) — regras para o Cursor
@@ -163,6 +166,8 @@ Ver `PROJECT_RULES.md` para lista completa.
 
 ```bash
 cargo test
+# em hosts com muitos núcleos / Windows, serializar se necessário:
+cargo test -- --test-threads=1
 ```
 
-**190** testes unitários (`cargo test -- --test-threads=1` recomendado no Windows).
+**204** testes unitários (verificado em Linux nativo, 2026-07-31).

@@ -1,8 +1,8 @@
 # PROJECT_TIMELINE — Editor Linux
 
 **Autor:** Perplexity AI  
-**Data:** 2026-06-09  
-**Versão:** 4.1
+**Data:** 2026-07-31  
+**Versão:** 4.2
 
 ## Registro
 
@@ -175,3 +175,4 @@
   - Módulos: `src/{reference_pane,app_reference_pane,editor_split,editor/{mod,commands,engine,render},widgets/panel,ui/layers/{editor,menu_bar,menu_dropdown,modal},menus,config,view_state,main}.rs`
   - Spec: `specs/done/SPEC-REFERENCE-PANE-SIDEKICK.md`
   - Testes: **190** total (`cargo test -- --test-threads=1`); docs STATUS **v4.1**, README **v2.5**
+- 2026-07-31 — **Host Linux nativo** — verificação de toolchain (Rust 1.97 / 1.85+, `cc`, X11); `cargo build --release` e **204** testes OK; docs Linux-first (README **v2.6**, MASTER/spec v1 supersessão, STATUS/TIMELINE **v4.2**). Sem mudança de código de runtime.

@@ -1,8 +1,10 @@
 # Especificação Funcional v1 — Editor Linux
 
 **Autor:** Perplexity AI  
-**Data:** 2026-06-06  
-**Versão:** 1.0
+**Data:** 2026-06-06 (nota de supersessão: 2026-07-31)  
+**Versão:** 1.1
+
+> **Supersessão:** documento histórico da v1. Regras e estado atuais: `PROJECT_RULES.md`, `PROJECT_STATUS.md`, `specs/done/`. Buffer atual: **ropey** (não `tui-textarea`). Barra de abas visual e painel lateral: descartados / substituídos.
 
 ## 1. Objetivo
 
@@ -25,20 +27,21 @@ O Editor Linux será um aplicativo de terminal com interface textual moderna, me
 - Linguagem: Rust.
 - UI TUI: Ratatui.
 - Backend de terminal: Crossterm.
-- Editor de texto base: tui-textarea ou componente próprio evolutivo.
-- Persistência: sistema local de arquivos.
-- Clipboard interno: histórico próprio dentro do editor.
+- Editor de texto base: **ropey** (`src/editor/`; `tui-textarea` removido após migração de arquitetura).
+- Persistência: sistema local de arquivos (`edit.json`).
+- Clipboard interno: histórico próprio dentro do editor (+ `arboard` para SO).
 
 ## 5. Layout da Tela
 
 A tela principal deve conter:
 
-- Barra superior com título, nome do arquivo e estado da sessão.
-- Barra de abas com arquivos abertos.
-- Área central de edição.
-- Painel lateral opcional com arquivos e navegação.
-- Rodapé com atalhos e mensagens de status.
-- Painel inferior opcional para terminal integrado.
+- Barra de menu principal visível.
+- Área central de edição (split horizontal opcional).
+- Rodapé contextual (help + estado).
+- Painel inferior opcional para terminal integrado (PTY).
+- Abas via menu **Abas** (barra de abas visual descartada; painel lateral removido).
+
+> Layout detalhado vigente: `PROJECT_RULES.md` (UI / Turbo Vision).
 
 ## 6. Atalhos Básicos
 
