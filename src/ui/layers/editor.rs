@@ -58,7 +58,8 @@ impl UiLayer for EditorLayer {
             let right_idx = app.editor_split.right_tab;
             let right_reference = app.editor_split.has_reference();
             let right_env = app.editor_split.has_env_pane();
-            let right_special = right_reference || right_env;
+            let right_linux_configs = app.editor_split.has_linux_configs();
+            let right_special = right_reference || right_env || right_linux_configs;
 
             if focused != SplitPane::Left && split.left.width > 0 {
                 paint_pane(
@@ -185,6 +186,20 @@ impl UiLayer for EditorLayer {
             return InputResult::Consumed;
         }
 
+        if app.linux_configs_pane_active() {
+            let visible = app
+                .linux_configs_list_area
+                .map(|r| r.height as usize)
+                .unwrap_or(10);
+            let action = if let Some(pane) = app.editor_split.linux_configs.as_mut() {
+                pane.handle_key(&key, visible)
+            } else {
+                crate::linux_configs::LinuxConfigsAction::None
+            };
+            app.linux_configs_dispatch(action);
+            return InputResult::Consumed;
+        }
+
         if matches!(key.code, crossterm::event::KeyCode::Esc)
             && !key.modifiers.intersects(
                 crossterm::event::KeyModifiers::CONTROL | crossterm::event::KeyModifiers::ALT,
@@ -307,6 +322,15 @@ impl UiLayer for EditorLayer {
             }
         }
 
+        if let Some(hit) = app.linux_configs_close_hit {
+            if mouse::point_in_rect(&mouse, hit)
+                && matches!(mouse.kind, MouseEventKind::Down(MouseButton::Left))
+            {
+                app.close_linux_configs_pane();
+                return InputResult::Consumed;
+            }
+        }
+
         if let Some(hit) = app.reference_close_hit {
             if mouse::point_in_rect(&mouse, hit)
                 && matches!(mouse.kind, MouseEventKind::Down(MouseButton::Left))
@@ -327,6 +351,20 @@ impl UiLayer for EditorLayer {
                 }
             }
             // Clique/scroll fora da lista/botões: deixa outras camadas (editor esquerdo) tratarem.
+        }
+
+        if app.linux_configs_pane_active() {
+            let hits = app.linux_configs_button_hits.clone();
+            if let (Some(list), Some(pane)) = (
+                app.linux_configs_list_area,
+                app.editor_split.linux_configs.as_mut(),
+            ) {
+                let visible = list.height as usize;
+                if let Some(action) = pane.handle_mouse(&mouse, list, &hits, visible) {
+                    app.linux_configs_dispatch(action);
+                    return InputResult::Consumed;
+                }
+            }
         }
 
         if let Some(split) = layout.editor_split {
@@ -385,8 +423,9 @@ fn paint_pane(
     );
     let is_reference = pane == SplitPane::Right && app.editor_split.has_reference();
     let is_env = pane == SplitPane::Right && app.editor_split.has_env_pane();
+    let is_linux_configs = pane == SplitPane::Right && app.editor_split.has_linux_configs();
     let has_file_tab = tab_index.is_some_and(|index| index < app.workspace.tabs.len());
-    if use_active_editor && has_file_tab && !is_reference && !is_env {
+    if use_active_editor && has_file_tab && !is_reference && !is_env && !is_linux_configs {
         paint_guide_column(app, frame, area, text_viewport, palette, border_visible);
     }
 
@@ -410,6 +449,31 @@ fn paint_pane(
                 app.env_close_hit = action_hit;
                 app.env_list_area = Some(list_area);
                 app.env_button_hits = button_hits;
+            }
+        }
+        return;
+    }
+
+    if is_linux_configs {
+        let close_label = if app.view.use_paren_mnemonics {
+            "Fe(c)har"
+        } else {
+            "Fechar"
+        };
+        if let Some(cfg) = app.editor_split.linux_configs.as_mut() {
+            let (list_area, action_hit, button_hits) =
+                crate::linux_configs::paint_linux_configs_pane(
+                    frame,
+                    area,
+                    cfg,
+                    &palette,
+                    use_active_editor,
+                    close_label,
+                );
+            if use_active_editor {
+                app.linux_configs_close_hit = action_hit;
+                app.linux_configs_list_area = Some(list_area);
+                app.linux_configs_button_hits = button_hits;
             }
         }
         return;

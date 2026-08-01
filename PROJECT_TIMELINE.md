@@ -2,7 +2,7 @@
 
 **Autor:** Perplexity AI  
 **Data:** 2026-08-01  
-**Versão:** 4.6
+**Versão:** 4.8
 
 ## Registro
 
@@ -181,3 +181,8 @@
 - 2026-07-31 — **Terminal UX + PATH** — atalho **Ctrl+`**; fundo padrão `classico`; `docs/ENV_EDITOR.md` + help; `install-user.sh` → `~/.local/bin/edit`; RULES **v3.5**, README **v2.10**, STATUS/TIMELINE **v4.5**.
 - 2026-08-01 — **Remoção Sair da tela** — incompatibilidade TTY (shell usável vs retomada por chord); remove menu/atalho/`platform.rs`/`suspend`; README **v2.11**, STATUS/TIMELINE **v4.6**.
 - 2026-08-01 — **Fix env Usuário** — deixa de misturar sessão systemd/`show-environment` na lista; descodifica `$''`; evita poluir `99-edit.conf`; atalho **Ctrl+Alt+V**.
+- 2026-08-01 — **Painel Configurações Linux** — catálogo no Editor 2 (`Ctrl+Alt+L`); Enter abre no Editor 1; spec `SPEC-LINUX-CONFIGS-PANE.md`; RULES **v3.6**, README **v2.12**, STATUS/TIMELINE **v4.7**; **220** testes.
+- 2026-08-01 — **Fix abrir configs + split + abas** — conteúdo no Editor 1 (`focus_tab_unchecked`); `Ctrl+1`/`Ctrl+2`/Alt+dígito/`Ctrl+Tab` globais; menu Abas → Próxima/Anterior (`F4`/`Shift+F4`); **222** testes.
+- 2026-08-01 — **F8 Alternar editores + TTY Ctrl+dígito** — menu Exibir; Kitty keyboard enhancement; nota RULES **v3.7** (Ctrl+1/2 falham em TTY clássico).
+- 2026-08-01 — **Novo no painel focado** — Arquivo→Novo / Ctrl+N cria aba no Editor 1 ou 2 conforme o foco; `on_tab_inserted_at`.
+- 2026-08-01 — **Fechar dirty no Editor 2** — `sync_focused_editor_buffer` evita fechar sem prompt quando `active_index` está desalinhado do painel.

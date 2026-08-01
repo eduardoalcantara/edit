@@ -71,6 +71,9 @@ pub struct App {
     pub env_close_hit: Option<ratatui::layout::Rect>,
     pub env_list_area: Option<ratatui::layout::Rect>,
     pub env_button_hits: Vec<crate::env_pane::EnvButtonHit>,
+    pub linux_configs_close_hit: Option<ratatui::layout::Rect>,
+    pub linux_configs_list_area: Option<ratatui::layout::Rect>,
+    pub linux_configs_button_hits: Vec<crate::linux_configs::LinuxConfigsButtonHit>,
     pub pending_env_scope: Option<crate::env_editor::EnvScope>,
     pub pending_env_elevation: bool,
     pub pending_env_vars: Option<Vec<crate::env_editor::EnvVar>>,
@@ -186,6 +189,9 @@ impl App {
             env_close_hit: None,
             env_list_area: None,
             env_button_hits: Vec::new(),
+            linux_configs_close_hit: None,
+            linux_configs_list_area: None,
+            linux_configs_button_hits: Vec::new(),
             pending_env_scope: None,
             pending_env_elevation: false,
             pending_env_vars: None,
@@ -431,6 +437,12 @@ impl App {
 
     pub fn request_new_document(&mut self) {
         self.sync_active_tab();
+
+        if self.split_active() {
+            self.request_new_document_in_focused_pane();
+            return;
+        }
+
         if self.active_tab_is_pristine() {
             return;
         }
@@ -439,6 +451,61 @@ impl App {
             self.set_status("Documento novo");
             return;
         }
+        if self.workspace.needs_eviction() {
+            let tail = self.workspace.tail_index().expect("tail");
+            if self.workspace.tabs[tail].is_dirty() {
+                self.begin_dirty_flow(
+                    vec![tail],
+                    PromptReason::EvictTail,
+                    AfterDirtyResolved::EvictThenNew,
+                );
+                return;
+            }
+            self.evict_tail_silent();
+        }
+        self.create_new_tab_at_top();
+        self.refresh_menu();
+    }
+
+    /// Novo no painel com foco (Editor 1 ou 2): não reutiliza a aba do outro painel.
+    fn request_new_document_in_focused_pane(&mut self) {
+        let pane = self.editor_split.focused_pane;
+        if let Some(idx) = self.editor_split.pane_tab_index(pane) {
+            let pristine = if idx == self.workspace.active_index {
+                self.active_tab_is_pristine()
+            } else {
+                self.workspace
+                    .tabs
+                    .get(idx)
+                    .is_some_and(|t| t.document.path().is_none() && t.is_pristine())
+            };
+            if pristine {
+                self.focus_tab(idx);
+                return;
+            }
+        }
+
+        let other = match pane {
+            SplitPane::Left => self.editor_split.right_tab,
+            SplitPane::Right => Some(self.editor_split.left_tab),
+        };
+        if let Some(index) = self
+            .workspace
+            .tabs
+            .iter()
+            .enumerate()
+            .find(|(i, t)| {
+                Some(*i) != other && t.document.path().is_none() && t.is_pristine()
+            })
+            .map(|(i, _)| i)
+        {
+            self.assign_tab_to_focused_pane(index);
+            self.focus_tab_unchecked(index);
+            self.set_status("Documento novo");
+            self.refresh_menu();
+            return;
+        }
+
         if self.workspace.needs_eviction() {
             let tail = self.workspace.tail_index().expect("tail");
             if self.workspace.tabs[tail].is_dirty() {
@@ -520,12 +587,16 @@ impl App {
     }
 
     fn close_tab_after_sync(&mut self, index: usize) {
+        if index >= self.workspace.tabs.len() {
+            return;
+        }
+        // Flush para a aba do painel focado (pode diferir de active_index no split).
+        self.sync_focused_editor_buffer();
         if index != self.workspace.active_index {
             self.focus_tab_unchecked(index);
-        } else {
-            self.sync_active_tab();
         }
-        if self.workspace.tabs[index].is_dirty() {
+        let dirty = self.is_dirty() || self.workspace.tabs[index].is_dirty();
+        if dirty {
             self.begin_dirty_flow(
                 vec![index],
                 PromptReason::CloseTab,
@@ -834,6 +905,20 @@ impl App {
 
         if self.has_reference_pane() {
             self.close_reference_pane();
+        }
+
+        // Alinhar buffer do ecrã com a aba do painel focado antes de fechar.
+        if self.split_active() {
+            if let Some(index) = self.focused_editor_tab_index() {
+                self.sync_focused_editor_buffer();
+                self.close_tab_after_sync(index);
+                return;
+            }
+            // Editor 2 vazio ("Selecione aba…"): não fechar a aba do Editor 1 por engano.
+            if self.editor_split.focused_pane == SplitPane::Right {
+                self.set_status("Editor 2 vazio — nada a fechar (F8 volta ao Editor 1)");
+                return;
+            }
         }
 
         match self.resolve_close_tab_index() {
@@ -1503,6 +1588,7 @@ impl App {
                 });
             }
             ActionId::ToggleSplitEditor => self.toggle_editor_split(),
+            ActionId::ToggleEditorPane => self.chord_toggle_editor_pane(),
             ActionId::EncodingUtf8 => self.set_encoding(FileEncoding::Utf8),
             ActionId::EncodingUtf8NoBom => self.set_encoding(FileEncoding::Utf8NoBom),
             ActionId::EncodingUtf16Le => self.set_encoding(FileEncoding::Utf16Le),
@@ -1528,6 +1614,8 @@ impl App {
                 }
             }
             ActionId::FocusTab(i) => self.focus_tab(i),
+            ActionId::NextTab => self.focus_tab_relative(1),
+            ActionId::PrevTab => self.focus_tab_relative(-1),
             ActionId::ToggleCloseAllOnExit => {
                 self.workspace.fechar_tudo_ao_sair = !self.workspace.fechar_tudo_ao_sair;
                 self.persist_user_config();
@@ -1573,6 +1661,7 @@ impl App {
             ActionId::HelpAsciiTable => self.open_ascii_table(),
             ActionId::HelpAbout => self.modal = Modal::help(HelpKind::About),
             ActionId::EnvVariables => self.open_env_pane(),
+            ActionId::LinuxConfigs => self.open_linux_configs_pane(),
             ActionId::Recent | ActionId::PastePrevious | ActionId::NoOp => {}
         }
         if persist {

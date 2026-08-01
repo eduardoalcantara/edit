@@ -2,7 +2,7 @@
 
 **Autor:** Perplexity AI  
 **Data:** 2026-08-01  
-**Versão:** 2.11
+**Versão:** 2.13
 
 Editor TUI para **Linux** (alvo principal; alternativa ao Vim) com suporte a Windows. Menus estilo **Turbo Vision**, núcleo **ropey**, UX previsível e proteção contra perda de trabalho.
 
@@ -121,7 +121,7 @@ Isso instala `/usr/bin/edit`, o lançador `.desktop` e os ícones.
 | **Exibir** | Temas, word wrap, símbolos/espaços/tabs/EOL, colunas, margem, borda, **Dividir editor**, terminal, rodapé, **memória** |
 | **Formatar** | Codificação (UTF-8, ANSI, UTF-16…), tabulação, converter tabulação |
 | **Abas** | Lista dinâmica (até 10, check na ativa), Fechar Todos, toggles sessão, Ordenar por |
-| **Ferramentas** | **Variáveis de ambiente…** (`Ctrl+Alt+V`) — Usuário/Sistema persistentes |
+| **Ferramentas** | **Variáveis de ambiente…** (`Ctrl+Alt+V`); **Configurações do sistema…** (`Ctrl+Alt+L`, Linux) |
 | **Ajuda** | **Funcionalidades** e **Atalhos** no painel direito (split); **Tabela ASCII**; **Sobre** (modal) |
 
 ### Variáveis de ambiente
@@ -149,7 +149,7 @@ Documentação: [`docs/ENV_EDITOR.md`](docs/ENV_EDITOR.md).
 - Modais com mouse/hover; sair/fechar com **[Salvar] [Não Salvar] [Cancelar]**; `Ctrl+Q` / `Alt+F4` global.
 - **Navegador de arquivos** estilo Turbo Pascal para Abrir / Salvar Como (`Ctrl+O`, `Ctrl+Shift+S`).
 - **Buscar / Substituir / Ir para linha** — modais dedicados; campos com `TextInput` (cursor, seleção, Del, setas, Home/End, Ctrl+C/V/X/A).
-- **Split horizontal** — duas abas lado a lado (`Ctrl+1` único, `Ctrl+2` dividir); borda dupla no painel com foco.
+- **Split horizontal** — duas abas lado a lado (`Ctrl+1` único, `Ctrl+2` dividir; **`F8`** / **Exibir → Alternar entre editores**); borda dupla no painel com foco.
 - Busca no editor destaca **todas** as ocorrências; `F3` / `Shift+F3` navega entre elas.
 
 ### Persistência
@@ -172,7 +172,8 @@ Documentação: [`docs/ENV_EDITOR.md`](docs/ENV_EDITOR.md).
 | `Ctrl+Shift+W` | Fechar Todos |
 | `Ctrl+Tab` / `Ctrl+Shift+Tab` | Próxima / anterior aba |
 | `Alt+1` … `Alt+0` | Foco aba 1–10 |
-| `Ctrl+1` / `Ctrl+2` | Editor único / split horizontal (foco esquerda-direita) |
+| `Ctrl+1` / `Ctrl+2` | Editor único / split (pode falhar em TTY clássico Linux) |
+| **`F8`** | Alternar foco Editor 1 ↔ Editor 2 (TTY-safe) |
 | `Alt+S` | Menu Abas |
 | `Ctrl+F/H` | Buscar / Substituir |
 | `Ctrl+Q`, `Alt+F4` | Sair (global) |
@@ -185,7 +186,9 @@ Documentação: [`docs/ENV_EDITOR.md`](docs/ENV_EDITOR.md).
 | **`Ctrl+E`** | Foco no editor |
 | **`Ctrl+G`** | Ir para linha... |
 | **`Ctrl+Alt+V`** | Variáveis de ambiente |
+| **`Ctrl+Alt+L`** | Configurações Linux (Editor 2 → abre no Editor 1) |
 | **`F6`** | Alterna foco Editor ↔ Terminal |
+| **`F8`** | Alternar foco Editor 1 ↔ Editor 2 |
 | **`F4`** / **`Shift+F4`** | Próxima / anterior aba (Windows-safe) |
 
 Ver `PROJECT_RULES.md` para lista completa.

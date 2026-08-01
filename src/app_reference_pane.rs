@@ -28,6 +28,9 @@ impl App {
         if self.has_env_pane() {
             self.close_env_pane_force();
         }
+        if self.has_linux_configs_pane() {
+            self.close_linux_configs_pane();
+        }
         self.sync_active_tab();
 
         let stash = if let Some(ref reference) = self.editor_split.reference {
@@ -171,17 +174,7 @@ impl App {
         let idx = self
             .focused_editor_tab_index()
             .unwrap_or(self.workspace.active_index);
-        if idx >= self.workspace.tabs.len() {
-            return;
-        }
-        let saved = self.workspace.tabs[idx]
-            .document
-            .saved_snapshot()
-            .to_string();
-        self.workspace.tabs[idx].editor.replace_content(&saved);
-        if self.workspace.active_index == idx {
-            self.editor.replace_content(&saved);
-        }
+        self.discard_tab_changes_at(idx);
     }
 
     pub(crate) fn effective_right_tab(&self) -> Option<usize> {

@@ -456,6 +456,7 @@ impl EditConfig {
                 focused_pane: foco,
                 reference: None,
                 env_pane: None,
+                linux_configs: None,
             };
             split.enforce_focus_invariant();
             return split;
@@ -484,6 +485,7 @@ impl EditConfig {
             focused_pane: foco,
             reference: None,
             env_pane: None,
+            linux_configs: None,
         };
         split.ensure_distinct_tabs();
         if split.right_tab.is_none() {

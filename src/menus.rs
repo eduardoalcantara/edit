@@ -59,6 +59,7 @@ pub enum ActionId {
     MarginTwoLines,
     BorderToggle,
     ToggleSplitEditor,
+    ToggleEditorPane,
     EncodingUtf8,
     EncodingUtf8NoBom,
     EncodingUtf16Le,
@@ -73,6 +74,8 @@ pub enum ActionId {
     PasteClip(usize),
     OpenRecent(usize),
     FocusTab(usize),
+    NextTab,
+    PrevTab,
     ToggleCloseAllOnExit,
     TogglePersistUndo,
     SortFileName,
@@ -85,6 +88,7 @@ pub enum ActionId {
     HelpAsciiTable,
     HelpAbout,
     EnvVariables,
+    LinuxConfigs,
 }
 
 #[derive(Clone)]
@@ -294,6 +298,23 @@ fn tabs_menu(workspace: &Workspace) -> Vec<MenuNode> {
         ));
     }
 
+    nodes.push(MenuNode::Separator);
+    nodes.push(item(
+        "Próxima aba",
+        Some("F4"),
+        ActionId::NextTab,
+        true,
+        None,
+        "Foca a aba seguinte (também Ctrl+Tab se o terminal repassar)",
+    ));
+    nodes.push(item(
+        "Aba anterior",
+        Some("Shift+F4"),
+        ActionId::PrevTab,
+        true,
+        None,
+        "Foca a aba anterior",
+    ));
     nodes.push(MenuNode::Separator);
     nodes.push(item(
         "Fechar Todos",
@@ -586,7 +607,15 @@ fn view_menu(view: &ViewState, split_editor: bool) -> Vec<MenuNode> {
             ActionId::ToggleSplitEditor,
             true,
             Some(split_editor),
-            "Dois arquivos lado a lado (Ctrl+1 único | Ctrl+2 dividir/direita)",
+            "Dois arquivos lado a lado (Ctrl+1 único | Ctrl+2 dividir/direita; em muitos TTY Linux use o menu ou F8)",
+        ),
+        item(
+            "Alternar entre editores",
+            Some("F8"),
+            ActionId::ToggleEditorPane,
+            true,
+            None,
+            "Foca o outro painel (Editor 1 ↔ Editor 2); abre o split se estiver fechado",
         ),
         item(
             "Terminal",
@@ -758,14 +787,25 @@ fn view_menu(view: &ViewState, split_editor: bool) -> Vec<MenuNode> {
 }
 
 fn tools_menu() -> Vec<MenuNode> {
-    vec![item(
+    let mut items = vec![item(
         "Variáveis de ambiente...",
         Some("Ctrl+Alt+V"),
         ActionId::EnvVariables,
         true,
         None,
         "Editar variáveis persistentes de Usuário e Sistema",
-    )]
+    )];
+    if crate::app_linux_configs::linux_configs_supported() {
+        items.push(item(
+            "Configurações do sistema...",
+            Some("Ctrl+Alt+L"),
+            ActionId::LinuxConfigs,
+            true,
+            None,
+            "Lista ficheiros de config comuns; Enter abre no Editor 1",
+        ));
+    }
+    items
 }
 
 fn help_menu() -> Vec<MenuNode> {
@@ -1671,6 +1711,29 @@ mod tests {
         assert!(has_ascii);
     }
 
+    #[test]
+    fn tools_menu_linux_configs_matches_platform() {
+        let bar = MenuBar::build(
+            &RecentFiles::default(),
+            &ViewState::default(),
+            FileEncoding::Utf8,
+            Tabulation::Spaces4,
+            &Clipboard::default(),
+            &empty_workspace(),
+            false,
+        );
+        let tools = bar.tops.iter().find(|t| t.mnemonic == 'T').unwrap();
+        let has = tools.children.iter().any(|node| {
+            matches!(
+                node,
+                MenuNode::Item {
+                    action: ActionId::LinuxConfigs,
+                    ..
+                }
+            )
+        });
+        assert_eq!(has, crate::app_linux_configs::linux_configs_supported());
+    }
 }
 
 fn line_width(node: &MenuNode) -> usize {

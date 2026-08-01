@@ -58,6 +58,18 @@ impl App {
                 return;
             }
         }
+        if self.editor_split.env_pane.is_some() {
+            self.close_env_pane_force();
+            if !self.editor_split.is_active() {
+                return;
+            }
+        }
+        if self.editor_split.linux_configs.is_some() {
+            self.close_linux_configs_pane();
+            if !self.editor_split.is_active() {
+                return;
+            }
+        }
         let keep = self
             .editor_split
             .left_tab
@@ -81,6 +93,17 @@ impl App {
                 self.sync_active_tab();
             }
             self.focus_reference_pane();
+            return;
+        }
+        if pane == SplitPane::Right
+            && (self.editor_split.env_pane.is_some() || self.editor_split.linux_configs.is_some())
+        {
+            if self.reference_pane_active() {
+                self.unfocus_reference_pane();
+            }
+            self.sync_active_tab();
+            self.editor_split.focused_pane = SplitPane::Right;
+            self.input_focus = InputFocus::Editor;
             return;
         }
         if self.reference_pane_active() {
@@ -118,16 +141,50 @@ impl App {
         }
     }
 
-    /// `Ctrl+2`: divide o editor ou foca o painel direito.
+    /// `Ctrl+2`: divide o editor ou foca o painel direito (arquivo, Env ou Configs).
     pub fn chord_editor_split_or_right(&mut self) {
         if self.editor_split.is_active() {
             self.focus_editor_pane(SplitPane::Right);
         } else {
             self.enable_editor_split();
-            if self.editor_split.right_tab.is_some() {
+            if self.editor_split.right_tab.is_some()
+                || self.has_env_pane()
+                || self.has_linux_configs_pane()
+            {
                 self.focus_editor_pane(SplitPane::Right);
             }
         }
+    }
+
+    /// `F8` / menu: alterna o foco entre Editor 1 e Editor 2.
+    /// Se o split estiver fechado, abre-o e foca o painel direito (quando houver).
+    pub fn chord_toggle_editor_pane(&mut self) {
+        if !self.editor_split.is_active() {
+            self.enable_editor_split();
+            if self.editor_split.is_active() {
+                if self.editor_split.right_tab.is_some()
+                    || self.has_env_pane()
+                    || self.has_linux_configs_pane()
+                    || self.editor_split.reference.is_some()
+                {
+                    self.focus_editor_pane(SplitPane::Right);
+                    self.set_status("Editor 2 (F8 volta ao Editor 1)");
+                } else {
+                    self.set_status("Split activo — abra outra aba para o Editor 2 (F4)");
+                }
+            }
+            return;
+        }
+        let next = match self.editor_split.focused_pane {
+            SplitPane::Left => SplitPane::Right,
+            SplitPane::Right => SplitPane::Left,
+        };
+        self.focus_editor_pane(next);
+        let label = match next {
+            SplitPane::Left => "Editor 1",
+            SplitPane::Right => "Editor 2",
+        };
+        self.set_status(format!("{label} (F8 alterna)"));
     }
 
     pub(crate) fn on_tab_count_changed(&mut self) {
@@ -152,6 +209,40 @@ impl App {
             }
         }
         self.editor_split.ensure_distinct_tabs();
+    }
+
+    /// Após `insert` numa posição: desloca índices dos painéis (≥ index) uma casa à frente.
+    pub(crate) fn on_tab_inserted_at(&mut self, index: usize) {
+        if !self.editor_split.is_active() {
+            return;
+        }
+        let bump = |idx: usize| -> usize {
+            if idx >= index {
+                idx + 1
+            } else {
+                idx
+            }
+        };
+        self.editor_split.left_tab = bump(self.editor_split.left_tab);
+        if let Some(r) = self.editor_split.right_tab {
+            self.editor_split.right_tab = Some(bump(r));
+        }
+        if let Some(ref mut reference) = self.editor_split.reference {
+            if let Some(r) = reference.stashed_right_tab {
+                reference.stashed_right_tab = Some(bump(r));
+            }
+        }
+        if let Some(ref mut pane) = self.editor_split.env_pane {
+            if let Some(r) = pane.stashed_right_tab {
+                pane.stashed_right_tab = Some(bump(r));
+            }
+        }
+        if let Some(ref mut pane) = self.editor_split.linux_configs {
+            if let Some(r) = pane.stashed_right_tab {
+                pane.stashed_right_tab = Some(bump(r));
+            }
+        }
+        self.on_tab_count_changed();
     }
 
     pub(crate) fn on_tab_closed(&mut self, closed_index: usize) {

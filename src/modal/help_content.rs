@@ -22,10 +22,10 @@ menus pull-down, modais e proteção contra perda de trabalho.
 
 ═══ WORKSPACE / ABAS ═══
 
-  • Até 10 abas; Ctrl+Tab / Ctrl+Shift+Tab / F4 / Shift+F4
-  • Split horizontal: Exibir → Dividir editor; Ctrl+1 (único/esquerda) / Ctrl+2 (split/direita)
+  • Até 10 abas; menu Abas → Próxima/Anterior; F4 / Shift+F4; Alt+1…0
+  • Split horizontal: Exibir → Dividir editor; F8 alterna painéis; Ctrl+1/Ctrl+2 (se o TTY reportar)
   • Alt+1 … Alt+0 foco direto; menu Abas (Alt+S)
-  • Novo (Ctrl+N): reutiliza aba pristine ou cria NovoN
+  • Novo (Ctrl+N): no painel com foco (Editor 1 ou 2); reutiliza Novo pristine livre ou cria NovoN
   • Fechar aba (Ctrl+W); Fechar Todos (Ctrl+Shift+W) com confirmação
   • Salvar Todos (Ctrl+Alt+S); evicção da aba do final se exceder 10
   • Recentes (Arquivo): últimos 10 fechados; menu Abas = abertos
@@ -63,6 +63,7 @@ menus pull-down, modais e proteção contra perda de trabalho.
   • Menus Alt+A/E/X/F/S/T/H; toggles com √; opções exclusivas estilo radio
   • Split: rodapé mostra Editor 1 / Editor 2 conforme painel em foco
   • Ferramentas → Variáveis de ambiente (Ctrl+Alt+V): Usuário/Sistema
+  • Ferramentas → Configurações do sistema (Ctrl+Alt+L, Linux): lista → abre no Editor 1
   • Valores de env em claro na v1; persistência fora do processo (environment.d / registry)
 
 
@@ -96,6 +97,7 @@ quando indicado (ex.: Ctrl+Q, Alt+F4).
   Ctrl+T / Ctrl+`     Editor: abre/foca terminal; Terminal: fecha painel
   F6                  Alterna foco Editor ↔ Terminal
   F7                  Envia seleção/linha ao terminal
+  F8                  Alterna foco Editor 1 ↔ Editor 2
   F1                  Ajuda → Funcionalidades
   F10                 Salvar aba ativa
 
@@ -120,6 +122,7 @@ quando indicado (ex.: Ctrl+Q, Alt+F4).
   Ctrl+F / Ctrl+R     Buscar / Substituir
   Ctrl+G              Ir para linha...
   Ctrl+Alt+V          Variáveis de ambiente (painel direito)
+  Ctrl+Alt+L          Configurações Linux (painel direito; Enter → Editor 1)
   F3 / Shift+F3       Próxima / anterior ocorrência de busca
   Esc                 Limpa busca ativa no editor (sem modal aberto)
 
@@ -145,10 +148,11 @@ quando indicado (ex.: Ctrl+Q, Alt+F4).
 
   Ctrl+Tab            Próxima aba (se o host repassar)
   Ctrl+Shift+Tab      Aba anterior
-  F4 / Shift+F4       Próxima / anterior aba (Windows-safe)
+  F4 / Shift+F4       Próxima / anterior aba (menu Abas; Windows-safe)
   Alt+1 … Alt+0       Foco aba na posição 1–10
-  Ctrl+1              Editor único (ou foco esquerdo em split)
-  Ctrl+2              Dividir editor / foco painel direito
+  Ctrl+1              Editor único (ou foco esquerdo em split; pode falhar em TTY clássico)
+  Ctrl+2              Dividir editor / foco painel direito (idem)
+  F8                  Alternar entre Editor 1 ↔ Editor 2 (menu Exibir; TTY-safe)
   Alt+S               Menu Abas
 
 

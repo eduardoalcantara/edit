@@ -43,6 +43,18 @@ pub fn is_env_variables_chord(key: &KeyEvent) -> bool {
         && !key.modifiers.contains(KeyModifiers::SHIFT)
 }
 
+pub fn is_linux_configs_chord(key: &KeyEvent) -> bool {
+    use crossterm::event::KeyEventKind;
+    if !crate::app_linux_configs::linux_configs_supported() {
+        return false;
+    }
+    matches!(key.kind, KeyEventKind::Press | KeyEventKind::Repeat)
+        && matches!(key.code, KeyCode::Char('l' | 'L'))
+        && key.modifiers.contains(KeyModifiers::CONTROL)
+        && key.modifiers.contains(KeyModifiers::ALT)
+        && !key.modifiers.contains(KeyModifiers::SHIFT)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -70,6 +82,22 @@ mod tests {
         assert!(!is_env_variables_chord(&key(
             KeyCode::Char('v'),
             KeyModifiers::CONTROL
+        )));
+    }
+
+    #[test]
+    fn linux_configs_chord_is_ctrl_alt_l() {
+        assert!(is_linux_configs_chord(&key(
+            KeyCode::Char('l'),
+            KeyModifiers::CONTROL | KeyModifiers::ALT
+        )));
+        assert!(!is_linux_configs_chord(&key(
+            KeyCode::Char('l'),
+            KeyModifiers::CONTROL | KeyModifiers::SHIFT
+        )));
+        assert!(!is_linux_configs_chord(&key(
+            KeyCode::Char('v'),
+            KeyModifiers::CONTROL | KeyModifiers::ALT
         )));
     }
 }

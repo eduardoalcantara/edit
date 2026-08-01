@@ -45,6 +45,8 @@ pub enum AfterDirtyResolved {
     CloseAll,
     CloseTab,
     EvictThenOpen(PathBuf),
+    /// Após evicção (limite de abas): abre path como aba nova no Editor 1 (sem substituir).
+    OpenAsNewInLeft(PathBuf),
     EvictThenNew,
     SaveAll,
 }
@@ -73,8 +75,43 @@ impl App {
         flush_editor_into_tab(&self.editor, &self.document, tab, word_wrap);
     }
 
+    /// Grava o buffer do ecrã na aba do **painel com foco** (não só `active_index`).
+    /// Corrige desalinhamento split em que o utilizador edita o Editor 2 mas
+    /// `active_index` ainda aponta para o Editor 1 — sem isto, Fechar descarta
+    /// alterações sem perguntar.
+    pub(crate) fn sync_focused_editor_buffer(&mut self) {
+        if self.reference_pane_active()
+            || self.env_pane_active()
+            || self.linux_configs_pane_active()
+        {
+            return;
+        }
+        if self.workspace.tabs.is_empty() {
+            return;
+        }
+        let idx = if self.split_active() {
+            self.focused_editor_tab_index()
+                .unwrap_or(self.workspace.active_index)
+        } else {
+            self.workspace.active_index
+        };
+        let idx = idx.min(self.workspace.tabs.len() - 1);
+        let word_wrap = self.view.word_wrap;
+        flush_editor_into_tab(
+            &self.editor,
+            &self.document,
+            &mut self.workspace.tabs[idx],
+            word_wrap,
+        );
+        self.workspace.active_index = idx;
+    }
+
     pub(crate) fn focus_tab(&mut self, index: usize) {
-        if index >= self.workspace.tabs.len() || index == self.workspace.active_index {
+        if index >= self.workspace.tabs.len() {
+            return;
+        }
+        if index == self.workspace.active_index {
+            self.sync_split_after_focus_tab(index);
             return;
         }
         self.sync_active_tab();
@@ -301,8 +338,68 @@ impl App {
             AfterDirtyResolved::CloseAll => self.close_all_tabs_final(),
             AfterDirtyResolved::CloseTab => self.set_status("Aba fechada"),
             AfterDirtyResolved::EvictThenOpen(path) => self.open_path_after_evict(path),
+            AfterDirtyResolved::OpenAsNewInLeft(path) => {
+                self.evict_tail_silent();
+                self.open_path_as_new_tab_in_left(path);
+            }
             AfterDirtyResolved::EvictThenNew => self.create_new_tab_at_top(),
             AfterDirtyResolved::SaveAll => self.save_all_remaining(),
+        }
+    }
+
+    pub(crate) fn discard_tab_changes_at(&mut self, tab_index: usize) {
+        if tab_index >= self.workspace.tabs.len() {
+            return;
+        }
+        let saved = self.workspace.tabs[tab_index]
+            .document
+            .saved_snapshot()
+            .to_string();
+        self.workspace.tabs[tab_index]
+            .editor
+            .replace_content(&saved);
+        if self.workspace.active_index == tab_index {
+            self.editor.replace_content(&saved);
+        }
+    }
+
+    /// Abre (ou foca) o path numa aba própria e associa ao Editor 1 — não substitui a aba atual.
+    pub(crate) fn open_path_as_new_tab_in_left(&mut self, path: PathBuf) {
+        let path = crate::file_io::normalize_open_path(&path);
+        if !path.is_file() {
+            self.set_status(format!("Não é ficheiro: {}", path.display()));
+            return;
+        }
+        self.sync_active_tab();
+        match self.ensure_tab_for_path(path.clone()) {
+            EnsureTabResult::Ok(index) => {
+                if self.editor_split.is_active() {
+                    self.editor_split.left_tab = index;
+                }
+                self.editor_split.focused_pane = SplitPane::Left;
+                // `insert_tab_at_top` já põe active_index=0; `focus_tab` sairia sem
+                // carregar o buffer em `app.editor` — forçar unchecked.
+                if index == self.workspace.active_index {
+                    self.focus_tab_unchecked(index);
+                } else {
+                    self.focus_tab(index);
+                }
+                self.set_status(format!("Aberto no Editor 1: {}", path.display()));
+            }
+            EnsureTabResult::BlockedNeedsSave => {
+                let Some(tail) = self.workspace.tail_index() else {
+                    self.set_status("Não foi possível abrir (limite de abas)");
+                    return;
+                };
+                self.begin_dirty_flow(
+                    vec![tail],
+                    PromptReason::EvictTail,
+                    AfterDirtyResolved::OpenAsNewInLeft(path),
+                );
+            }
+            EnsureTabResult::Failed => {
+                self.set_status(format!("Erro ao abrir: {}", path.display()));
+            }
         }
     }
 
@@ -322,7 +419,11 @@ impl App {
             PromptReason::CloseTab | PromptReason::EvictTail => {
                 self.remove_tab_at(tab_index);
             }
-            PromptReason::Quit | PromptReason::CloseAll | PromptReason::OpenInPane => {}
+            PromptReason::OpenInPane => {
+                // "Não Salvar": descarta edições e continua (senão o open volta a ver dirty e reabre o modal).
+                self.discard_tab_changes_at(tab_index);
+            }
+            PromptReason::Quit | PromptReason::CloseAll => {}
         }
 
         if rest.is_empty() {
@@ -352,7 +453,10 @@ impl App {
                     PromptReason::CloseTab | PromptReason::EvictTail => {
                         self.remove_tab_at(index);
                     }
-                    PromptReason::Quit | PromptReason::CloseAll | PromptReason::OpenInPane => {}
+                    PromptReason::OpenInPane => {
+                        self.discard_tab_changes_at(index);
+                    }
+                    PromptReason::Quit | PromptReason::CloseAll => {}
                 }
             } else if matches!(
                 flow.reason,
@@ -394,7 +498,18 @@ impl App {
             session_id,
             name,
         );
+        let pane = if self.split_active() {
+            Some(self.editor_split.focused_pane)
+        } else {
+            None
+        };
         self.workspace.insert_tab_at_top(tab);
+        if pane.is_some() {
+            self.on_tab_inserted_at(0);
+            if let Some(pane) = pane {
+                self.editor_split.set_pane_tab(pane, 0);
+            }
+        }
         self.focus_tab_unchecked(0);
         self.refresh_menu();
         self.set_status("Novo documento");
@@ -519,7 +634,7 @@ impl App {
             Ok(lines) => {
                 let tab = self.tab_from_opened_path(&path, lines);
                 self.workspace.insert_tab_at_top(tab);
-                self.on_tab_count_changed();
+                self.on_tab_inserted_at(0);
                 self.workspace
                     .find_open_path(&path)
                     .map(EnsureTabResult::Ok)
@@ -588,7 +703,7 @@ impl App {
         }
     }
 
-    fn assign_tab_to_focused_pane(&mut self, index: usize) {
+    pub(crate) fn assign_tab_to_focused_pane(&mut self, index: usize) {
         if !self.split_active() {
             return;
         }
@@ -646,8 +761,8 @@ impl App {
             }
         } else {
             self.workspace.insert_tab_at_top(tab);
+            self.on_tab_inserted_at(0);
             self.focus_tab_unchecked(0);
-            self.on_tab_count_changed();
         }
         self.recent.remove_path(path);
         self.persist_user_config();
@@ -1695,6 +1810,181 @@ mod tests {
     }
 
     #[test]
+    fn open_as_new_tab_in_left_keeps_previous_tab() {
+        let _guard = IsolatedConfigGuard::new("open-new-left");
+        let a = std::env::temp_dir().join(format!("edit-open-left-a-{}.conf", std::process::id()));
+        let b = std::env::temp_dir().join(format!("edit-open-left-b-{}.conf", std::process::id()));
+        std::fs::write(&a, "aaa").unwrap();
+        std::fs::write(&b, "bbb").unwrap();
+
+        let mut app = App::new(false, false);
+        app.open_path(a.clone());
+        let idx_a = app.workspace.find_open_path(&a).expect("a aberto");
+        let n_after_a = app.workspace.tabs.len();
+        app.focus_tab(idx_a);
+        app.editor.replace_content("aaa-editado");
+        app.sync_active_tab();
+        assert!(app.workspace.tabs[idx_a].is_dirty());
+
+        app.editor_split.mode = crate::editor_split::SplitMode::Horizontal;
+        app.editor_split.left_tab = idx_a;
+        app.open_path_as_new_tab_in_left(b.clone());
+
+        assert_eq!(app.workspace.tabs.len(), n_after_a + 1);
+        assert!(app.workspace.find_open_path(&a).is_some());
+        assert!(app.workspace.find_open_path(&b).is_some());
+        let idx_a2 = app.workspace.find_open_path(&a).unwrap();
+        assert!(app.workspace.tabs[idx_a2].is_dirty());
+        assert_eq!(
+            app.editor_split.left_tab,
+            app.workspace.find_open_path(&b).unwrap()
+        );
+        assert_eq!(app.editor.content_string(), "bbb");
+        assert_eq!(app.workspace.active_index, app.workspace.find_open_path(&b).unwrap());
+
+        let _ = std::fs::remove_file(a);
+        let _ = std::fs::remove_file(b);
+    }
+
+    #[test]
+    fn toggle_editor_pane_switches_focus() {
+        let _guard = IsolatedConfigGuard::new("toggle-pane");
+        let a = std::env::temp_dir().join(format!("edit-toggle-a-{}.txt", std::process::id()));
+        let b = std::env::temp_dir().join(format!("edit-toggle-b-{}.txt", std::process::id()));
+        std::fs::write(&a, "left").unwrap();
+        std::fs::write(&b, "right").unwrap();
+
+        let mut app = App::new(false, false);
+        app.open_path(a.clone());
+        app.open_path(b.clone());
+        assert!(app.workspace.tabs.len() >= 2);
+        app.enable_editor_split();
+        app.focus_editor_pane(SplitPane::Left);
+        assert_eq!(app.editor_split.focused_pane, SplitPane::Left);
+
+        app.chord_toggle_editor_pane();
+        assert_eq!(app.editor_split.focused_pane, SplitPane::Right);
+
+        app.chord_toggle_editor_pane();
+        assert_eq!(app.editor_split.focused_pane, SplitPane::Left);
+
+        let _ = std::fs::remove_file(a);
+        let _ = std::fs::remove_file(b);
+    }
+
+    #[test]
+    fn new_document_opens_in_focused_right_pane() {
+        let _guard = IsolatedConfigGuard::new("new-in-right");
+        let mut app = App::new(false, false);
+        assert_eq!(app.workspace.tabs.len(), 1);
+        app.editor.replace_content("conteudo-esquerda");
+        app.sync_active_tab();
+        assert!(!app.workspace.tabs[0].is_pristine());
+
+        app.enable_editor_split();
+        app.editor_split.right_tab = None;
+        app.editor_split.focused_pane = SplitPane::Right;
+        let left_session = app.workspace.tabs[0].session_id.clone();
+
+        app.request_new_document();
+
+        assert_eq!(app.workspace.tabs.len(), 2);
+        assert_eq!(app.editor_split.focused_pane, SplitPane::Right);
+        assert_eq!(app.editor_split.right_tab, Some(0));
+        assert_eq!(app.editor_split.left_tab, 1);
+        assert_eq!(app.editor.content_string(), crate::editor::EMPTY_DOCUMENT_TEXT);
+        assert_eq!(app.workspace.tabs[1].session_id, left_session);
+        assert_eq!(
+            app.workspace.tabs[1].editor.content_string(),
+            "conteudo-esquerda"
+        );
+    }
+
+    #[test]
+    fn close_dirty_novo_in_right_pane_prompts() {
+        let _guard = IsolatedConfigGuard::new("close-dirty-right");
+        let mut app = App::new(false, false);
+        app.editor.replace_content("esquerda");
+        app.sync_active_tab();
+
+        app.enable_editor_split();
+        app.editor_split.right_tab = None;
+        app.editor_split.focused_pane = SplitPane::Right;
+        app.request_new_document();
+        assert_eq!(app.editor_split.right_tab, Some(0));
+        assert_eq!(app.workspace.active_index, 0);
+
+        app.editor.replace_content("rascunho no editor 2");
+        // Simula fechar sem sync prévio explícito (como no menu).
+        app.request_close();
+
+        assert!(
+            app.modal.is_active(),
+            "esperava modal de confirmação ao fechar Novo dirty no Editor 2"
+        );
+        assert_eq!(app.workspace.tabs.len(), 2, "não deve fechar sem confirmar");
+    }
+
+    #[test]
+    fn close_dirty_right_prompts_even_if_active_index_desynced() {
+        let _guard = IsolatedConfigGuard::new("close-dirty-desync");
+        let mut app = App::new(false, false);
+        app.editor.replace_content("esquerda");
+        app.sync_active_tab();
+
+        app.enable_editor_split();
+        app.editor_split.right_tab = None;
+        app.editor_split.focused_pane = SplitPane::Right;
+        app.request_new_document();
+        assert_eq!(app.editor_split.right_tab, Some(0));
+
+        app.editor.replace_content("dirty so no editor 2");
+        // Desalinha active_index (bug de split) sem fazer flush para a aba 0.
+        app.workspace.active_index = 1;
+        app.editor_split.focused_pane = SplitPane::Right;
+        app.editor_split.right_tab = Some(0);
+
+        app.request_close();
+
+        assert!(
+            app.modal.is_active(),
+            "deve perguntar mesmo com active_index desalinhado"
+        );
+        assert_eq!(app.workspace.tabs.len(), 2);
+        assert!(app.workspace.tabs[0].is_dirty());
+    }
+
+    #[test]
+    fn open_in_pane_nao_salvar_does_not_loop() {
+        let _guard = IsolatedConfigGuard::new("open-pane-discard");
+        let a = std::env::temp_dir().join(format!("edit-pane-a-{}.txt", std::process::id()));
+        let b = std::env::temp_dir().join(format!("edit-pane-b-{}.txt", std::process::id()));
+        std::fs::write(&a, "base-a").unwrap();
+        std::fs::write(&b, "base-b").unwrap();
+
+        let mut app = App::new(false, false);
+        app.open_path(a.clone());
+        app.editor_split.mode = crate::editor_split::SplitMode::Horizontal;
+        app.editor_split.left_tab = 0;
+        app.editor_split.focused_pane = SplitPane::Left;
+        app.editor.replace_content("sujo");
+        app.sync_active_tab();
+
+        app.open_path(b.clone());
+        assert!(matches!(app.modal, Modal::Confirm { .. }));
+
+        // Simula confirmar o modal (limpa o diálogo) e escolhe Não Salvar.
+        app.modal = Modal::None;
+        app.handle_tab_unsaved_modal(0, PromptReason::OpenInPane, DialogButtonAction::Secondary);
+        assert!(matches!(app.modal, Modal::None));
+        assert!(app.workspace.find_open_path(&b).is_some());
+        assert!(!app.is_dirty());
+
+        let _ = std::fs::remove_file(a);
+        let _ = std::fs::remove_file(b);
+    }
+
+    #[test]
     fn ignore_open_allowed_when_below_tab_limit() {
         let _guard = IsolatedConfigGuard::new("ignore-below-limit");
         let mut app = App::new(false, false);
@@ -1785,7 +2075,7 @@ mod tests {
     }
 
     #[test]
-    fn close_with_empty_right_pane_closes_left_tab() {
+    fn close_with_empty_right_pane_does_not_close_left() {
         let _guard = IsolatedConfigGuard::new("close-empty-right");
         let path =
             std::env::temp_dir().join(format!("edit-close-er-{}.md", std::process::id()));
@@ -1804,9 +2094,11 @@ mod tests {
         assert_eq!(app.focused_editor_tab_index(), None);
 
         app.request_close();
-        assert!(app.workspace.find_open_path(&path).is_none());
-        assert_eq!(app.workspace.tabs.len(), 1);
-        assert!(app.workspace.tabs[0].filepath().is_none());
+        assert!(
+            app.workspace.find_open_path(&path).is_some(),
+            "não deve fechar o Editor 1 quando o Editor 2 está vazio"
+        );
+        assert!(app.split_active());
 
         let _ = std::fs::remove_file(path);
     }

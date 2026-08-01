@@ -1,6 +1,7 @@
 mod app;
 mod app_editor_split;
 mod app_env_pane;
+mod app_linux_configs;
 mod app_reference_pane;
 mod app_workspace;
 mod cli;
@@ -16,6 +17,7 @@ mod env_pane;
 mod events;
 mod file_io;
 mod input;
+mod linux_configs;
 mod memory;
 mod menus;
 mod modal;
@@ -35,7 +37,10 @@ use std::io::{self, stdout, IsTerminal, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use crossterm::cursor::Show;
-use crossterm::event::{DisableMouseCapture, EnableMouseCapture};
+use crossterm::event::{
+    DisableMouseCapture, EnableMouseCapture, KeyboardEnhancementFlags,
+    PopKeyboardEnhancementFlags, PushKeyboardEnhancementFlags,
+};
 use crossterm::execute;
 use crossterm::style::{force_color_output, ResetColor};
 use crossterm::terminal::{
@@ -52,6 +57,7 @@ static TERMINAL_RESTORED: AtomicBool = AtomicBool::new(true);
 
 pub struct TerminalGuard {
     mouse_enabled: bool,
+    keyboard_enhanced: bool,
 }
 
 impl TerminalGuard {
@@ -71,19 +77,37 @@ impl TerminalGuard {
         execute!(out, EnterAlternateScreen)?;
 
         let mouse_enabled = execute!(out, EnableMouseCapture).is_ok();
+        // Kitty keyboard protocol: permite Ctrl+1/Ctrl+2 e outros acordes que o TTY
+        // clássico não distingue (ex.: Ctrl+dígito chega como '1' sem CONTROL).
+        // Falha de forma silenciosa em emuladores sem suporte (GNOME Terminal, etc.).
+        let keyboard_enhanced = execute!(
+            out,
+            PushKeyboardEnhancementFlags(
+                KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES
+                    | KeyboardEnhancementFlags::REPORT_EVENT_TYPES
+                    | KeyboardEnhancementFlags::REPORT_ALL_KEYS_AS_ESCAPE_CODES
+            )
+        )
+        .is_ok();
         TERMINAL_RESTORED.store(false, Ordering::SeqCst);
 
         let backend = CrosstermBackend::new(out);
         let terminal = Terminal::new(backend)?;
 
-        Ok((terminal, Self { mouse_enabled }))
+        Ok((
+            terminal,
+            Self {
+                mouse_enabled,
+                keyboard_enhanced,
+            },
+        ))
     }
 
     pub fn leave_ui_briefly(
         &self,
         _terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
     ) -> io::Result<()> {
-        Self::teardown_ui(self.mouse_enabled)?;
+        Self::teardown_ui(self.mouse_enabled, self.keyboard_enhanced)?;
         Ok(())
     }
 
@@ -95,6 +119,16 @@ impl TerminalGuard {
         if self.mouse_enabled {
             let _ = execute!(out, EnableMouseCapture);
         }
+        if self.keyboard_enhanced {
+            let _ = execute!(
+                out,
+                PushKeyboardEnhancementFlags(
+                    KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES
+                        | KeyboardEnhancementFlags::REPORT_EVENT_TYPES
+                        | KeyboardEnhancementFlags::REPORT_ALL_KEYS_AS_ESCAPE_CODES
+                )
+            );
+        }
         TERMINAL_RESTORED.store(false, Ordering::SeqCst);
         terminal.clear()?;
         if let Ok(size) = terminal.size() {
@@ -104,13 +138,16 @@ impl TerminalGuard {
     }
 
     pub fn leave(self) -> io::Result<()> {
-        Self::restore_host_terminal(self.mouse_enabled)
+        Self::restore_host_terminal(self.mouse_enabled, self.keyboard_enhanced)
     }
 
-    fn teardown_ui(mouse_enabled: bool) -> io::Result<()> {
+    fn teardown_ui(mouse_enabled: bool, keyboard_enhanced: bool) -> io::Result<()> {
         // Sai de raw mode primeiro para o shell/host não engolir CSI.
         let _ = disable_raw_mode();
         let mut out = stdout();
+        if keyboard_enhanced {
+            let _ = execute!(out, PopKeyboardEnhancementFlags);
+        }
         if mouse_enabled {
             let _ = execute!(out, DisableMouseCapture);
         }
@@ -120,12 +157,15 @@ impl TerminalGuard {
         Ok(())
     }
 
-    fn restore_host_terminal(mouse_enabled: bool) -> io::Result<()> {
+    fn restore_host_terminal(mouse_enabled: bool, keyboard_enhanced: bool) -> io::Result<()> {
         if TERMINAL_RESTORED.swap(true, Ordering::SeqCst) {
             return Ok(());
         }
         let _ = disable_raw_mode();
         let mut out = stdout();
+        if keyboard_enhanced {
+            let _ = execute!(out, PopKeyboardEnhancementFlags);
+        }
         if mouse_enabled {
             let _ = execute!(out, DisableMouseCapture);
         }
@@ -142,7 +182,7 @@ impl TerminalGuard {
 
 impl Drop for TerminalGuard {
     fn drop(&mut self) {
-        let _ = Self::restore_host_terminal(self.mouse_enabled);
+        let _ = Self::restore_host_terminal(self.mouse_enabled, self.keyboard_enhanced);
     }
 }
 

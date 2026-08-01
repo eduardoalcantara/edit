@@ -63,6 +63,10 @@ impl Compositor {
             app.open_env_pane();
             return;
         }
+        if crate::input::keyboard::is_linux_configs_chord(&key) {
+            app.open_linux_configs_pane();
+            return;
+        }
         if key.code == KeyCode::F(4) && key.modifiers.contains(KeyModifiers::ALT) {
             app.request_quit();
             return;
@@ -83,6 +87,8 @@ impl Compositor {
                 app.clear_search();
             } else if app.has_env_pane() {
                 app.close_env_pane();
+            } else if app.has_linux_configs_pane() {
+                app.close_linux_configs_pane();
             } else if app.has_reference_pane() {
                 app.close_reference_pane();
             } else {
@@ -369,11 +375,42 @@ pub fn footer_inner(area: ratatui::layout::Rect) -> ratatui::layout::Rect {
     }
 }
 
-/// Atalhos globais que funcionam mesmo com foco no terminal.
+/// Atalhos globais (editor, terminal, split, abas) — antes das camadas, para não
+/// perder Ctrl+1/2 / Alt+dígito quando o painel Configs/Env está em foco.
 fn handle_global_chords(app: &mut App, key: KeyEvent) -> bool {
+    // Alt+1…0 → aba N (também no menu Abas)
+    if key.modifiers.contains(KeyModifiers::ALT)
+        && !key.modifiers.contains(KeyModifiers::CONTROL)
+        && matches!(key.code, KeyCode::Char(c) if c.is_ascii_digit())
+    {
+        let n = match key.code {
+            KeyCode::Char('0') => 0,
+            KeyCode::Char(d) => d.to_digit(10).unwrap_or(1) as usize,
+            _ => 1,
+        };
+        app.focus_tab_by_menu_number(n);
+        return true;
+    }
+
     if !key.modifiers.contains(KeyModifiers::CONTROL) {
         return false;
     }
+
+    // Ctrl+Tab / Ctrl+Shift+Tab → próxima / anterior aba
+    if matches!(key.code, KeyCode::Tab) {
+        if key.modifiers.contains(KeyModifiers::SHIFT) {
+            app.focus_tab_relative(-1);
+        } else {
+            app.focus_tab_relative(1);
+        }
+        return true;
+    }
+
+    // Ctrl+Alt+… e Ctrl+Shift+… (exceto Tab acima) ficam para as camadas.
+    if key.modifiers.contains(KeyModifiers::ALT) || key.modifiers.contains(KeyModifiers::SHIFT) {
+        return false;
+    }
+
     match key.code {
         KeyCode::Char('e' | 'E') => {
             app.focus_editor();
@@ -386,6 +423,14 @@ fn handle_global_chords(app: &mut App, key: KeyEvent) -> bool {
         }
         KeyCode::Char('g' | 'G') => {
             app.request_go_to_line();
+            true
+        }
+        KeyCode::Char('1') => {
+            app.chord_editor_single_or_left();
+            true
+        }
+        KeyCode::Char('2') => {
+            app.chord_editor_split_or_right();
             true
         }
         _ => false,
@@ -432,6 +477,10 @@ fn handle_global_function_keys(app: &mut App, key: KeyEvent) -> bool {
         }
         KeyCode::F(7) => {
             app.send_editor_text_to_terminal();
+            true
+        }
+        KeyCode::F(8) => {
+            app.chord_toggle_editor_pane();
             true
         }
         KeyCode::F(10) => {

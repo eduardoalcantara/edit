@@ -2,7 +2,7 @@
 
 **Autor:** Perplexity AI  
 **Data:** 2026-08-01  
-**Versão:** 4.6
+**Versão:** 4.8
 
 **Branch:** `main` (desenvolvimento integrado; branches de feature removidas após merge em 2026-06-09).
 
@@ -211,6 +211,13 @@
   - Bug do código: a lista Usuário misturava `systemctl --user show-environment` (sessão live) e gravava isso em `99-edit.conf`.
   - Descodifica quoting `$''`; atalho **`Ctrl+Alt+V`** — `Ctrl+Shift+V` é Paste nos emuladores Linux e não chega ao `edit`.
   - Suite: **215** testes.
+- **Painel Configurações Linux (2026-08-01):**
+  - Ferramentas → Configurações do sistema… / `Ctrl+Alt+L` (só Unix).
+  - Lista no Editor 2; Enter/clique abre **nova aba** no Editor 1 (conteúdo carregado via `focus_tab_unchecked`).
+  - Menu **Abas → Próxima aba / Aba anterior** (`F4` / `Shift+F4`); `Ctrl+1`/`Ctrl+2` e Alt+dígito globais (funcionam com painel Configs em foco).
+  - **`F8` / Exibir → Alternar entre editores**; Kitty keyboard enhancement (quando o emulador suportar) para `Ctrl+1`/`Ctrl+2`.
+  - **Novo no Editor 2:** cria/foca aba no painel com foco; `on_tab_inserted_at` corrige índices do split.
+  - Spec: `SPEC-LINUX-CONFIGS-PANE.md`; doc: `docs/LINUX_CONFIGS_PANE.md`.
 - **Editor de variáveis de ambiente (2026-07-31):**
   - Menu Ferramentas (`Alt+T`) + `Ctrl+Alt+V`; painel direito Usuário/Sistema.
   - Linux: `environment.d/99-edit.conf`; sistema com modal de privilégio + `pkexec`.

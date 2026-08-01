@@ -1,8 +1,8 @@
 # PROJECT_RULES — Editor Linux (`edit`)
 
 **Autor:** Perplexity AI  
-**Data:** 2026-07-31  
-**Versão:** 3.5
+**Data:** 2026-08-01  
+**Versão:** 3.7
 
 Regras estáveis do projeto. Para estado de implementação, ver `PROJECT_STATUS.md`; para histórico, `PROJECT_TIMELINE.md`; para detalhes de feature, specs em `specs/done/`.
 
@@ -44,6 +44,11 @@ Regras estáveis do projeto. Para estado de implementação, ver `PROJECT_STATUS
 - Linux usuário: `~/.config/environment.d/99-edit.conf`; sistema: `/etc/environment.d/99-edit.conf` (gravação com modal de privilégio + `pkexec`).
 - Windows usuário: `HKCU\Environment`; sistema: `HKLM\...\Environment` (requer admin).
 - Spec: `specs/done/SPEC-ENV-EDITOR.md`; doc: `docs/ENV_EDITOR.md`.
+
+### Configurações Linux (painel)
+
+- Painel **Ferramentas → Configurações do sistema…** (`Ctrl+Alt+L`, só Unix/Linux): lista no Editor 2; Enter/clique abre no Editor 1.
+- Catálogo embutido (só paths existentes). Spec: `specs/done/SPEC-LINUX-CONFIGS-PANE.md`; doc: `docs/LINUX_CONFIGS_PANE.md`.
 
 ---
 
@@ -96,10 +101,12 @@ Regras estáveis do projeto. Para estado de implementação, ver `PROJECT_STATUS
 | **`F7`** | Envia seleção do editor (ou linha atual) ao terminal e foca o PTY |
 | **`F4`** | Próxima aba de edição (alternativa segura no Windows) |
 | **`Shift+F4`** | Aba anterior de edição (alternativa segura no Windows) |
+| **`F8`** | Alternar foco Editor 1 ↔ Editor 2 (abre split se fechado) |
 | `Ctrl+Tab` / `Ctrl+Shift+Tab` | Próxima / anterior aba (quando o host repassar ao app) |
 | `Ctrl+F` / `Ctrl+H` | Buscar / Substituir |
 | **`Ctrl+G`** | Ir para linha... |
 | **`Ctrl+Alt+V`** | Variáveis de ambiente (painel direito) |
+| **`Ctrl+Alt+L`** | Configurações Linux (painel direito; só Unix) |
 | `Ctrl+←/→` | Navegação inteligente por palavra |
 | `Ctrl+Shift+←/→` | Seleção por palavra |
 | `Alt` + arraste | Seleção retangular (bloco) |
@@ -117,6 +124,7 @@ Menu Arquivo: **`Alt+A`** (mnemônico). Menu Ajuda: **`Alt+H`**. *`F10` deixou d
 | **`F4`** | Próxima aba de edição |
 | **`F6`** | Foco Editor ↔ Terminal (painel terminal visível) |
 | **`F7`** | Envia seleção do editor (ou linha atual) ao terminal |
+| **`F8`** | Alternar foco Editor 1 ↔ Editor 2 |
 | **`F10`** | **Salvar** aba ativa (`Ctrl+S` equivalente) |
 
 Detalhes do terminal integrado: `specs/done/SPEC-TERMINAL-INFERIOR.md`.
@@ -162,6 +170,9 @@ Detalhes do terminal integrado: `specs/done/SPEC-TERMINAL-INFERIOR.md`.
 | **`F4`** / **`Shift+F4`** | Próxima / anterior aba (Windows-safe) |
 | **`Ctrl+1`** | Editor único; em split com foco direito → foco esquerdo |
 | **`Ctrl+2`** | Split horizontal (50/50); em split → foco painel direito |
+| **`F8`** | Alternar entre Editor 1 e Editor 2 (TTY-safe; menu Exibir) |
+
+**Nota Linux/TTY:** em muitos emuladores (GNOME Terminal, Konsole, etc.), `Ctrl+1`/`Ctrl+2` **não** chegam com o modificador Control — o TTY clássico envia só o dígito (`1` é digitado no editor). Preferir **F8** / menu **Exibir → Alternar entre editores** e **Exibir → Dividir editor**. Em terminais com Kitty keyboard protocol (Kitty, Alacritty, WezTerm, foot…), o `edit` pede enhancement flags e `Ctrl+1`/`Ctrl+2` tendem a funcionar.
 
 Ver também `specs/done/SPEC-EDITOR-SPLIT-VIEW.md` e `specs/done/SPEC-MULTPLOS-ARQUIVOS.md` §6.7 e §10.
 
@@ -203,7 +214,8 @@ Mnemônico de Exibir é **X** (não E).
 - **Exibir → Mostrar:** símbolos, espaços, tabs (`»` onde há `\t`), fim de linha, tudo.
 - **Exibir → Mostrar consumo de memória:** toggle (default ativo); amostragem leve (~2s).
 - **Exibir → Dividir editor:** dois arquivos lado a lado (50/50); painel com foco = borda dupla; terminal inferior **não** é dividido.
-- **`Ctrl+1` / `Ctrl+2`:** ver tabela em abas de edição (único / split / foco esquerda-direita).
+- **Exibir → Alternar entre editores (`F8`):** troca o foco Editor 1 ↔ Editor 2; se o split estiver fechado, abre-o.
+- **`Ctrl+1` / `Ctrl+2`:** ver tabela em abas de edição (único / split / foco esquerda-direita). Em TTY sem protocolo Kitty, preferir menu/`F8`.
 - Tabulação literal e por espaços (2/4/8): expansão visual, cursor e scroll por coluna visual; parada 8 para Tab literal.
 - Baseline dirty: documento novo ou aberto sem edição não dispara confirmação de saída (`EMPTY_DOCUMENT_TEXT`).
 

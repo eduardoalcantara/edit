@@ -4,6 +4,7 @@ use ratatui::layout::Rect;
 
 use crate::reference_pane::ReferencePane;
 use crate::env_pane::EnvPane;
+use crate::linux_configs::LinuxConfigsPane;
 
 pub const MIN_PANE_WIDTH: u16 = 20;
 
@@ -35,6 +36,7 @@ pub struct EditorSplit {
     pub focused_pane: SplitPane,
     pub reference: Option<ReferencePane>,
     pub env_pane: Option<EnvPane>,
+    pub linux_configs: Option<LinuxConfigsPane>,
 }
 
 impl Default for EditorSplit {
@@ -46,6 +48,7 @@ impl Default for EditorSplit {
             focused_pane: SplitPane::Left,
             reference: None,
             env_pane: None,
+            linux_configs: None,
         }
     }
 }
@@ -59,7 +62,10 @@ impl EditorSplit {
         match pane {
             SplitPane::Left => Some(self.left_tab),
             SplitPane::Right => {
-                if self.reference.is_some() || self.env_pane.is_some() {
+                if self.reference.is_some()
+                    || self.env_pane.is_some()
+                    || self.linux_configs.is_some()
+                {
                     None
                 } else {
                     self.right_tab
@@ -76,8 +82,12 @@ impl EditorSplit {
         self.env_pane.is_some()
     }
 
+    pub fn has_linux_configs(&self) -> bool {
+        self.linux_configs.is_some()
+    }
+
     pub fn has_special_right(&self) -> bool {
-        self.reference.is_some() || self.env_pane.is_some()
+        self.reference.is_some() || self.env_pane.is_some() || self.linux_configs.is_some()
     }
 
     pub fn pane_tab_index(&self, pane: SplitPane) -> Option<usize> {

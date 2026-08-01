@@ -23,6 +23,9 @@ impl App {
         if self.has_reference_pane() {
             self.close_reference_pane();
         }
+        if self.has_linux_configs_pane() {
+            self.close_linux_configs_pane();
+        }
         self.sync_active_tab();
 
         let stash = if let Some(ref pane) = self.editor_split.env_pane {
