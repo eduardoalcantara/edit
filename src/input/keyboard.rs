@@ -43,3 +43,12 @@ pub fn is_suspend_screen_chord(key: &KeyEvent) -> bool {
         && key.modifiers.contains(KeyModifiers::SHIFT)
         && key.modifiers.contains(KeyModifiers::ALT)
 }
+
+pub fn is_env_variables_chord(key: &KeyEvent) -> bool {
+    use crossterm::event::KeyEventKind;
+    key.kind == KeyEventKind::Press
+        && matches!(key.code, KeyCode::Char('v' | 'V'))
+        && key.modifiers.contains(KeyModifiers::CONTROL)
+        && key.modifiers.contains(KeyModifiers::SHIFT)
+        && !key.modifiers.contains(KeyModifiers::ALT)
+}

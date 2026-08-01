@@ -59,8 +59,9 @@ menus pull-down, modais e proteção contra perda de trabalho.
   • Temas: Azul Clássico, Escuro, Claro, Matrix (Exibir → Temas)
   • Rodapé: help à esquerda; Tam/Pos/modo/encoding/tab/memória à direita
   • Zoom 1–3; consumo de memória opcional (~2s)
-  • Menus Alt+A/E/X/F/S/H; toggles com √; opções exclusivas estilo radio
+  • Menus Alt+A/E/X/F/S/T/H; toggles com √; opções exclusivas estilo radio
   • Split: rodapé mostra Editor 1 / Editor 2 conforme painel em foco
+  • Ferramentas → Variáveis de ambiente (Ctrl+Shift+V): Usuário/Sistema
 
 
 ═══ PERSISTÊNCIA ═══
@@ -68,6 +69,8 @@ menus pull-down, modais e proteção contra perda de trabalho.
   • edit.json (Linux: ~/.config/edit/; Windows: ao lado do exe)
   • Sessão: Linux ~/.local/state/edit/.edit-session/; Windows ao lado do exe
   • --workspace: ./.edit/ no diretório atual
+  • Env usuário Linux: ~/.config/environment.d/99-edit.conf
+  • Env sistema Linux: /etc/environment.d/99-edit.conf (pkexec)
   • Migração automática de config legado
   • Clipboard interno: 5 itens
   • Sem telemetria
@@ -112,6 +115,7 @@ quando indicado (ex.: Ctrl+Q, Alt+F4).
   Ctrl+A              Selecionar tudo
   Ctrl+F / Ctrl+R     Buscar / Substituir
   Ctrl+G              Ir para linha...
+  Ctrl+Shift+V        Variáveis de ambiente (painel direito)
   F3 / Shift+F3       Próxima / anterior ocorrência de busca
   Esc                 Limpa busca ativa no editor (sem modal aberto)
 

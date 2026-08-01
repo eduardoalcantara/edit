@@ -63,6 +63,10 @@ impl Compositor {
             app.request_suspend_screen();
             return;
         }
+        if crate::input::keyboard::is_env_variables_chord(&key) {
+            app.open_env_pane();
+            return;
+        }
         if key.code == KeyCode::F(4) && key.modifiers.contains(KeyModifiers::ALT) {
             app.request_quit();
             return;
@@ -81,6 +85,8 @@ impl Compositor {
                 app.clear_search();
             } else if app.reference_pane_active() {
                 app.close_reference_pane();
+            } else if app.env_pane_active() {
+                app.close_env_pane();
             } else {
                 app.request_quit();
             }

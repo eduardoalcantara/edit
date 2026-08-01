@@ -25,6 +25,9 @@ impl App {
     }
 
     pub fn open_reference_pane(&mut self, kind: ReferenceKind) {
+        if self.has_env_pane() {
+            self.close_env_pane_force();
+        }
         self.sync_active_tab();
 
         let stash = if let Some(ref reference) = self.editor_split.reference {

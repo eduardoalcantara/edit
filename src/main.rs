@@ -1,5 +1,6 @@
 mod app;
 mod app_editor_split;
+mod app_env_pane;
 mod app_reference_pane;
 mod app_workspace;
 mod cli;
@@ -10,6 +11,8 @@ mod edit_mode;
 mod editor;
 mod editor_split;
 mod encoding;
+mod env_editor;
+mod env_pane;
 mod events;
 mod file_io;
 mod input;
@@ -73,22 +76,28 @@ impl TerminalGuard {
             let _ = execute!(out, DisableMouseCapture);
         }
         execute!(out, LeaveAlternateScreen)?;
-        #[cfg(unix)]
         writeln!(
             out,
-            "Editor suspenso — digite fg no shell para retomar (ou Ctrl+Shift+Alt+E)"
-        )?;
-        #[cfg(not(unix))]
-        writeln!(
-            out,
-            "Editor suspenso — Ctrl+Shift+Alt+E para retomar"
+            "Editor suspenso — pressione Ctrl+Shift+Alt+E para retomar"
         )?;
         out.flush()?;
-        #[cfg(unix)]
-        unsafe {
-            libc::raise(libc::SIGTSTP);
-        }
+        // Raw mode de novo para o loop `ui_suspended` detectar o chord de retorno.
+        enable_raw_mode()?;
         let _ = terminal;
+        Ok(())
+    }
+
+    pub fn leave_ui_briefly(
+        &self,
+        _terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
+    ) -> io::Result<()> {
+        disable_raw_mode()?;
+        let mut out = stdout();
+        if self.mouse_enabled {
+            let _ = execute!(out, DisableMouseCapture);
+        }
+        execute!(out, LeaveAlternateScreen)?;
+        out.flush()?;
         Ok(())
     }
 

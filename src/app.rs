@@ -68,6 +68,11 @@ pub struct App {
     pub(crate) pending_fs_checks: Vec<PendingFsCheck>,
     pub(crate) pending_focus_tab: Option<usize>,
     pub reference_close_hit: Option<ratatui::layout::Rect>,
+    pub env_close_hit: Option<ratatui::layout::Rect>,
+    pub env_list_area: Option<ratatui::layout::Rect>,
+    pub pending_env_scope: Option<crate::env_editor::EnvScope>,
+    pub pending_env_elevation: bool,
+    pub pending_env_vars: Option<Vec<crate::env_editor::EnvVar>>,
     pub ui_suspended: bool,
     pub suspend_requested: bool,
     user_config: EditConfig,
@@ -179,6 +184,11 @@ impl App {
             pending_fs_checks,
             pending_focus_tab: None,
             reference_close_hit: None,
+            env_close_hit: None,
+            env_list_area: None,
+            pending_env_scope: None,
+            pending_env_elevation: false,
+            pending_env_vars: None,
             ui_suspended: false,
             suspend_requested: false,
             user_config,
@@ -409,15 +419,14 @@ impl App {
             if self.suspend_requested {
                 self.suspend_requested = false;
                 guard.suspend(terminal)?;
-                #[cfg(unix)]
-                {
-                    guard.resume(terminal)?;
-                    self.set_status("Editor retomado");
-                }
-                #[cfg(not(unix))]
-                {
-                    self.ui_suspended = true;
-                }
+                self.ui_suspended = true;
+            }
+
+            if let Some(vars) = self.take_pending_env_elevation() {
+                guard.leave_ui_briefly(terminal)?;
+                let result = crate::app_env_pane::run_elevated_install(&vars);
+                guard.resume(terminal)?;
+                self.finish_env_elevation(result);
             }
         }
 
@@ -982,6 +991,24 @@ impl App {
             (ConfirmKind::FileMissing { tab_index }, action) => {
                 let from_focus = self.pending_focus_tab == Some(tab_index);
                 self.handle_file_missing(tab_index, action, from_focus);
+            }
+            (ConfirmKind::EnvNeedsElevation, DialogButtonAction::Primary) => {
+                self.env_save_elevated();
+            }
+            (ConfirmKind::EnvDeleteVar, DialogButtonAction::Primary) => {
+                self.env_delete_selected();
+            }
+            (ConfirmKind::EnvDiscardClose, DialogButtonAction::Primary) => {
+                self.close_env_pane_force();
+            }
+            (ConfirmKind::EnvDiscardSwitchScope, DialogButtonAction::Primary) => {
+                if let Some(scope) = self.pending_env_scope.take() {
+                    self.env_switch_scope_force(scope);
+                }
+            }
+            (ConfirmKind::EnvNeedsElevation | ConfirmKind::EnvDeleteVar | ConfirmKind::EnvDiscardClose | ConfirmKind::EnvDiscardSwitchScope, _) => {
+                self.pending_env_scope = None;
+                self.set_status("Ação cancelada");
             }
             (ConfirmKind::QuitUnsaved, DialogButtonAction::Primary) => {
                 self.pending_quit = true;
@@ -1574,6 +1601,7 @@ impl App {
             ActionId::HelpShortcuts => self.open_help_shortcuts(),
             ActionId::HelpAsciiTable => self.open_ascii_table(),
             ActionId::HelpAbout => self.modal = Modal::help(HelpKind::About),
+            ActionId::EnvVariables => self.open_env_pane(),
             ActionId::SuspendScreen => self.request_suspend_screen(),
             ActionId::Recent | ActionId::PastePrevious | ActionId::NoOp => {}
         }

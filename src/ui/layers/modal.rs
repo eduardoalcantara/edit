@@ -4,7 +4,7 @@ use ratatui::layout::Rect;
 use crate::modal::{
     convert_tab::ConvertTabKeyResult, file_browser::FileBrowserKeyResult,
     find_replace::FindReplaceKeyResult, go_to_line::GoToLineKeyResult, help::HelpKeyResult,
-    DialogButtonAction, DialogKeyResult, Modal,
+    env_var::{EnvVarCommand, EnvVarKeyResult}, DialogButtonAction, DialogKeyResult, Modal,
 };
 use crate::theme::ThemePalette;
 use crate::ui::layer::{InputResult, LayerId, UiLayer};
@@ -50,6 +50,10 @@ impl UiLayer for ModalLayer {
                 modal.paint(frame, area, palette);
             }
             Modal::Help(modal) => {
+                let area = modal.outer_rect(frame.area());
+                modal.paint(frame, area, palette);
+            }
+            Modal::EnvVar(modal) => {
                 let area = modal.outer_rect(frame.area());
                 modal.paint(frame, area, palette);
             }
@@ -146,6 +150,21 @@ impl UiLayer for ModalLayer {
                     InputResult::Consumed
                 }
                 HelpKeyResult::Consumed => InputResult::Consumed,
+            },
+            Modal::EnvVar(modal) => match modal.handle_key(key, &mut app.clipboard) {
+                EnvVarKeyResult::Command(EnvVarCommand::Ok) => {
+                    let is_new = modal.is_new;
+                    let name = modal.name.text().to_string();
+                    let value = modal.value.text().to_string();
+                    app.modal = Modal::None;
+                    app.env_apply_edit(is_new, name, value);
+                    InputResult::Consumed
+                }
+                EnvVarKeyResult::Command(EnvVarCommand::Cancel) | EnvVarKeyResult::Cancel => {
+                    app.cancel_modal();
+                    InputResult::Consumed
+                }
+                EnvVarKeyResult::Consumed => InputResult::Consumed,
             },
             Modal::None => InputResult::Unhandled,
         }
@@ -263,6 +282,23 @@ impl UiLayer for ModalLayer {
                     if let Some(idx) = modal.hit_button(&mouse, outer) {
                         app.modal.dialog_mut().map(|d| d.set_selected(idx));
                     }
+                }
+                InputResult::Consumed
+            }
+            Modal::EnvVar(modal) => {
+                let outer = modal.outer_rect(frame);
+                match modal.handle_mouse(&mouse, outer) {
+                    EnvVarKeyResult::Command(EnvVarCommand::Ok) => {
+                        let is_new = modal.is_new;
+                        let name = modal.name.text().to_string();
+                        let value = modal.value.text().to_string();
+                        app.modal = Modal::None;
+                        app.env_apply_edit(is_new, name, value);
+                    }
+                    EnvVarKeyResult::Command(EnvVarCommand::Cancel) | EnvVarKeyResult::Cancel => {
+                        app.cancel_modal();
+                    }
+                    EnvVarKeyResult::Consumed => {}
                 }
                 InputResult::Consumed
             }

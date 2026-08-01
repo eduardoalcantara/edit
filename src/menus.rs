@@ -84,6 +84,7 @@ pub enum ActionId {
     HelpShortcuts,
     HelpAsciiTable,
     HelpAbout,
+    EnvVariables,
     SuspendScreen,
 }
 
@@ -227,6 +228,11 @@ impl MenuBar {
                     label: " Abas ",
                     mnemonic: 'S',
                     children: tabs_menu(workspace),
+                },
+                MenuTopItem {
+                    label: " Ferramentas ",
+                    mnemonic: 'T',
+                    children: tools_menu(),
                 },
                 MenuTopItem {
                     label: " Ajuda ",
@@ -755,6 +761,17 @@ fn view_menu(view: &ViewState, split_editor: bool) -> Vec<MenuNode> {
             ],
         ),
     ]
+}
+
+fn tools_menu() -> Vec<MenuNode> {
+    vec![item(
+        "Variáveis de ambiente...",
+        Some("Ctrl+Shift+V"),
+        ActionId::EnvVariables,
+        true,
+        None,
+        "Editar variáveis persistentes de Usuário e Sistema",
+    )]
 }
 
 fn help_menu() -> Vec<MenuNode> {

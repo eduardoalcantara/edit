@@ -1,6 +1,7 @@
 mod buttons;
 pub mod convert_tab;
 pub mod dialog;
+pub mod env_var;
 pub mod file_browser;
 pub mod find_replace;
 pub mod form_controls;
@@ -13,6 +14,7 @@ use std::path::PathBuf;
 
 pub use convert_tab::ConvertTabulationModal;
 pub use dialog::{Dialog, DialogButton, DialogButtonAction, DialogKeyResult};
+pub use env_var::{EnvVarCommand, EnvVarKeyResult, EnvVarModal};
 pub use file_browser::{FileBrowserModal, FileBrowserMode};
 pub use find_replace::{FindReplaceCommand, FindReplaceModal, FindReplaceKeyResult};
 pub use go_to_line::{GoToLineCommand, GoToLineModal, GoToLineKeyResult};
@@ -24,7 +26,7 @@ use crate::workspace::PromptReason;
 
 use buttons::{
     CONVERT, DISCARD_CLOSE, DISCARD_NEW, DISCARD_OPEN, OPEN_UNSAVED_FULL, OPEN_UNSAVED_NO_IGNORE,
-    OVERWRITE,
+    OVERWRITE, OK_CANCEL,
     FILE_MISSING, PATH_OPEN, PATH_RENAME, PATH_SAVE_AS, PURGE_UNDO, QUIT_UNSAVED, REINTERPRET,
     RELOAD_EXTERNAL, TAB_UNSAVED,
 };
@@ -46,6 +48,10 @@ pub enum ConfirmKind {
     PurgeUndoOnToggle,
     ReloadExternal { tab_index: usize },
     FileMissing { tab_index: usize },
+    EnvNeedsElevation,
+    EnvDeleteVar,
+    EnvDiscardClose,
+    EnvDiscardSwitchScope,
 }
 
 #[derive(Debug, Clone)]
@@ -70,6 +76,7 @@ pub enum Modal {
     GoToLine(GoToLineModal),
     FileBrowser(FileBrowserModal),
     Help(HelpModal),
+    EnvVar(EnvVarModal),
 }
 
 impl Modal {
@@ -86,6 +93,7 @@ impl Modal {
             Modal::ConvertTabulation(modal) => Some(&modal.dialog),
             Modal::FileBrowser(modal) => Some(&modal.dialog),
             Modal::Help(modal) => Some(&modal.dialog),
+            Modal::EnvVar(modal) => Some(&modal.dialog),
             Modal::None => None,
         }
     }
@@ -99,6 +107,7 @@ impl Modal {
             Modal::ConvertTabulation(modal) => Some(&mut modal.dialog),
             Modal::FileBrowser(modal) => Some(&mut modal.dialog),
             Modal::Help(modal) => Some(&mut modal.dialog),
+            Modal::EnvVar(modal) => Some(&mut modal.dialog),
             Modal::None => None,
         }
     }
@@ -178,6 +187,10 @@ impl Modal {
             ),
             kind: ConfirmKind::PurgeUndoOnToggle,
         }
+    }
+
+    pub fn env_var_edit(is_new: bool, name: impl Into<String>, value: impl Into<String>) -> Self {
+        Modal::EnvVar(EnvVarModal::new(is_new, name.into(), value.into()))
     }
 
     pub fn quit_unsaved(filename: &str) -> Self {
@@ -284,5 +297,9 @@ fn confirm_buttons(kind: &ConfirmKind) -> &'static [DialogButton] {
         ConfirmKind::PurgeUndoOnToggle => &PURGE_UNDO,
         ConfirmKind::ReloadExternal { .. } => &RELOAD_EXTERNAL,
         ConfirmKind::FileMissing { .. } => &FILE_MISSING,
+        ConfirmKind::EnvNeedsElevation => &OK_CANCEL,
+        ConfirmKind::EnvDeleteVar => &OK_CANCEL,
+        ConfirmKind::EnvDiscardClose => &OK_CANCEL,
+        ConfirmKind::EnvDiscardSwitchScope => &OK_CANCEL,
     }
 }

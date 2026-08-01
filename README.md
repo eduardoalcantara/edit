@@ -2,7 +2,7 @@
 
 **Autor:** Perplexity AI  
 **Data:** 2026-07-31  
-**Versão:** 2.7
+**Versão:** 2.8
 
 Editor TUI para **Linux** (alvo principal; alternativa ao Vim) com suporte a Windows. Menus estilo **Turbo Vision**, núcleo **ropey**, UX previsível e proteção contra perda de trabalho.
 
@@ -163,6 +163,7 @@ Isso instala `/usr/bin/edit`, o lançador `.desktop` e os ícones.
 | `Ctrl+T` / `Ctrl+'` | Do editor: abre/foca terminal; do terminal: fecha painel |
 | **`Ctrl+E`** | Foco no editor |
 | **`Ctrl+G`** | Ir para linha... |
+| **`Ctrl+Shift+V`** | Variáveis de ambiente |
 | **`F6`** | Alterna foco Editor ↔ Terminal |
 | **`F4`** / **`Shift+F4`** | Próxima / anterior aba (Windows-safe) |
 
@@ -180,7 +181,7 @@ Ver `PROJECT_RULES.md` para lista completa.
 
 ## Documentação
 
-1. [`PROJECT_RULES.md`](PROJECT_RULES.md) — regras estáveis (v3.3)
+1. [`PROJECT_RULES.md`](PROJECT_RULES.md) — regras estáveis (v3.4)
 2. [`PROJECT_STATUS.md`](PROJECT_STATUS.md) — estado e pendências
 3. [`PROJECT_TIMELINE.md`](PROJECT_TIMELINE.md) — histórico
 4. [`.cursorrules`](.cursorrules) — regras para o Cursor
@@ -198,4 +199,4 @@ cargo test
 cargo test -- --test-threads=1
 ```
 
-**206** testes unitários (Linux nativo, 2026-07-31).
+**210** testes unitários (Linux nativo, 2026-07-31).

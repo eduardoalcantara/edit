@@ -2,7 +2,7 @@
 
 **Autor:** Perplexity AI  
 **Data:** 2026-07-31  
-**Versão:** 4.3
+**Versão:** 4.4
 
 **Branch:** `main` (desenvolvimento integrado; branches de feature removidas após merge em 2026-06-09).
 
@@ -203,6 +203,14 @@
   - Scripts: `scripts/linux/` (build, stage, tarball, deb, rpm, Arch, AppImage, package-all).
   - Spec: `specs/done/SPEC-LINUX-XDG-PACKAGING.md`; RULES **v3.3**; README **v2.7**.
   - **206** testes unitários passando (`cargo test -- --test-threads=1`).
+- **Fix Sair da tela / retomada (2026-07-31):**
+  - Linux deixava de usar o loop `ui_suspended` (usava `SIGTSTP`/`fg`); `Ctrl+Shift+Alt+E` não retomava.
+  - Agora suspende a TUI, aguarda o mesmo chord e retoma; mensagem alinhada à spec SideKick.
+- **Editor de variáveis de ambiente (2026-07-31):**
+  - Menu Ferramentas (`Alt+T`) + `Ctrl+Shift+V`; painel direito Usuário/Sistema.
+  - Linux: `environment.d/99-edit.conf`; sistema com modal de privilégio + `pkexec`.
+  - Windows: HKCU/HKLM + `WM_SETTINGCHANGE` (`winreg`).
+  - Spec: `specs/done/SPEC-ENV-EDITOR.md`; RULES **v3.4**; **210** testes.
 
 ### Em andamento
 - **Fidelidade Turbo Vision:** `specs/to-do/SPEC-UX-FIDELIDADE-TURBO-VISION.md` (TV1–TV3 paleta/rodapé; demais itens TV8+).

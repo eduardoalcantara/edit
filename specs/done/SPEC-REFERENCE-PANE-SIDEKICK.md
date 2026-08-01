@@ -45,10 +45,11 @@ Trazer três evoluções inspiradas no Borland SideKick:
 ## 2. Sair da tela
 
 - Menu **Arquivo → Sair da tela** e atalho **`Ctrl+Shift+Alt+E`** — **visíveis apenas em Unix/Linux** (`src/platform.rs`: `terminal_suspend_to_shell_supported()`).
-- Windows: item oculto e atalho ignorado (sem daemon TSR / SIGTSTP).
-- `TerminalGuard::suspend` / `resume` em `main.rs`.
-- Loop suspenso captura apenas o chord de retorno.
+- Windows: item oculto e atalho ignorado.
+- `TerminalGuard::suspend` deixa a tela alternativa, imprime aviso e reativa raw mode; `resume` restaura a TUI.
+- Loop `ui_suspended` captura **apenas** o chord `Ctrl+Shift+Alt+E` para retomar (processo permanece em memória).
 - Diferente de **Sair** (`Ctrl+Q`): processo continua até quit explícito.
+- **Nota:** não usa `SIGTSTP`/`fg` — o mesmo atalho precisa funcionar para sair e voltar.
 
 ## 3. Modo monocromático
 

@@ -57,6 +57,8 @@ impl UiLayer for EditorLayer {
             let left_idx = Some(app.editor_split.left_tab);
             let right_idx = app.editor_split.right_tab;
             let right_reference = app.editor_split.has_reference();
+            let right_env = app.editor_split.has_env_pane();
+            let right_special = right_reference || right_env;
 
             if focused != SplitPane::Left && split.left.width > 0 {
                 paint_pane(
@@ -77,7 +79,7 @@ impl UiLayer for EditorLayer {
                     app,
                     frame,
                     split.right,
-                    if right_reference { None } else { right_idx },
+                    if right_special { None } else { right_idx },
                     palette,
                     pane_terminal,
                     false,
@@ -91,7 +93,7 @@ impl UiLayer for EditorLayer {
                 SplitPane::Left => (split.left, left_idx, SplitPane::Left),
                 SplitPane::Right => (
                     split.right,
-                    if right_reference { None } else { right_idx },
+                    if right_special { None } else { right_idx },
                     SplitPane::Right,
                 ),
             };
@@ -167,6 +169,20 @@ impl UiLayer for EditorLayer {
         }
         if app.input_focus == crate::view_state::InputFocus::Terminal {
             return InputResult::Unhandled;
+        }
+
+        if app.env_pane_active() {
+            let visible = app
+                .env_list_area
+                .map(|r| r.height as usize)
+                .unwrap_or(10);
+            let action = if let Some(pane) = app.editor_split.env_pane.as_mut() {
+                pane.handle_key(&key, visible)
+            } else {
+                crate::env_pane::EnvPaneAction::None
+            };
+            app.env_dispatch_action(action);
+            return InputResult::Consumed;
         }
 
         if matches!(key.code, crossterm::event::KeyCode::Esc)
@@ -282,11 +298,30 @@ impl UiLayer for EditorLayer {
             return InputResult::Unhandled;
         }
 
+        if let Some(hit) = app.env_close_hit {
+            if mouse::point_in_rect(&mouse, hit)
+                && matches!(mouse.kind, MouseEventKind::Down(MouseButton::Left))
+            {
+                app.close_env_pane();
+                return InputResult::Consumed;
+            }
+        }
+
         if let Some(hit) = app.reference_close_hit {
             if mouse::point_in_rect(&mouse, hit)
                 && matches!(mouse.kind, MouseEventKind::Down(MouseButton::Left))
             {
                 app.close_reference_pane();
+                return InputResult::Consumed;
+            }
+        }
+
+        if app.env_pane_active() {
+            if let (Some(list), Some(pane)) = (app.env_list_area, app.editor_split.env_pane.as_mut())
+            {
+                let visible = list.height as usize;
+                let action = pane.handle_mouse(&mouse, list, visible);
+                app.env_dispatch_action(action);
                 return InputResult::Consumed;
             }
         }
@@ -334,10 +369,35 @@ fn paint_pane(
         app.view.margin,
     );
     let is_reference = pane == SplitPane::Right && app.editor_split.has_reference();
+    let is_env = pane == SplitPane::Right && app.editor_split.has_env_pane();
     let has_file_tab = tab_index.is_some_and(|index| index < app.workspace.tabs.len());
-    if use_active_editor && has_file_tab && !is_reference {
+    if use_active_editor && has_file_tab && !is_reference && !is_env {
         paint_guide_column(app, frame, area, text_viewport, palette, border_visible);
     }
+
+    if is_env {
+        let close_label = if app.view.use_paren_mnemonics {
+            "(F)echar"
+        } else {
+            "Fechar"
+        };
+        if let Some(env) = app.editor_split.env_pane.as_mut() {
+            let (list_area, action_hit) = crate::env_pane::paint_env_pane(
+                frame,
+                area,
+                env,
+                &palette,
+                use_active_editor,
+                close_label,
+            );
+            if use_active_editor {
+                app.env_close_hit = action_hit;
+                app.env_list_area = Some(list_area);
+            }
+        }
+        return;
+    }
+
     let title = if is_reference {
         app.reference_title()
             .unwrap_or_else(|| "Referência".to_string())

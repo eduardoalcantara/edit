@@ -2,7 +2,7 @@
 
 **Autor:** Perplexity AI  
 **Data:** 2026-07-31  
-**Versão:** 3.3
+**Versão:** 3.4
 
 Regras estáveis do projeto. Para estado de implementação, ver `PROJECT_STATUS.md`; para histórico, `PROJECT_TIMELINE.md`; para detalhes de feature, specs em `specs/done/`.
 
@@ -37,6 +37,13 @@ Regras estáveis do projeto. Para estado de implementação, ver `PROJECT_STATUS
 - No Linux, migrar automaticamente na primeira execução se o config XDG não existir: (1) `edit.json` ao lado do executável; (2) `.edit/recent.json` / `.editor-linux/recent.json`; (3) `.edit-session/` ao lado do exe → state XDG.
 - Resolução de paths: módulo `src/paths.rs`.
 - Empacotamento Linux e freedesktop: `specs/done/SPEC-LINUX-XDG-PACKAGING.md`, assets em `packaging/`, scripts em `scripts/linux/`.
+
+### Variáveis de ambiente persistentes
+
+- Painel **Ferramentas → Variáveis de ambiente…** (`Ctrl+Shift+V`): lista estruturada Usuário / Sistema no split direito.
+- Linux usuário: `~/.config/environment.d/99-edit.conf`; sistema: `/etc/environment.d/99-edit.conf` (gravação com modal de privilégio + `pkexec`).
+- Windows usuário: `HKCU\Environment`; sistema: `HKLM\...\Environment` (requer admin).
+- Spec: `specs/done/SPEC-ENV-EDITOR.md`.
 
 ---
 
@@ -91,6 +98,7 @@ Regras estáveis do projeto. Para estado de implementação, ver `PROJECT_STATUS
 | `Ctrl+Tab` / `Ctrl+Shift+Tab` | Próxima / anterior aba (quando o host repassar ao app) |
 | `Ctrl+F` / `Ctrl+H` | Buscar / Substituir |
 | **`Ctrl+G`** | Ir para linha... |
+| **`Ctrl+Shift+V`** | Variáveis de ambiente (painel direito) |
 | `Ctrl+←/→` | Navegação inteligente por palavra |
 | `Ctrl+Shift+←/→` | Seleção por palavra |
 | `Alt` + arraste | Seleção retangular (bloco) |
@@ -164,6 +172,7 @@ Ver também `specs/done/SPEC-EDITOR-SPLIT-VIEW.md` e `specs/done/SPEC-MULTPLOS-A
 | `Alt+E` | Editar |
 | `Alt+X` | Exibir |
 | `Alt+F` | Formatar |
+| `Alt+T` | Ferramentas |
 
 Mnemônico de Exibir é **X** (não E).
 

@@ -3,6 +3,7 @@
 use ratatui::layout::Rect;
 
 use crate::reference_pane::ReferencePane;
+use crate::env_pane::EnvPane;
 
 pub const MIN_PANE_WIDTH: u16 = 20;
 
@@ -33,6 +34,7 @@ pub struct EditorSplit {
     pub right_tab: Option<usize>,
     pub focused_pane: SplitPane,
     pub reference: Option<ReferencePane>,
+    pub env_pane: Option<EnvPane>,
 }
 
 impl Default for EditorSplit {
@@ -43,6 +45,7 @@ impl Default for EditorSplit {
             right_tab: None,
             focused_pane: SplitPane::Left,
             reference: None,
+            env_pane: None,
         }
     }
 }
@@ -56,7 +59,7 @@ impl EditorSplit {
         match pane {
             SplitPane::Left => Some(self.left_tab),
             SplitPane::Right => {
-                if self.reference.is_some() {
+                if self.reference.is_some() || self.env_pane.is_some() {
                     None
                 } else {
                     self.right_tab
@@ -67,6 +70,14 @@ impl EditorSplit {
 
     pub fn has_reference(&self) -> bool {
         self.reference.is_some()
+    }
+
+    pub fn has_env_pane(&self) -> bool {
+        self.env_pane.is_some()
+    }
+
+    pub fn has_special_right(&self) -> bool {
+        self.reference.is_some() || self.env_pane.is_some()
     }
 
     pub fn pane_tab_index(&self, pane: SplitPane) -> Option<usize> {
