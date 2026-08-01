@@ -17,7 +17,7 @@ use crate::widgets::panel;
 
 const DIALOG_WIDTH: u16 = 56;
 const CONTENT_ROWS: u16 = 7;
-const COMMANDS: &[&str] = &["OK", "Cancelar"];
+const COMMANDS: &[&str] = &["Sim", "Cancelar"];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EnvVarCommand {

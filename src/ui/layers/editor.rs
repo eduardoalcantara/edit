@@ -317,24 +317,39 @@ impl UiLayer for EditorLayer {
         }
 
         if app.env_pane_active() {
+            let hits = app.env_button_hits.clone();
             if let (Some(list), Some(pane)) = (app.env_list_area, app.editor_split.env_pane.as_mut())
             {
                 let visible = list.height as usize;
-                let action = pane.handle_mouse(&mouse, list, visible);
-                app.env_dispatch_action(action);
-                return InputResult::Consumed;
+                if let Some(action) = pane.handle_mouse(&mouse, list, &hits, visible) {
+                    app.env_dispatch_action(action);
+                    return InputResult::Consumed;
+                }
             }
+            // Clique/scroll fora da lista/botões: deixa outras camadas (editor esquerdo) tratarem.
         }
 
         if let Some(split) = layout.editor_split {
             if let Some(pane) = pane_at_column(split, mouse.column) {
+                let is_scroll = matches!(
+                    mouse.kind,
+                    MouseEventKind::ScrollUp | MouseEventKind::ScrollDown
+                );
                 if pane != app.editor_split.focused_pane {
                     match mouse.kind {
                         MouseEventKind::Down(MouseButton::Left) => {
                             app.focus_editor_pane(pane);
                             return InputResult::Consumed;
                         }
-                        _ => return InputResult::Unhandled,
+                        MouseEventKind::ScrollUp | MouseEventKind::ScrollDown => {
+                            // Roda sobre o painel: foca e aplica scroll nesse editor.
+                            app.focus_editor_pane(pane);
+                        }
+                        _ => {
+                            if !is_scroll {
+                                return InputResult::Unhandled;
+                            }
+                        }
                     }
                 }
             }
@@ -377,22 +392,24 @@ fn paint_pane(
 
     if is_env {
         let close_label = if app.view.use_paren_mnemonics {
-            "(F)echar"
+            "Fe(c)har"
         } else {
             "Fechar"
         };
         if let Some(env) = app.editor_split.env_pane.as_mut() {
-            let (list_area, action_hit) = crate::env_pane::paint_env_pane(
+            let (list_area, action_hit, button_hits) = crate::env_pane::paint_env_pane(
                 frame,
                 area,
                 env,
                 &palette,
                 use_active_editor,
                 close_label,
+                app.view.use_paren_mnemonics,
             );
             if use_active_editor {
                 app.env_close_hit = action_hit;
                 app.env_list_area = Some(list_area);
+                app.env_button_hits = button_hits;
             }
         }
         return;
@@ -536,7 +553,7 @@ fn handle_ctrl_key(app: &mut crate::app::App, key: KeyEvent) -> InputResult {
         KeyCode::Char('s' | 'S') => app.request_save(),
         KeyCode::Char('o' | 'O') => app.request_open(),
         KeyCode::Char('n' | 'N') => app.request_new_document(),
-        KeyCode::Char('t' | 'T' | '\'') => app.chord_terminal_toggle(),
+        KeyCode::Char('t' | 'T' | '`' | '\'') => app.chord_terminal_toggle(),
         KeyCode::Char('w' | 'W') => app.request_close(),
         KeyCode::Char('z' | 'Z') => app.editor.execute(EditorCommand::Undo),
         KeyCode::Char('y' | 'Y') => app.editor.execute(EditorCommand::Redo),

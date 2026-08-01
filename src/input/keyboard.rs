@@ -32,18 +32,6 @@ pub fn key_to_command(key: KeyEvent) -> Option<EditorCommand> {
     }
 }
 
-pub fn is_suspend_screen_chord(key: &KeyEvent) -> bool {
-    if !crate::platform::terminal_suspend_to_shell_supported() {
-        return false;
-    }
-    use crossterm::event::KeyEventKind;
-    key.kind == KeyEventKind::Press
-        && matches!(key.code, KeyCode::Char('e' | 'E'))
-        && key.modifiers.contains(KeyModifiers::CONTROL)
-        && key.modifiers.contains(KeyModifiers::SHIFT)
-        && key.modifiers.contains(KeyModifiers::ALT)
-}
-
 pub fn is_env_variables_chord(key: &KeyEvent) -> bool {
     use crossterm::event::KeyEventKind;
     key.kind == KeyEventKind::Press

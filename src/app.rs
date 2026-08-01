@@ -70,11 +70,10 @@ pub struct App {
     pub reference_close_hit: Option<ratatui::layout::Rect>,
     pub env_close_hit: Option<ratatui::layout::Rect>,
     pub env_list_area: Option<ratatui::layout::Rect>,
+    pub env_button_hits: Vec<crate::env_pane::EnvButtonHit>,
     pub pending_env_scope: Option<crate::env_editor::EnvScope>,
     pub pending_env_elevation: bool,
     pub pending_env_vars: Option<Vec<crate::env_editor::EnvVar>>,
-    pub ui_suspended: bool,
-    pub suspend_requested: bool,
     user_config: EditConfig,
 }
 
@@ -186,11 +185,10 @@ impl App {
             reference_close_hit: None,
             env_close_hit: None,
             env_list_area: None,
+            env_button_hits: Vec::new(),
             pending_env_scope: None,
             pending_env_elevation: false,
             pending_env_vars: None,
-            ui_suspended: false,
-            suspend_requested: false,
             user_config,
         };
         app.refresh_menu();
@@ -389,20 +387,6 @@ impl App {
         guard: &crate::TerminalGuard,
     ) -> io::Result<()> {
         while !self.should_quit {
-            if self.ui_suspended {
-                if events::poll(Duration::from_millis(200))? {
-                    let event = events::read()?;
-                    if let crossterm::event::Event::Key(key) = event {
-                        if crate::input::keyboard::is_suspend_screen_chord(&key) {
-                            guard.resume(terminal)?;
-                            self.ui_suspended = false;
-                            self.set_status("Editor retomado");
-                        }
-                    }
-                }
-                continue;
-            }
-
             self.process_pending_fs_checks();
             self.memory.refresh_if_due();
             self.terminal.drain_all();
@@ -416,12 +400,6 @@ impl App {
                 events::dispatch(self, event);
             }
 
-            if self.suspend_requested {
-                self.suspend_requested = false;
-                guard.suspend(terminal)?;
-                self.ui_suspended = true;
-            }
-
             if let Some(vars) = self.take_pending_env_elevation() {
                 guard.leave_ui_briefly(terminal)?;
                 let result = crate::app_env_pane::run_elevated_install(&vars);
@@ -431,13 +409,6 @@ impl App {
         }
 
         Ok(())
-    }
-
-    pub fn request_suspend_screen(&mut self) {
-        if !crate::platform::terminal_suspend_to_shell_supported() {
-            return;
-        }
-        self.suspend_requested = true;
     }
 
     pub fn shutdown(&mut self) {
@@ -1602,7 +1573,6 @@ impl App {
             ActionId::HelpAsciiTable => self.open_ascii_table(),
             ActionId::HelpAbout => self.modal = Modal::help(HelpKind::About),
             ActionId::EnvVariables => self.open_env_pane(),
-            ActionId::SuspendScreen => self.request_suspend_screen(),
             ActionId::Recent | ActionId::PastePrevious | ActionId::NoOp => {}
         }
         if persist {

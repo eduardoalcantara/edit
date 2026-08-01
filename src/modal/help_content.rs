@@ -46,9 +46,10 @@ menus pull-down, modais e proteção contra perda de trabalho.
 ═══ TERMINAL INTEGRADO ═══
 
   • PTY real (portable-pty), emulador VT100, multi-sessão
-  • Ctrl+T / Ctrl+' abre/foca/fecha; F6 alterna Editor ↔ Terminal
+  • Ctrl+T / Ctrl+` abre/foca/fecha; F6 alterna Editor ↔ Terminal
   • F7 envia seleção (ou linha atual) ao terminal
-  • Sidebar: nova sessão, +/- altura painel, fechar painel/sessão
+  • Sidebar: nova sessão, +/- altura, [c] fundo tema/clássico, fechar painel/sessão
+  • Output PTY padrão: fundo clássico (preto/cinza); [c] alterna com cores do tema
   • PgUp/PgDn rola scrollback; Ctrl+C copia seleção do scrollback
   • Cwd da nova sessão = pasta do arquivo da aba ativa
 
@@ -56,12 +57,13 @@ menus pull-down, modais e proteção contra perda de trabalho.
 ═══ INTERFACE E TEMAS ═══
 
   • Compositor de camadas: menu opaco, modais com sombra, rodapé contextual
-  • Temas: Azul Clássico, Escuro, Claro, Matrix (Exibir → Temas)
+  • Temas: Azul Clássico, Escuro, Claro, VGA 16 cores, Matrix (Exibir → Temas)
   • Rodapé: help à esquerda; Tam/Pos/modo/encoding/tab/memória à direita
   • Zoom 1–3; consumo de memória opcional (~2s)
   • Menus Alt+A/E/X/F/S/T/H; toggles com √; opções exclusivas estilo radio
   • Split: rodapé mostra Editor 1 / Editor 2 conforme painel em foco
   • Ferramentas → Variáveis de ambiente (Ctrl+Shift+V): Usuário/Sistema
+  • Valores de env em claro na v1; persistência fora do processo (environment.d / registry)
 
 
 ═══ PERSISTÊNCIA ═══
@@ -69,8 +71,10 @@ menus pull-down, modais e proteção contra perda de trabalho.
   • edit.json (Linux: ~/.config/edit/; Windows: ao lado do exe)
   • Sessão: Linux ~/.local/state/edit/.edit-session/; Windows ao lado do exe
   • --workspace: ./.edit/ no diretório atual
-  • Env usuário Linux: ~/.config/environment.d/99-edit.conf
-  • Env sistema Linux: /etc/environment.d/99-edit.conf (pkexec)
+  • Env usuário Linux: environment.d + systemctl --user show-environment
+  • Env sistema Linux: /etc/environment + /etc/environment.d/*.conf
+  • Gravação: 99-edit.conf (usuário/sistema); sistema via pkexec
+  • Doc: docs/ENV_EDITOR.md
   • Migração automática de config legado
   • Clipboard interno: 5 itens
   • Sem telemetria
@@ -89,7 +93,7 @@ quando indicado (ex.: Ctrl+Q, Alt+F4).
   Ctrl+Q / Alt+F4     Sair (confirma se dirty)
   Esc                 Limpa busca ativa; sem busca, sai do editor
   Ctrl+E              Foco no editor
-  Ctrl+T / Ctrl+'     Editor: abre/foca terminal; Terminal: fecha painel
+  Ctrl+T / Ctrl+`     Editor: abre/foca terminal; Terminal: fecha painel
   F6                  Alterna foco Editor ↔ Terminal
   F7                  Envia seleção/linha ao terminal
   F1                  Ajuda → Funcionalidades
@@ -155,7 +159,26 @@ quando indicado (ex.: Ctrl+Q, Alt+F4).
   Alt+X               Exibir  (mnemônico X, não E)
   Alt+F               Formatar
   Alt+S               Abas
+  Alt+T               Ferramentas (variáveis de ambiente)
   Alt+H               Ajuda (Funcionalidades, Atalhos, Sobre)
+
+
+─── VARIÁVEIS DE AMBIENTE (painel) ───
+
+  Ctrl+Shift+V        Abre o painel Usuário/Sistema
+  Alt+O / Tab         Alterna escopo (Origem)
+  Alt+N               Nova
+  Alt+M / Enter       Mudar (editar)
+  Alt+R / Del         Remover
+  Alt+G               Gravar (salvar no disco)
+  Alt+L               Ler (recarregar)
+  Alt+C               Fechar o painel
+  Esc                 Se o painel estiver aberto: fecha-o; senão: sai do editor
+  Roda do mouse       Rola a lista
+
+  Botões: Alt+letra (como no Windows). Menus: Alt+A/E/X/F/S/T/H.
+  Linux: environment.d + systemctl --user show-environment
+  Doc: docs/ENV_EDITOR.md
 
 
 ─── TERMINAL (foco no PTY) ───
@@ -165,7 +188,7 @@ quando indicado (ex.: Ctrl+Q, Alt+F4).
   Ctrl+C              Copia seleção do scrollback (ou envia ao PTY)
   Mouse               Arraste seleciona; roda rola scrollback
 
-  Sidebar [n] nova sessão  [+]/- altura  [f] fecha painel  [q] fecha sessão
+  Sidebar [n] nova sessão  [+]/- altura  [c] fundo  [f] fecha painel  [q] fecha sessão
 
 
 ─── NAVEGADOR DE ARQUIVOS (modal Abrir/Salvar) ───

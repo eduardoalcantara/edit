@@ -67,6 +67,7 @@ impl App {
         self.editor_split.right_tab = pane.stashed_right_tab;
         self.env_close_hit = None;
         self.env_list_area = None;
+        self.env_button_hits.clear();
         self.editor_split.focused_pane = SplitPane::Left;
         let keep = self
             .editor_split

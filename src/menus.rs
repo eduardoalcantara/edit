@@ -85,7 +85,6 @@ pub enum ActionId {
     HelpAsciiTable,
     HelpAbout,
     EnvVariables,
-    SuspendScreen,
 }
 
 #[derive(Clone)]
@@ -457,25 +456,16 @@ fn file_menu(recent: &RecentFiles) -> Vec<MenuNode> {
             None,
             "Fecha o documento atual",
         ),
-    ]);
-    if crate::platform::terminal_suspend_to_shell_supported() {
-        nodes.push(item(
-            "Sair da tela",
-            Some("Ctrl+Shift+Alt+E"),
-            ActionId::SuspendScreen,
+        MenuNode::Separator,
+        item(
+            "Sair",
+            Some("Ctrl+Q / Alt+F4 / Esc"),
+            ActionId::Quit,
             true,
             None,
-            "Suspende a interface e retorna ao prompt do terminal",
-        ));
-    }
-    nodes.push(item(
-        "Sair",
-        Some("Ctrl+Q / Alt+F4 / Esc"),
-        ActionId::Quit,
-        true,
-        None,
-        "Encerra o editor",
-    ));
+            "Encerra o editor",
+        ),
+    ]);
     nodes
 }
 
@@ -590,17 +580,21 @@ fn edit_menu(clip: &Clipboard) -> Vec<MenuNode> {
 
 fn view_menu(view: &ViewState, split_editor: bool) -> Vec<MenuNode> {
     vec![
-        toggle_item(
+        item(
             "Dividir editor",
+            Some("Ctrl+1 / Ctrl+2"),
             ActionId::ToggleSplitEditor,
-            split_editor,
-            "Dois arquivos lado a lado (Ctrl+1 único | Ctrl+2 direita)",
+            true,
+            Some(split_editor),
+            "Dois arquivos lado a lado (Ctrl+1 único | Ctrl+2 dividir/direita)",
         ),
-        toggle_item(
+        item(
             "Terminal",
+            Some("Ctrl+T / Ctrl+`"),
             ActionId::ToggleTerminal,
-            view.terminal,
-            "Mostra ou oculta o terminal integrado (Ctrl+T / Ctrl+')",
+            true,
+            Some(view.terminal),
+            "Mostra ou oculta o terminal integrado (Ctrl+T / Ctrl+`)",
         ),
         toggle_item(
             "Rodapé",
@@ -1255,7 +1249,7 @@ pub fn render_bar(
 
     let mut x = area.x;
     for (i, top) in bar.tops.iter().enumerate() {
-        let width = top.label.len() as u16;
+        let width = top_menu_slot_width(top.label, top.mnemonic, use_paren_mnemonics);
         let item_area = Rect {
             x,
             y: area.y,
@@ -1328,7 +1322,11 @@ fn render_panels(
         if i == top_idx {
             break;
         }
-        origin_x = origin_x.saturating_add(top.label.len() as u16);
+        origin_x = origin_x.saturating_add(top_menu_slot_width(
+            top.label,
+            top.mnemonic,
+            use_paren_mnemonics,
+        ));
     }
 
     let mut panel_x = origin_x;
@@ -1460,6 +1458,16 @@ fn menu_top_spans(
     }
     out.push(Span::styled(" ", base));
     out
+}
+
+/// Largura do slot na barra (inclui `(X)` no modo parênteses — evita truncar em `Arquivo(`).
+fn top_menu_slot_width(label: &str, mnemonic: char, use_paren: bool) -> u16 {
+    if use_paren {
+        let text = format!(" {}({mnemonic}) ", label.trim());
+        text.chars().count() as u16
+    } else {
+        label.chars().count() as u16
+    }
 }
 
 fn measure_panel(nodes: &[MenuNode]) -> (u16, u16) {
@@ -1632,6 +1640,14 @@ mod tests {
     }
 
     #[test]
+    fn top_menu_slot_width_includes_paren_mnemonic() {
+        let plain = top_menu_slot_width(" Arquivo ", 'A', false);
+        let paren = top_menu_slot_width(" Arquivo ", 'A', true);
+        assert!(paren > plain);
+        assert_eq!(paren, " Arquivo(A) ".chars().count() as u16);
+    }
+
+    #[test]
     fn build_includes_ascii_table_in_help() {
         let bar = MenuBar::build(
             &RecentFiles::default(),
@@ -1655,34 +1671,6 @@ mod tests {
         assert!(has_ascii);
     }
 
-    fn file_menu_has_action(bar: &MenuBar, action: ActionId) -> bool {
-        let file = bar.tops.iter().find(|t| t.mnemonic == 'A').unwrap();
-        fn walk(nodes: &[MenuNode], action: ActionId) -> bool {
-            nodes.iter().any(|node| match node {
-                MenuNode::Item { action: a, .. } => *a == action,
-                MenuNode::SubMenu { children, .. } => walk(children, action),
-                MenuNode::Separator => false,
-            })
-        }
-        walk(&file.children, action)
-    }
-
-    #[test]
-    fn suspend_screen_menu_matches_platform() {
-        let bar = MenuBar::build(
-            &RecentFiles::default(),
-            &ViewState::default(),
-            FileEncoding::Utf8,
-            Tabulation::Spaces4,
-            &Clipboard::default(),
-            &empty_workspace(),
-            false,
-        );
-        assert_eq!(
-            file_menu_has_action(&bar, ActionId::SuspendScreen),
-            crate::platform::terminal_suspend_to_shell_supported()
-        );
-    }
 }
 
 fn line_width(node: &MenuNode) -> usize {

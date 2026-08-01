@@ -87,8 +87,9 @@ impl GuideColumn {
 /// Cores do output PTY (área dentro da moldura, sem bordas/divisor).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum TerminalColorScheme {
-    #[default]
     Theme,
+    /// Fundo preto / texto cinza (padrão; `exibir.terminal_fundo = classico`).
+    #[default]
     Classic,
 }
 
@@ -154,9 +155,8 @@ pub enum MnemonicParenthesesMode {
 }
 
 pub fn detect_monochrome_terminal() -> bool {
-    if std::env::var_os("NO_COLOR").is_some() {
-        return true;
-    }
+    // NÃO usar NO_COLOR aqui: o crossterm já respeita NO_COLOR para ANSI, e o TUI
+    // força cores ao entrar (temas). Parênteses de mnemônico são só para TTYs sem underline.
     if std::env::var("TERM")
         .map(|t| t.eq_ignore_ascii_case("dumb"))
         .unwrap_or(false)
@@ -167,7 +167,10 @@ pub fn detect_monochrome_terminal() -> bool {
         return false;
     }
     match std::env::var("TERM") {
-        Ok(term) if term.contains("color") || term.contains("256") => false,
+        Ok(term) if term.contains("color") || term.contains("256") || term.contains("xterm") => {
+            false
+        }
+        Ok(term) if term.eq_ignore_ascii_case("linux") => false,
         Ok(_) => false,
         Err(_) => false,
     }
@@ -207,6 +210,28 @@ pub fn format_button_label_paren(label: &str) -> String {
     let first = chars.next().unwrap();
     let rest: String = chars.collect();
     format!("({first}){rest}")
+}
+
+/// Destaca a primeira ocorrência de `mnemonic` no rótulo: `Fechar`+`C` → `Fe(c)har`.
+pub fn format_button_label_mnemonic(label: &str, mnemonic: char) -> String {
+    let target = mnemonic.to_ascii_lowercase();
+    let mut out = String::with_capacity(label.len() + 2);
+    let mut done = false;
+    for c in label.chars() {
+        if !done && c.to_ascii_lowercase() == target {
+            out.push('(');
+            out.push(c);
+            out.push(')');
+            done = true;
+        } else {
+            out.push(c);
+        }
+    }
+    if done {
+        out
+    } else {
+        format!("({mnemonic}){label}")
+    }
 }
 
 #[derive(Debug, Clone)]

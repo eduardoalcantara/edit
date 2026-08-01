@@ -11,6 +11,16 @@ pub const OK_CANCEL: [DialogButton; 2] = [
     ),
 ];
 
+/// Confirmações do painel de variáveis (padrão Sim/Cancelar do projeto).
+pub const SIM_CANCEL: [DialogButton; 2] = [
+    DialogButton::new("Sim", "Confirma a ação", DialogButtonAction::Primary),
+    DialogButton::new(
+        "Cancelar",
+        "Volta ao painel sem confirmar",
+        DialogButtonAction::Cancel,
+    ),
+];
+
 pub const PURGE_UNDO: [DialogButton; 3] = [
     DialogButton::new(
         "Apagar desfazer",

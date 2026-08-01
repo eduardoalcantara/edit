@@ -108,7 +108,8 @@ fn default_terminal_altura() -> u16 {
 }
 
 fn default_terminal_fundo() -> String {
-    "tema".to_string()
+    // Fundo escuro (preto/cinza) do output PTY — ver TIMELINE / [c] no sidebar.
+    "classico".to_string()
 }
 
 impl Default for AbasConfig {

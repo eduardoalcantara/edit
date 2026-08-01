@@ -59,10 +59,6 @@ impl Compositor {
     }
 
     fn dispatch_key(app: &mut App, key: KeyEvent, layout: UiLayout) {
-        if crate::input::keyboard::is_suspend_screen_chord(&key) {
-            app.request_suspend_screen();
-            return;
-        }
         if crate::input::keyboard::is_env_variables_chord(&key) {
             app.open_env_pane();
             return;
@@ -81,12 +77,14 @@ impl Compositor {
             && !app.menu_state.is_open()
             && app.input_focus != InputFocus::Terminal
         {
+            // Cascata: limpar busca → fechar painéis especiais → só então sair.
+            // Env/referência fecham se existirem (mesmo com foco no editor esquerdo).
             if app.has_active_search() {
                 app.clear_search();
-            } else if app.reference_pane_active() {
-                app.close_reference_pane();
-            } else if app.env_pane_active() {
+            } else if app.has_env_pane() {
                 app.close_env_pane();
+            } else if app.has_reference_pane() {
+                app.close_reference_pane();
             } else {
                 app.request_quit();
             }
@@ -381,7 +379,8 @@ fn handle_global_chords(app: &mut App, key: KeyEvent) -> bool {
             app.focus_editor();
             true
         }
-        KeyCode::Char('t' | 'T' | '\'') => {
+        // Ctrl+T e Ctrl+` (grave; atalho estilo VS Code). Ctrl+' falha em muitos TTY Linux.
+        KeyCode::Char('t' | 'T' | '`' | '\'') => {
             app.chord_terminal_toggle();
             true
         }
@@ -554,9 +553,14 @@ mod tests {
 
     #[test]
     fn footer_focus_label_shows_editor_by_default() {
-        let app = App::new(false, true);
+        let mut app = App::new(false, true);
+        app.editor_split.mode = crate::editor_split::SplitMode::Off;
+        app.editor_split.focused_pane = crate::editor_split::SplitPane::Left;
         let status = footer_status_right(&app);
-        assert!(status.starts_with("Editor |"));
+        assert!(
+            status.starts_with("Editor |"),
+            "got status: {status:?}"
+        );
     }
 
     #[test]

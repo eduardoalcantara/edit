@@ -26,7 +26,7 @@ use crate::workspace::PromptReason;
 
 use buttons::{
     CONVERT, DISCARD_CLOSE, DISCARD_NEW, DISCARD_OPEN, OPEN_UNSAVED_FULL, OPEN_UNSAVED_NO_IGNORE,
-    OVERWRITE, OK_CANCEL,
+    OVERWRITE, SIM_CANCEL,
     FILE_MISSING, PATH_OPEN, PATH_RENAME, PATH_SAVE_AS, PURGE_UNDO, QUIT_UNSAVED, REINTERPRET,
     RELOAD_EXTERNAL, TAB_UNSAVED,
 };
@@ -297,9 +297,9 @@ fn confirm_buttons(kind: &ConfirmKind) -> &'static [DialogButton] {
         ConfirmKind::PurgeUndoOnToggle => &PURGE_UNDO,
         ConfirmKind::ReloadExternal { .. } => &RELOAD_EXTERNAL,
         ConfirmKind::FileMissing { .. } => &FILE_MISSING,
-        ConfirmKind::EnvNeedsElevation => &OK_CANCEL,
-        ConfirmKind::EnvDeleteVar => &OK_CANCEL,
-        ConfirmKind::EnvDiscardClose => &OK_CANCEL,
-        ConfirmKind::EnvDiscardSwitchScope => &OK_CANCEL,
+        ConfirmKind::EnvNeedsElevation => &SIM_CANCEL,
+        ConfirmKind::EnvDeleteVar => &SIM_CANCEL,
+        ConfirmKind::EnvDiscardClose => &SIM_CANCEL,
+        ConfirmKind::EnvDiscardSwitchScope => &SIM_CANCEL,
     }
 }

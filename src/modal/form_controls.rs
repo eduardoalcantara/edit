@@ -26,14 +26,55 @@ pub fn paint_button(
     focused: bool,
     palette: ThemePalette,
 ) {
+    paint_button_with_mnemonic(frame, area, label, None, focused, palette);
+}
+
+/// Botão `[Label]` com letra mnemónica realçada (cor de hotkey do tema).
+pub fn paint_button_with_mnemonic(
+    frame: &mut Frame<'_>,
+    area: Rect,
+    label: &str,
+    mnemonic: Option<char>,
+    focused: bool,
+    palette: ThemePalette,
+) {
     if area.width == 0 || area.height == 0 {
         return;
     }
-    let text = format!("[{label}]");
-    frame.render_widget(
-        Paragraph::new(text).style(palette.button_style(focused)),
-        area,
-    );
+    use ratatui::text::{Line, Span};
+
+    let base = palette.button_style(focused);
+    let hot = Style::default()
+        .fg(palette.menu_hotkey)
+        .bg(if focused {
+            ratatui::style::Color::White
+        } else {
+            palette.button_bg
+        })
+        .add_modifier(Modifier::BOLD);
+
+    let mut spans = vec![Span::styled("[", base)];
+    if let Some(m) = mnemonic {
+        let target = m.to_ascii_lowercase();
+        let mut done = false;
+        for ch in label.chars() {
+            if !done && ch.to_ascii_lowercase() == target {
+                spans.push(Span::styled(ch.to_string(), hot));
+                done = true;
+            } else {
+                spans.push(Span::styled(ch.to_string(), base));
+            }
+        }
+        if !done {
+            spans.push(Span::styled(format!("({m})"), hot));
+            spans.push(Span::styled(label.to_string(), base));
+        }
+    } else {
+        spans.push(Span::styled(label.to_string(), base));
+    }
+    spans.push(Span::styled("]", base));
+
+    frame.render_widget(Paragraph::new(Line::from(spans)).style(base), area);
 }
 
 pub fn paint_text_input(
