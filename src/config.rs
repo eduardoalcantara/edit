@@ -1,4 +1,4 @@
-//! Configurações persistentes do usuário em `edit.json` (ao lado do executável).
+//! Configurações persistentes do usuário em `edit.json`.
 
 use std::fs;
 use std::io;
@@ -9,10 +9,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::editor_split::{EditorSplit, SplitMode, SplitPane};
 use crate::encoding::{FileEncoding, Tabulation};
+use crate::paths::{self};
 use crate::theme::ThemeId;
 use crate::view_state::{EditorBorder, EditorMargin, GuideColumn, TerminalColorScheme, parse_terminal_color_scheme};
 
-const CONFIG_FILE: &str = "edit.json";
 const WORKSPACE_CONFIG_FILE: &str = ".edit.workspace";
 const LOCAL_EDIT_DIR: &str = ".edit";
 const CONFIG_VERSION: u32 = 2;
@@ -363,6 +363,8 @@ impl Default for EditConfig {
 
 impl EditConfig {
     pub fn load() -> Self {
+        let migrated_recent = paths::migrate_linux_legacy_if_needed();
+
         let path = config_path();
         if path.exists() {
             if let Ok(content) = fs::read_to_string(&path) {
@@ -374,7 +376,7 @@ impl EditConfig {
         }
 
         let mut config = Self::default();
-        if let Some(recentes) = migrate_legacy_recent_paths() {
+        if let Some(recentes) = migrated_recent.or_else(migrate_legacy_recent_paths) {
             config.arquivo.recentes = recentes;
             let _ = config.save();
         }
@@ -524,10 +526,7 @@ impl EditConfig {
 }
 
 pub fn global_config_path() -> PathBuf {
-    std::env::current_exe()
-        .ok()
-        .and_then(|exe| exe.parent().map(|dir| dir.join(CONFIG_FILE)))
-        .unwrap_or_else(|| PathBuf::from(CONFIG_FILE))
+    paths::global_config_path()
 }
 
 pub fn local_workspace_config_path(base_dir: &Path) -> PathBuf {

@@ -1,0 +1,30 @@
+# Maintainer: edit contributors
+pkgname=edit
+pkgver=@VERSION@
+pkgrel=1
+pkgdesc="Editor de terminal estilo Turbo Vision"
+arch=('x86_64')
+url="https://github.com/"
+license=('MIT')
+depends=('glibc')
+optdepends=('xdg-utils: abrir arquivos pelo desktop')
+options=('!strip')
+source=("edit-fhs.tar.gz")
+sha256sums=('SKIP')
+
+package() {
+  cd "$srcdir"
+  if [[ -d usr ]]; then
+    cp -a usr "$pkgdir"/
+  else
+    # tarball pode extrair em subpasta
+    local d
+    d="$(find . -maxdepth 2 -type d -name usr | head -1)"
+    if [[ -n "$d" ]]; then
+      cp -a "$d" "$pkgdir"/
+    else
+      echo "layout FHS (usr/) não encontrado no source" >&2
+      return 1
+    fi
+  fi
+}

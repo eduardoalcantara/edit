@@ -2,7 +2,7 @@
 
 **Autor:** Perplexity AI  
 **Data:** 2026-07-31  
-**Versão:** 4.2
+**Versão:** 4.3
 
 **Branch:** `main` (desenvolvimento integrado; branches de feature removidas após merge em 2026-06-09).
 
@@ -194,9 +194,15 @@
 - **Host Linux nativo (2026-07-31):**
   - Repositório desenvolvido originalmente no Windows; alvo do produto sempre foi Linux (alternativa ao Vim).
   - Verificação neste host Arch Linux: Rust 1.85+ (`rustc`/`cargo`), `cc`, `pkg-config`, `libx11`/`libxcb` presentes.
-  - `cargo build --release` → `target/release/edit`; **204** testes unitários OK (`cargo test -- --test-threads=1`).
-  - Código já era multiplataforma (`cfg(unix)` / `cfg(windows)`): shell via `$SHELL`, PTY `portable-pty`, suspend `SIGTSTP`, paths case-sensitive — **sem alteração de código** necessária para compilar/rodar no Linux.
-  - Docs alinhados: README v2.6 (Linux-first), MASTER/spec v1 com notas de supersessão, contagem de testes e versão RULES (v3.2).
+  - `cargo build --release` → `target/release/edit`; testes unitários OK.
+  - Docs alinhados: README Linux-first, MASTER/spec v1 com notas de supersessão.
+- **XDG + freedesktop + pacotes Linux (2026-07-31):**
+  - Paths globais no Linux: `~/.config/edit/edit.json` e `~/.local/state/edit/.edit-session/` (`src/paths.rs`); Windows permanece ao lado do exe; `--workspace` inalterado.
+  - Migração de `edit.json` / `.edit-session` adjacentes ao exe e recentes legados.
+  - Assets: `packaging/linux/` (`.desktop`, ícones hicolor, metainfo).
+  - Scripts: `scripts/linux/` (build, stage, tarball, deb, rpm, Arch, AppImage, package-all).
+  - Spec: `specs/done/SPEC-LINUX-XDG-PACKAGING.md`; RULES **v3.3**; README **v2.7**.
+  - **206** testes unitários passando (`cargo test -- --test-threads=1`).
 
 ### Em andamento
 - **Fidelidade Turbo Vision:** `specs/to-do/SPEC-UX-FIDELIDADE-TURBO-VISION.md` (TV1–TV3 paleta/rodapé; demais itens TV8+).

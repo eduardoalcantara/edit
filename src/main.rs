@@ -16,6 +16,7 @@ mod input;
 mod memory;
 mod menus;
 mod modal;
+mod paths;
 mod platform;
 mod recent;
 mod reference_pane;

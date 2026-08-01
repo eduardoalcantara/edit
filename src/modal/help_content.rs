@@ -65,8 +65,10 @@ menus pull-down, modais e proteção contra perda de trabalho.
 
 ═══ PERSISTÊNCIA ═══
 
-  • edit.json ao lado do executável (arquivo, exibir, formatar)
-  • Migração automática de recent.json legado
+  • edit.json (Linux: ~/.config/edit/; Windows: ao lado do exe)
+  • Sessão: Linux ~/.local/state/edit/.edit-session/; Windows ao lado do exe
+  • --workspace: ./.edit/ no diretório atual
+  • Migração automática de config legado
   • Clipboard interno: 5 itens
   • Sem telemetria
 "#
@@ -197,8 +199,10 @@ pub fn about_text() -> String {
          Versão: {}\n\
          Pacote: edit\n\
          Autor: Perplexity AI (README do projeto)\n\n\
-         Configuração: edit.json (mesma pasta do executável)\n\
-         Sessão de abas: .edit-session/\n\
+         Configuração (Linux): ~/.config/edit/edit.json (XDG)\n\
+         Sessão (Linux): ~/.local/state/edit/.edit-session/\n\
+         Windows: edit.json e .edit-session/ ao lado do executável\n\
+         Workspace: ./.edit/ com --workspace\n\
          Documentação: PROJECT_RULES.md, README.md\n\n\
          Licença e código-fonte conforme repositório do projeto.\n\
          Sem telemetria ou envio de dados.\n",

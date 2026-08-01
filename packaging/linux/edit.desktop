@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=edit
+GenericName=Text Editor
+Comment=Editor de terminal estilo Turbo Vision
+Exec=edit %F
+Icon=edit
+Terminal=true
+Categories=Utility;TextEditor;
+MimeType=text/plain;text/x-csrc;text/x-c++src;text/x-python;text/x-rust;text/markdown;application/json;application/x-shellscript;
+Keywords=editor;text;tui;terminal;
+StartupNotify=false

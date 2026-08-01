@@ -1,0 +1,11 @@
+Source: edit
+Section: editors
+Priority: optional
+Maintainer: edit contributors <edit@localhost>
+Homepage: https://github.com/
+Architecture: amd64
+Depends: libc6
+Recommends: xdg-utils
+Description: Editor de terminal estilo Turbo Vision
+ Editor TUI com menus Turbo Vision, núcleo ropey, abas,
+ terminal integrado e proteção contra perda de trabalho.

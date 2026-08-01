@@ -1,0 +1,27 @@
+Name: edit
+Version: @VERSION@
+Release: 1%{?dist}
+Summary: Editor de terminal estilo Turbo Vision
+License: MIT
+URL: https://github.com/
+BuildArch: x86_64
+
+%description
+Editor TUI com menus Turbo Vision, núcleo ropey, abas,
+terminal integrado e proteção contra perda de trabalho.
+
+%install
+mkdir -p %{buildroot}
+cp -a @STAGE@/* %{buildroot}/
+
+%files
+/usr/bin/edit
+/usr/share/applications/edit.desktop
+/usr/share/metainfo/edit.metainfo.xml
+/usr/share/icons/hicolor/scalable/apps/edit.svg
+/usr/share/icons/hicolor/48x48/apps/edit.png
+/usr/share/icons/hicolor/128x128/apps/edit.png
+
+%changelog
+* Fri Jul 31 2026 edit contributors <edit@localhost> - @VERSION@-1
+- Empacotamento RPM inicial

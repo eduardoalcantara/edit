@@ -1,8 +1,8 @@
 # PROJECT_RULES — Editor Linux (`edit`)
 
 **Autor:** Perplexity AI  
-**Data:** 2026-06-09  
-**Versão:** 3.2
+**Data:** 2026-07-31  
+**Versão:** 3.3
 
 Regras estáveis do projeto. Para estado de implementação, ver `PROJECT_STATUS.md`; para histórico, `PROJECT_TIMELINE.md`; para detalhes de feature, specs em `specs/done/`.
 
@@ -23,10 +23,20 @@ Regras estáveis do projeto. Para estado de implementação, ver `PROJECT_STATUS
 ## Identidade do produto
 
 - Pacote e executável: **`edit`** (não `editor-linux`).
-- Configuração persistente: **`edit.json`** na **mesma pasta** do executável (`edit` / `edit.exe`).
 - Estrutura do JSON espelha a organização dos menus: **`arquivo`**, **`exibir`**, **`formatar`**.
-- Migrar automaticamente `.edit/recent.json` e `.editor-linux/recent.json` na primeira execução, se `edit.json` não existir.
 - Gravar configuração ao alterar opções persistidas, ao atualizar recentes e ao encerrar o programa.
+
+### Paths de configuração e sessão
+
+| Modo | Config | Sessão |
+|------|--------|--------|
+| **Linux** (global) | `$XDG_CONFIG_HOME/edit/edit.json` (fallback `~/.config/edit/edit.json`) | `$XDG_STATE_HOME/edit/.edit-session/` (fallback `~/.local/state/edit/.edit-session/`) |
+| **Windows** (global) | `edit.json` na **mesma pasta** do `edit.exe` | `.edit-session/` na mesma pasta do exe |
+| **`--workspace`** | `./.edit/.edit.workspace` (cwd) | `./.edit/.edit-session/` (cwd) |
+
+- No Linux, migrar automaticamente na primeira execução se o config XDG não existir: (1) `edit.json` ao lado do executável; (2) `.edit/recent.json` / `.editor-linux/recent.json`; (3) `.edit-session/` ao lado do exe → state XDG.
+- Resolução de paths: módulo `src/paths.rs`.
+- Empacotamento Linux e freedesktop: `specs/done/SPEC-LINUX-XDG-PACKAGING.md`, assets em `packaging/`, scripts em `scripts/linux/`.
 
 ---
 
@@ -234,6 +244,7 @@ Codificação e tabulação persistidas em `formatar` são **padrão** para novo
 | `src/menus.rs` | Menu shell Turbo Vision; **proibido** menu estático com rótulos de comando |
 | `src/modal/` | Shell `Dialog` reutilizável; presets em `buttons.rs`; `TextInput` para campos de linha única |
 | `src/widgets/panel.rs` | Painéis, bordas ASCII, dropdown |
+| `src/paths.rs` | Paths globais (XDG no Linux; pasta do exe no Windows) |
 | `src/config.rs` | Load/save `edit.json` |
 | `src/recent.rs` | Lista em memória (persistida via config) |
 | `src/memory.rs` | Monitor RSS/working set (`sysinfo`) |

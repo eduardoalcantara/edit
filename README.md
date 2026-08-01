@@ -2,7 +2,7 @@
 
 **Autor:** Perplexity AI  
 **Data:** 2026-07-31  
-**Versão:** 2.6
+**Versão:** 2.7
 
 Editor TUI para **Linux** (alvo principal; alternativa ao Vim) com suporte a Windows. Menus estilo **Turbo Vision**, núcleo **ropey**, UX previsível e proteção contra perda de trabalho.
 
@@ -28,6 +28,15 @@ cargo run -- --workspace src/main.rs
 
 No Windows, o artefato é `edit.exe`. Build cruzado via WSL a partir do Windows (legado): `wsl bash -lc "cd /caminho/edit && cargo build --release"`.
 
+### Paths de configuração (global)
+
+| SO | Config | Sessão |
+|----|--------|--------|
+| **Linux** | `$XDG_CONFIG_HOME/edit/edit.json` (`~/.config/edit/`) | `$XDG_STATE_HOME/edit/.edit-session/` (`~/.local/state/edit/`) |
+| **Windows** | `edit.json` ao lado do `edit.exe` | `.edit-session/` ao lado do exe |
+
+Com `--workspace`: `./.edit/.edit.workspace` + `./.edit/.edit-session/` no cwd (independente do SO).
+
 ### Linha de comando
 
 | Parâmetro | Ação |
@@ -47,6 +56,23 @@ edit --clean
 edit --workspace -- main.rs tests/mod.rs
 ```
 
+### Pacotes Linux (release)
+
+```bash
+./scripts/linux/build-release.sh
+./scripts/linux/package-tarball.sh    # dist/edit-<ver>-<arch>.tar.gz
+./scripts/linux/package-all.sh        # tarball + deb + rpm + Arch + AppImage (pula o que faltar ferramenta)
+```
+
+Ferramentas por formato: `makepkg` (Arch), `dpkg-deb` (Debian/Ubuntu), `rpmbuild` (Fedora), `appimagetool` ou `linuxdeploy` (AppImage). Assets freedesktop em `packaging/linux/` (`.desktop`, ícones, metainfo).
+
+Instalação manual do tarball (como root):
+
+```bash
+sudo tar -C / -xzf dist/edit-*-x86_64.tar.gz
+```
+
+Isso instala `/usr/bin/edit`, o lançador `.desktop` e os ícones.
 ## Funcionalidades
 
 ### Edição
@@ -106,9 +132,11 @@ edit --workspace -- main.rs tests/mod.rs
 
 ### Persistência
 
-- **`edit.json`** ao lado do executável — `arquivo` (recentes + **abas**), `exibir` (incl. `mnemonico_parenteses`: `auto`|`ligado`|`desligado`), `formatar`.
-- Migração automática de `.edit/recent.json` legado.
-- **`.edit-session/`** — conteúdo temporário de abas `NovoN`; purge ao fechar aba.
+- **Linux:** `edit.json` em `~/.config/edit/`; sessão em `~/.local/state/edit/.edit-session/` (XDG).
+- **Windows:** `edit.json` e `.edit-session/` ao lado do executável.
+- **`--workspace`:** `./.edit/` no cwd.
+- Migração automática de config legado (exe adjacente / `.edit/recent.json`).
+- Seções: `arquivo` (recentes + **abas**), `exibir` (incl. `mnemonico_parenteses`), `formatar`.
 
 ### Atalhos principais
 
@@ -152,7 +180,7 @@ Ver `PROJECT_RULES.md` para lista completa.
 
 ## Documentação
 
-1. [`PROJECT_RULES.md`](PROJECT_RULES.md) — regras estáveis (v3.2)
+1. [`PROJECT_RULES.md`](PROJECT_RULES.md) — regras estáveis (v3.3)
 2. [`PROJECT_STATUS.md`](PROJECT_STATUS.md) — estado e pendências
 3. [`PROJECT_TIMELINE.md`](PROJECT_TIMELINE.md) — histórico
 4. [`.cursorrules`](.cursorrules) — regras para o Cursor
@@ -170,4 +198,4 @@ cargo test
 cargo test -- --test-threads=1
 ```
 
-**204** testes unitários (verificado em Linux nativo, 2026-07-31).
+**206** testes unitários (Linux nativo, 2026-07-31).

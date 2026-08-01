@@ -1,4 +1,4 @@
-//! Persistência de sessão em `.edit-session/` ao lado do executável.
+//! Persistência de sessão em `.edit-session/`.
 
 use std::fs;
 use std::io;
@@ -8,8 +8,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
 
 use crate::editor::history::{HistoryStacks, PERSIST_UNDO_MIN};
+use crate::paths::{self};
 
-const SESSION_DIR: &str = ".edit-session";
 const TABS_DIR: &str = "tabs";
 
 static SESSION_ROOT_OVERRIDE: std::sync::Mutex<Option<PathBuf>> =
@@ -51,17 +51,7 @@ pub fn session_root() -> PathBuf {
             return path.clone();
         }
     }
-    session_root_from(
-        std::env::current_exe()
-            .ok()
-            .and_then(|p| p.parent().map(|d| d.to_path_buf())),
-    )
-}
-
-fn session_root_from(exe_dir: Option<PathBuf>) -> PathBuf {
-    exe_dir
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join(SESSION_DIR)
+    paths::global_session_root()
 }
 
 pub fn tab_dir(session_id: &str) -> PathBuf {

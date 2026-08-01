@@ -8,6 +8,7 @@ use std::path::{Path, PathBuf};
 use crate::config::{
     global_config_path, local_edit_dir, local_workspace_config_path, set_config_path, EditConfig,
 };
+use crate::paths;
 use crate::session::set_session_root;
 
 const SESSION_SUBDIR: &str = ".edit-session";
@@ -70,7 +71,11 @@ pub fn print_help(program: &str) {
            --workspace   Usa configuração local em ./.edit/.edit.workspace\n\
            -h, --help    Exibe esta ajuda\n\
          \n\
-         Arquivos listados são abertos em abas ao iniciar (até 10)."
+         Arquivos listados são abertos em abas ao iniciar (até 10).\n\
+         \n\
+         Linux (global): config em $XDG_CONFIG_HOME/edit/edit.json\n\
+                         sessão em $XDG_STATE_HOME/edit/.edit-session/\n\
+         Windows (global): edit.json e .edit-session/ ao lado do executável."
     );
 }
 
@@ -141,10 +146,7 @@ fn load_config_file(path: &Path) -> Option<EditConfig> {
 }
 
 fn global_session_root() -> PathBuf {
-    std::env::current_exe()
-        .ok()
-        .and_then(|exe| exe.parent().map(|dir| dir.join(SESSION_SUBDIR)))
-        .unwrap_or_else(|| PathBuf::from(SESSION_SUBDIR))
+    paths::global_session_root()
 }
 
 fn purge_all_at(root: &Path) -> io::Result<()> {

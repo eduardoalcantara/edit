@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>edit.desktop</id>
+  <name>edit</name>
+  <summary>Editor de terminal estilo Turbo Vision</summary>
+  <metadata_license>MIT</metadata_license>
+  <project_license>MIT</project_license>
+  <description>
+    <p>
+      Editor TUI com menus estilo Turbo Vision, núcleo ropey, abas, terminal
+      integrado e proteção contra perda de trabalho.
+    </p>
+  </description>
+  <launchable type="desktop-id">edit.desktop</launchable>
+  <url type="homepage">https://github.com/</url>
+  <provides>
+    <binary>edit</binary>
+  </provides>
+  <categories>
+    <category>Utility</category>
+    <category>TextEditor</category>
+  </categories>
+</component>
