@@ -210,7 +210,7 @@
   - Menu Ferramentas (`Alt+T`) + `Ctrl+Shift+V`; painel direito Usuário/Sistema.
   - Linux: `environment.d/99-edit.conf`; sistema com modal de privilégio + `pkexec`.
   - Windows: HKCU/HKLM + `WM_SETTINGCHANGE` (`winreg`).
-  - Spec: `specs/done/SPEC-ENV-EDITOR.md`; RULES **v3.4**; **210** testes.
+  - Spec: `specs/done/SPEC-ENV-EDITOR.md`; RULES **v3.4**; README **v2.9**; **211** testes.
 
 ### Em andamento
 - **Fidelidade Turbo Vision:** `specs/to-do/SPEC-UX-FIDELIDADE-TURBO-VISION.md` (TV1–TV3 paleta/rodapé; demais itens TV8+).
