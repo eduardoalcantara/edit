@@ -2,7 +2,7 @@
 
 **Autor:** Perplexity AI  
 **Data:** 2026-07-31  
-**Versão:** 3.4
+**Versão:** 3.5
 
 Regras estáveis do projeto. Para estado de implementação, ver `PROJECT_STATUS.md`; para histórico, `PROJECT_TIMELINE.md`; para detalhes de feature, specs em `specs/done/`.
 
@@ -43,7 +43,7 @@ Regras estáveis do projeto. Para estado de implementação, ver `PROJECT_STATUS
 - Painel **Ferramentas → Variáveis de ambiente…** (`Ctrl+Shift+V`): lista estruturada Usuário / Sistema no split direito.
 - Linux usuário: `~/.config/environment.d/99-edit.conf`; sistema: `/etc/environment.d/99-edit.conf` (gravação com modal de privilégio + `pkexec`).
 - Windows usuário: `HKCU\Environment`; sistema: `HKLM\...\Environment` (requer admin).
-- Spec: `specs/done/SPEC-ENV-EDITOR.md`.
+- Spec: `specs/done/SPEC-ENV-EDITOR.md`; doc: `docs/ENV_EDITOR.md`.
 
 ---
 
@@ -54,7 +54,8 @@ Regras estáveis do projeto. Para estado de implementação, ver `PROJECT_STATUS
 - Help contextual do item de menu em foco aparece à **esquerda** do rodapé.
 - Estado à **direita** do rodapé, nesta ordem: `Editor | Aba XX/YY | Tam XXX/NNN/YYYY | Pos XX/YY | modo | encoding | tab | Mem NMB` — o primeiro segmento é só o componente com foco (`Editor`, `Terminal`, `Menu` ou `Diálogo`); memória só se toggle ativo. Passar o mouse sobre cada grupo exibe help à esquerda.
 - O tema deve ser sempre explícito e selecionável no menu Exibir → Temas.
-- Painel lateral (placeholder) removido do menu; **terminal inferior integrado** (PTY real) via `Ctrl+T` / `Ctrl+'`.
+- Painel lateral (placeholder) removido do menu; **terminal inferior integrado** (PTY real) via **Ctrl+T** / **Ctrl+`** (grave).
+- Output do terminal: padrão **clássico** (fundo preto/cinza); `exibir.terminal_fundo` = `classico` | `tema`; botão **[c]** no sidebar alterna.
 - A interface não deve esconder ações essenciais atrás de gestos obscuros.
 - Preservar legibilidade em terminais com suporte limitado; preferir UTF-8 onde o terminal suportar (`»`, `█`, `▀`, `√`).
 
@@ -90,7 +91,7 @@ Regras estáveis do projeto. Para estado de implementação, ver `PROJECT_STATUS
 | `Ctrl+Q` / `Alt+F4` | Sair (com confirmação se dirty; funciona mesmo com menu/modal aberto) |
 | **`Esc`** | Modal/menu: cancela/fecha; terminal: devolve foco ao editor; editor com busca ativa (sem modal): limpa destaque; senão: sai |
 | **`Ctrl+E`** | Foco no **editor** (mesmo com terminal visível) |
-| `Ctrl+T` / **`Ctrl+'`** | Do **editor**: abre o terminal (se fechado) ou **foca** o terminal; do **terminal**: **fecha** o painel |
+| **Ctrl+T** / **Ctrl+`** (grave) | Do **editor**: abre o terminal (se fechado) ou **foca** o terminal; do **terminal**: **fecha** o painel |
 | **`F6`** | Alterna foco Editor ↔ Terminal (abre terminal se estiver fechado) |
 | **`F7`** | Envia seleção do editor (ou linha atual) ao terminal e foca o PTY |
 | **`F4`** | Próxima aba de edição (alternativa segura no Windows) |
@@ -124,7 +125,7 @@ Detalhes do terminal integrado: `specs/done/SPEC-TERMINAL-INFERIOR.md`.
 
 | Atalho / ação | Comportamento |
 |---------------|---------------|
-| `Ctrl+T` / `Ctrl+'` | Do editor: abre ou foca terminal; do terminal: fecha painel |
+| **Ctrl+T** / **Ctrl+`** (grave) | Do editor: abre ou foca terminal; do terminal: fecha painel |
 | **`Ctrl+E`** | Foco no editor |
 | **F6** | Alterna foco Editor ↔ Terminal |
 | **F7** | Envia seleção do editor (ou linha atual) ao PTY; abre terminal se fechado |

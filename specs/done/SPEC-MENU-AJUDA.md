@@ -46,7 +46,7 @@ Tabela em texto monoespaçado, agrupada:
 
 | Grupo | Exemplos |
 |-------|----------|
-| Global | `Ctrl+Q`, `Alt+F4`, `Ctrl+E` (editor), `Ctrl+T`/`Ctrl+'` (terminal) |
+| Global | `Ctrl+Q`, `Alt+F4`, `Ctrl+E` (editor), **Ctrl+T** / **Ctrl+`** (terminal) |
 | Arquivo | `Ctrl+N/O/S`, `F10`, `F2` |
 | Editar | `Ctrl+Z/Y`, `Ctrl+F/H`, `Ctrl+G` (ir para linha) |
 | Navegação | `F3`, `F4` abas, `F6` foco, `F7` editor→terminal |

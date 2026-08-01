@@ -1,8 +1,8 @@
 # PROJECT_STATUS — Editor Linux
 
 **Autor:** Perplexity AI  
-**Data:** 2026-07-31  
-**Versão:** 4.4
+**Data:** 2026-08-01  
+**Versão:** 4.6
 
 **Branch:** `main` (desenvolvimento integrado; branches de feature removidas após merge em 2026-06-09).
 
@@ -186,7 +186,6 @@
   - **181 testes** unitários passando (`cargo test`).
 - **Features SideKick UX (2026-06-09):**
   - **Painel de referência** no split direito: Funcionalidades (`F1`), Atalhos, Tabela ASCII — read-only, stash/restore da aba direita, botão **Fechar** na borda (`Esc` / `F`).
-  - **Sair da tela** (`Ctrl+Shift+Alt+E`): suspende TUI e retorna ao prompt; mesmo atalho retoma.
   - **Mnemônicos monocromáticos:** `exibir.mnemonico_parenteses` (`auto`|`ligado`|`desligado`); menus `(F) Arquivo`, itens `(N)ovo`, botões `(O)K`.
   - Spec: `specs/done/SPEC-REFERENCE-PANE-SIDEKICK.md`
   - **190 testes** unitários passando (`cargo test -- --test-threads=1`).
@@ -203,14 +202,22 @@
   - Scripts: `scripts/linux/` (build, stage, tarball, deb, rpm, Arch, AppImage, package-all).
   - Spec: `specs/done/SPEC-LINUX-XDG-PACKAGING.md`; RULES **v3.3**; README **v2.7**.
   - **206** testes unitários passando (`cargo test -- --test-threads=1`).
-- **Fix Sair da tela / retomada (2026-07-31):**
-  - Linux deixava de usar o loop `ui_suspended` (usava `SIGTSTP`/`fg`); `Ctrl+Shift+Alt+E` não retomava.
-  - Agora suspende a TUI, aguarda o mesmo chord e retoma; mensagem alinhada à spec SideKick.
+- **Remoção Sair da tela (2026-08-01):**
+  - Shell interativo + retomada com o mesmo chord são incompatíveis no mesmo TTY (`SIGTSTP`/`fg` vs processo em raw mode).
+  - Removidos menu, `Ctrl+Shift+Alt+E`, `ui_suspended`, `platform.rs` e `TerminalGuard::suspend`.
+  - Elevação env (`leave_ui_briefly` / `pkexec`) permanece.
+  - Suite: **213** testes (`cargo test -- --test-threads=1`).
 - **Editor de variáveis de ambiente (2026-07-31):**
   - Menu Ferramentas (`Alt+T`) + `Ctrl+Shift+V`; painel direito Usuário/Sistema.
   - Linux: `environment.d/99-edit.conf`; sistema com modal de privilégio + `pkexec`.
   - Windows: HKCU/HKLM + `WM_SETTINGCHANGE` (`winreg`).
   - Spec: `specs/done/SPEC-ENV-EDITOR.md`; RULES **v3.4**; README **v2.9**; **211** testes.
+  - Doc: `docs/ENV_EDITOR.md`; help in-app atualizado.
+
+- **Terminal UX / PATH (2026-07-31):**
+  - Atalho **Ctrl+`** (grave) além de `Ctrl+T` (menu Exibir → Terminal); `Ctrl+'` legado.
+  - Padrão `exibir.terminal_fundo = classico` (fundo preto/cinza).
+  - `scripts/linux/install-user.sh` → `~/.local/bin/edit`; RULES **v3.5**, README **v2.10**.
 
 ### Em andamento
 - **Fidelidade Turbo Vision:** `specs/to-do/SPEC-UX-FIDELIDADE-TURBO-VISION.md` (TV1–TV3 paleta/rodapé; demais itens TV8+).

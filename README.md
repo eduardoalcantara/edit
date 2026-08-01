@@ -1,8 +1,8 @@
 # edit — Editor de terminal (Power Edit)
 
 **Autor:** Perplexity AI  
-**Data:** 2026-07-31  
-**Versão:** 2.9
+**Data:** 2026-08-01  
+**Versão:** 2.11
 
 Editor TUI para **Linux** (alvo principal; alternativa ao Vim) com suporte a Windows. Menus estilo **Turbo Vision**, núcleo **ropey**, UX previsível e proteção contra perda de trabalho.
 
@@ -25,6 +25,17 @@ cargo run -- arquivo.txt outro.rs
 cargo run -- --clean
 cargo run -- --workspace src/main.rs
 ```
+
+### Instalar no PATH (Linux)
+
+Para usar o comando `edit` em qualquer pasta (não só `./edit`):
+
+```bash
+./scripts/linux/install-user.sh
+# copia target/release/edit → ~/.local/bin/edit
+```
+
+Garanta que `~/.local/bin` está no PATH (`echo $PATH`). Alternativa: pacote/tarball que instala em `/usr/bin/edit`.
 
 No Windows, o artefato é `edit.exe`. Build cruzado via WSL a partir do Windows (legado): `wsl bash -lc "cd /caminho/edit && cargo build --release"`.
 
@@ -105,7 +116,7 @@ Isso instala `/usr/bin/edit`, o lançador `.desktop` e os ícones.
 
 | Menu | Destaques |
 |------|-------------|
-| **Arquivo** | Novo, Abrir, **Recentes** (10 fechados), Salvar, Salvar Como, **Salvar Todos**, Fechar, **Sair da tela**, Sair |
+| **Arquivo** | Novo, Abrir, **Recentes** (10 fechados), Salvar, Salvar Como, **Salvar Todos**, Fechar, Sair |
 | **Editar** | Recortar/Copiar/Colar, clipboard 5 itens, Buscar/Substituir (modal), Selecionar tudo |
 | **Exibir** | Temas, word wrap, símbolos/espaços/tabs/EOL, colunas, margem, borda, **Dividir editor**, terminal, rodapé, **memória** |
 | **Formatar** | Codificação (UTF-8, ANSI, UTF-16…), tabulação, converter tabulação |
@@ -114,6 +125,9 @@ Isso instala `/usr/bin/edit`, o lançador `.desktop` e os ícones.
 | **Ajuda** | **Funcionalidades** e **Atalhos** no painel direito (split); **Tabela ASCII**; **Sobre** (modal) |
 
 ### Variáveis de ambiente
+
+Documentação: [`docs/ENV_EDITOR.md`](docs/ENV_EDITOR.md).
+
 
 - Painel direito estruturado (lista `NOME | valor`); escopos Usuário / Sistema.
 - Linux: `~/.config/environment.d/99-edit.conf` e `/etc/environment.d/99-edit.conf` (sistema via modal + `pkexec`).
@@ -167,8 +181,7 @@ Isso instala `/usr/bin/edit`, o lançador `.desktop` e os ícones.
 | `Alt+A` | Menu Arquivo |
 | `Alt+H` | Menu Ajuda |
 | **`F1`** | Ajuda → Funcionalidades (painel direito) |
-| **`Ctrl+Shift+Alt+E`** | Sair da tela / retornar ao editor (toggle prompt) |
-| `Ctrl+T` / `Ctrl+'` | Do editor: abre/foca terminal; do terminal: fecha painel |
+| **Ctrl+T** / **Ctrl+`** | Do editor: abre/foca terminal; do terminal: fecha painel |
 | **`Ctrl+E`** | Foco no editor |
 | **`Ctrl+G`** | Ir para linha... |
 | **`Ctrl+Shift+V`** | Variáveis de ambiente |

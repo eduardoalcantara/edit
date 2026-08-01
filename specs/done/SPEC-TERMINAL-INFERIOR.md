@@ -84,7 +84,7 @@ struct TerminalSession {
 | Atalho | Ação |
 |--------|------|
 | **`Ctrl+T`** | Mostrar / ocultar painel terminal inferior (toggle `view.terminal`). |
-| **`Ctrl+'`** | **Mesma ação** que `Ctrl+T` (compatibilidade VS Code). |
+| **`Ctrl+\``** | **Mesma ação** que `Ctrl+T` (estilo VS Code; preferido no Linux — `Ctrl+'` falha em muitos emuladores). |
 | **`F6`** | Com painel **visível:** alterna foco **Editor ↔ Terminal** (não troca aba de arquivo). Com painel **oculto:** noop ou abre painel e foca terminal (implementação: abrir + focar). |
 | **`Esc`** | Com foco no terminal → devolve foco ao editor (painel permanece visível). |
 
@@ -137,7 +137,7 @@ Ver **`SPEC-MULTPLOS-ARQUIVOS.md` §6.7** e **`PROJECT_RULES.md`**.
 ### Fase 1 — MVP
 
 - Crate **`portable-pty`** (Linux PTY + Windows ConPTY).
-- Uma sessão; borda + scrollback por linhas; foco Editor/Terminal; `Ctrl+T` / `Ctrl+'`; **`F6`** foco.
+- Uma sessão; borda + scrollback por linhas; foco Editor/Terminal; **Ctrl+T** / **Ctrl+`**; **`F6`** foco.
 - Loop principal: `drain_pty()` non-blocking antes de cada frame.
 
 ### Fase 2 — Multi-sessão + layout PO
@@ -167,7 +167,7 @@ Ver **`SPEC-MULTPLOS-ARQUIVOS.md` §6.7** e **`PROJECT_RULES.md`**.
 - [x] Painel com layout conforme §2 (mock ASCII aprovado pelo PO).
 - [x] Shell interativo (`cd`, `ls`, programas não-fullscreen) funcional.
 - [x] Scrollback com PgUp/PgDn no foco terminal.
-- [x] `Ctrl+T` e `Ctrl+'` equivalentes.
+- [x] **Ctrl+T** e **Ctrl+`** (grave) equivalentes; `Ctrl+'` mantido como alias legado.
 - [x] `F6` alterna foco Editor ↔ Terminal com painel visível.
 - [x] `F4`/`Shift+F4` trocam abas conforme §5.
 - [x] Fechar sessão / sair do app não deixa processos zumbis.
@@ -180,5 +180,6 @@ Ver **`SPEC-MULTPLOS-ARQUIVOS.md` §6.7** e **`PROJECT_RULES.md`**.
 | Data | Nota |
 |------|------|
 | 2026-06-08 | Spec inicial: layout PO com coluna de sessões; atalhos F6 foco terminal, F4/Shift+F4 abas, Ctrl+'. |
+| 2026-07-31 | Atalho secundário: **Ctrl+`** (grave, estilo VS Code) no Linux; padrão `terminal_fundo=classico`. |
 | 2026-06-08 | **F2** renomear; **F10** salvar (menu Arquivo → **Alt+A**). |
 | 2026-06-08 | Implementação MVP+fase 2: `src/terminal/` (PTY, scrollback, multi-sessão), moldura unificada, coluna `[+]`/`[-]`. |

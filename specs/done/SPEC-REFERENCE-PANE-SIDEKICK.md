@@ -3,15 +3,16 @@
 **Status:** done  
 **Data:** 2026-06-09  
 **Implementado:** 2026-06-09 (integrado em `main`)  
-**Autor:** Perplexity AI
+**Autor:** Perplexity AI  
+**Atualização:** 2026-08-01 — item **Sair da tela** removido (incompatibilidade TTY)
 
 ## Objetivo
 
-Trazer três evoluções inspiradas no Borland SideKick:
+Trazer evoluções inspiradas no Borland SideKick:
 
 1. Ajuda e tabela ASCII no **painel direito** do split (conteúdo virtual read-only).
-2. **Sair da tela** — suspende a TUI e volta ao prompt do terminal (**somente Unix/Linux**).
-3. **Mnemônicos entre parênteses** em terminais monocromáticos.
+2. **Mnemônicos entre parênteses** em terminais monocromáticos.
+3. ~~**Sair da tela**~~ — **removido em 2026-08-01** (ver seção 2).
 
 ## 1. Painel de referência
 
@@ -42,14 +43,13 @@ Trazer três evoluções inspiradas no Borland SideKick:
 | `build_abas_config` / sessão | não serializa |
 | Dirty / save | ignorado (`read_only`) |
 
-## 2. Sair da tela
+## 2. Sair da tela (removido)
 
-- Menu **Arquivo → Sair da tela** e atalho **`Ctrl+Shift+Alt+E`** — **visíveis apenas em Unix/Linux** (`src/platform.rs`: `terminal_suspend_to_shell_supported()`).
-- Windows: item oculto e atalho ignorado.
-- `TerminalGuard::suspend` deixa a tela alternativa, imprime aviso e reativa raw mode; `resume` restaura a TUI.
-- Loop `ui_suspended` captura **apenas** o chord `Ctrl+Shift+Alt+E` para retomar (processo permanece em memória).
-- Diferente de **Sair** (`Ctrl+Q`): processo continua até quit explícito.
-- **Nota:** não usa `SIGTSTP`/`fg` — o mesmo atalho precisa funcionar para sair e voltar.
+**Histórico:** menu **Arquivo → Sair da tela** e atalho **`Ctrl+Shift+Alt+E`** (Unix/Linux).
+
+**Motivo da remoção (2026-08-01):** no mesmo TTY, shell interativo (`SIGTSTP`/`fg`) e retomada pelo chord com o processo em foreground (raw mode) são mutuamente exclusivos. O half-fix sem shell usável foi descartado.
+
+Código removido: `platform.rs`, `TerminalGuard::suspend`, `ui_suspended` / `suspend_requested`, chord no compositor/keyboard, item de menu e teste associado. Elevação env (`leave_ui_briefly`) permanece.
 
 ## 3. Modo monocromático
 
@@ -69,7 +69,6 @@ Trazer três evoluções inspiradas no Borland SideKick:
 |------|----------|
 | Referência | `reference_pane.rs`, `app_reference_pane.rs`, `editor_split.rs`, `ui/layers/editor.rs` |
 | Read-only | `editor/engine.rs`, `editor/mod.rs`, `editor/commands.rs` |
-| Suspend | `main.rs`, `platform.rs`, `app.rs`, `ui/compositor.rs`, `input/keyboard.rs`, `menus.rs` |
 | Monocromático | `view_state.rs`, `config.rs`, `menus.rs`, `modal/dialog.rs` |
 | Abrir dirty | `modal/buttons.rs`, `modal/mod.rs`, `app.rs` |
 
@@ -77,7 +76,7 @@ Trazer três evoluções inspiradas no Borland SideKick:
 
 - `reference_pane::tests::reference_editor_is_read_only`
 - `app_workspace`: stash/restore, typing bloqueado, split com uma aba
-- `menus`: mnemônico `(F)`, item Tabela ASCII, Sair da tela condicional
+- `menus`: mnemônico `(F)`, item Tabela ASCII
 - `config`: `mnemonico_parenteses`
 - `view_state`: `resolve_paren_mnemonics`, `format_item_label_paren`
 
