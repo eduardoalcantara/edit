@@ -14,7 +14,7 @@ Painel direito estruturado (estilo Rapid Environment Editor) para ver, criar, ed
 | Caminho | Ação |
 |---------|------|
 | Menu **Ferramentas → Variáveis de ambiente…** | `Alt+T`, depois o item |
-| Atalho | **`Ctrl+Shift+V`** |
+| Atalho | **`Ctrl+Alt+V`** (não `Ctrl+Shift+V`: emuladores Linux usam isso para Paste e o chord não chega ao `edit`) |
 
 Título na borda: `[ Variáveis — Usuário ]` ou `[ Variáveis — Sistema ]`.
 
@@ -27,14 +27,16 @@ Título na borda: `[ Variáveis — Usuário ]` ou `[ Variáveis — Sistema ]`.
 
 ### Leitura (Linux)
 
-| Escopo | Fontes (fundidas; ficheiros posteriores / systemd prevalecem) |
-|--------|---------------------------------------------------------------|
-- Leitura Usuário: `~/.config/environment.d/*.conf` + `systemctl --user show-environment` (filtrado). Overrides `EDIT_ENV_*` **só em testes** — nunca em produção (evita lista vazia por path `/tmp` órfão no systemd).
+| Escopo | Fontes |
+|--------|--------|
+| **Usuário** | Só `~/.config/environment.d/*.conf` (persistente; análogo a `HKCU\Environment`) |
+| **Sistema** | `/etc/environment` + `/etc/environment.d/*.conf` |
 
-- Formato Linux: linhas `NOME=valor` (sem `export`).
-- Só o ficheiro `99-edit.conf` é **escrito** pelo `edit` (não reescreve `.bashrc` / `.profile` nem outros `.conf`).
-- Diretórios são criados se não existirem.
-- Após salvar Usuário no Linux: **`systemctl --user set-environment KEY=VAL`** só para as variáveis do ficheiro — **nunca** `import-environment` sem argumentos (isso copia o environ inteiro do processo `edit`, p.ex. `NO_COLOR`/`TERM=dumb` do Cursor, para a sessão systemd do utilizador).
+- **Não** misturar `systemctl --user show-environment` nem o environ do processo `edit` na lista editável — isso puxava a sessão live (Cursor AppImage, GNOME, RUSTUP…) e, ao gravar, poluía `99-edit.conf`.
+- Overrides `EDIT_ENV_*` **só em testes**.
+- Formato: linhas `NOME=valor` (sem `export`). Valores com `$''` (quoting do systemd) são descodificados na leitura.
+- Só o ficheiro `99-edit.conf` é **escrito** pelo `edit`.
+- Após salvar Usuário: **`systemctl --user set-environment KEY=VAL`** só para as variáveis do ficheiro — **nunca** `import-environment` sem argumentos.
 - Novas apps/terminais herdam as variáveis; a sessão gráfica já aberta pode exigir logout/login.
 
 ## Elevação (Sistema)

@@ -34,9 +34,42 @@ pub fn key_to_command(key: KeyEvent) -> Option<EditorCommand> {
 
 pub fn is_env_variables_chord(key: &KeyEvent) -> bool {
     use crossterm::event::KeyEventKind;
-    key.kind == KeyEventKind::Press
+    // Ctrl+Alt+V — Ctrl+Shift+V é Paste na maioria dos emuladores Linux (GNOME Terminal,
+    // Tilix, etc.) e nunca chega à aplicação; o texto colado parecia “escrever” no editor.
+    matches!(key.kind, KeyEventKind::Press | KeyEventKind::Repeat)
         && matches!(key.code, KeyCode::Char('v' | 'V'))
         && key.modifiers.contains(KeyModifiers::CONTROL)
-        && key.modifiers.contains(KeyModifiers::SHIFT)
-        && !key.modifiers.contains(KeyModifiers::ALT)
+        && key.modifiers.contains(KeyModifiers::ALT)
+        && !key.modifiers.contains(KeyModifiers::SHIFT)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crossterm::event::{KeyEventKind, KeyEventState};
+
+    fn key(code: KeyCode, mods: KeyModifiers) -> KeyEvent {
+        KeyEvent {
+            code,
+            modifiers: mods,
+            kind: KeyEventKind::Press,
+            state: KeyEventState::empty(),
+        }
+    }
+
+    #[test]
+    fn env_chord_is_ctrl_alt_v_not_ctrl_shift_v() {
+        assert!(is_env_variables_chord(&key(
+            KeyCode::Char('v'),
+            KeyModifiers::CONTROL | KeyModifiers::ALT
+        )));
+        assert!(!is_env_variables_chord(&key(
+            KeyCode::Char('v'),
+            KeyModifiers::CONTROL | KeyModifiers::SHIFT
+        )));
+        assert!(!is_env_variables_chord(&key(
+            KeyCode::Char('v'),
+            KeyModifiers::CONTROL
+        )));
+    }
 }

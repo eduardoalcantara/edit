@@ -121,7 +121,7 @@ Isso instala `/usr/bin/edit`, o lançador `.desktop` e os ícones.
 | **Exibir** | Temas, word wrap, símbolos/espaços/tabs/EOL, colunas, margem, borda, **Dividir editor**, terminal, rodapé, **memória** |
 | **Formatar** | Codificação (UTF-8, ANSI, UTF-16…), tabulação, converter tabulação |
 | **Abas** | Lista dinâmica (até 10, check na ativa), Fechar Todos, toggles sessão, Ordenar por |
-| **Ferramentas** | **Variáveis de ambiente…** (`Ctrl+Shift+V`) — Usuário/Sistema persistentes |
+| **Ferramentas** | **Variáveis de ambiente…** (`Ctrl+Alt+V`) — Usuário/Sistema persistentes |
 | **Ajuda** | **Funcionalidades** e **Atalhos** no painel direito (split); **Tabela ASCII**; **Sobre** (modal) |
 
 ### Variáveis de ambiente
@@ -184,7 +184,7 @@ Documentação: [`docs/ENV_EDITOR.md`](docs/ENV_EDITOR.md).
 | **Ctrl+T** / **Ctrl+`** | Do editor: abre/foca terminal; do terminal: fecha painel |
 | **`Ctrl+E`** | Foco no editor |
 | **`Ctrl+G`** | Ir para linha... |
-| **`Ctrl+Shift+V`** | Variáveis de ambiente |
+| **`Ctrl+Alt+V`** | Variáveis de ambiente |
 | **`F6`** | Alterna foco Editor ↔ Terminal |
 | **`F4`** / **`Shift+F4`** | Próxima / anterior aba (Windows-safe) |
 

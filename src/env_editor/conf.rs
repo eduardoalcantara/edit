@@ -36,7 +36,7 @@ pub fn parse_conf(text: &str) -> Vec<EnvVar> {
         if !seen.insert(name.to_string()) {
             continue;
         }
-        let value = strip_quotes(value);
+        let value = decode_env_value(value);
         out.push(EnvVar {
             name: name.to_string(),
             value,
@@ -45,16 +45,54 @@ pub fn parse_conf(text: &str) -> Vec<EnvVar> {
     out
 }
 
-fn strip_quotes(value: &str) -> String {
+/// Remove aspas e quoting estilo shell (`$'…'`) usado por `systemctl show-environment`.
+pub fn decode_env_value(value: &str) -> String {
+    let value = value.trim();
+    // ANSI-C: $'bye!' → bye!  (e escapes \n \t \\ \' \")
+    if let Some(inner) = value.strip_prefix("$'") {
+        if let Some(inner) = inner.strip_suffix('\'') {
+            return unescape_ansi_c(inner);
+        }
+    }
     let bytes = value.as_bytes();
     if bytes.len() >= 2 {
         let first = bytes[0];
         let last = bytes[bytes.len() - 1];
-        if (first == b'"' && last == b'"') || (first == b'\'' && last == b'\'') {
+        if first == b'"' && last == b'"' {
+            return value[1..value.len() - 1]
+                .replace("\\\"", "\"")
+                .replace("\\\\", "\\");
+        }
+        if first == b'\'' && last == b'\'' {
             return value[1..value.len() - 1].to_string();
         }
     }
     value.to_string()
+}
+
+fn unescape_ansi_c(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    let mut chars = s.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c != '\\' {
+            out.push(c);
+            continue;
+        }
+        match chars.next() {
+            Some('n') => out.push('\n'),
+            Some('t') => out.push('\t'),
+            Some('r') => out.push('\r'),
+            Some('\\') => out.push('\\'),
+            Some('\'') => out.push('\''),
+            Some('"') => out.push('"'),
+            Some(other) => {
+                out.push('\\');
+                out.push(other);
+            }
+            None => out.push('\\'),
+        }
+    }
+    out
 }
 
 pub fn serialize_conf(vars: &[EnvVar]) -> String {
@@ -110,6 +148,15 @@ mod tests {
         assert_eq!(vars[1].value, "hello world");
         let again = parse_conf(&serialize_conf(&vars));
         assert_eq!(again, vars);
+    }
+
+    #[test]
+    fn decodes_systemd_ansi_c_quoting() {
+        assert_eq!(decode_env_value("$'bye!'"), "bye!");
+        assert_eq!(decode_env_value("$'a\\nb'"), "a\nb");
+        assert_eq!(decode_env_value("plain"), "plain");
+        let vars = parse_conf("EDIT_TEST_VAR=$'bye!'\n");
+        assert_eq!(vars[0].value, "bye!");
     }
 
     #[test]

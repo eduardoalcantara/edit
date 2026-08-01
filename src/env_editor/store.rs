@@ -178,14 +178,11 @@ fn load_linux_user() -> Result<Vec<EnvVar>, EnvStoreError> {
         }
     }
 
+    // Só ficheiros persistentes em ~/.config/environment.d/ — como HKCU no Windows.
+    // NÃO misturar `systemctl --user show-environment` (sessão live: Cursor, GNOME, RUST…)
+    // nem o environ do processo: gravar isso em 99-edit.conf polui logins futuros.
     let dir = xdg_config_home().join(ENV_DIR);
-    let from_files = load_conf_dir(&dir)?;
-    let from_systemd = load_systemd_user_environment();
-    let merged = filter_ephemeral_vars(merge_var_lists([from_files, from_systemd]));
-    if !merged.is_empty() {
-        return Ok(merged);
-    }
-    Ok(load_process_env_filtered())
+    Ok(filter_ephemeral_vars(load_conf_dir(&dir)?))
 }
 
 fn filter_ephemeral_vars(vars: Vec<EnvVar>) -> Vec<EnvVar> {
@@ -206,31 +203,6 @@ fn load_linux_system() -> Result<Vec<EnvVar>, EnvStoreError> {
     let etc_env = load_conf_file(Path::new("/etc/environment"))?;
     let etc_dir = load_conf_dir(&PathBuf::from("/etc").join(ENV_DIR))?;
     Ok(filter_ephemeral_vars(merge_var_lists([etc_env, etc_dir])))
-}
-
-#[cfg(not(windows))]
-fn load_systemd_user_environment() -> Vec<EnvVar> {
-    let output = Command::new("systemctl")
-        .args(["--user", "show-environment"])
-        .output();
-    let Ok(out) = output else {
-        return Vec::new();
-    };
-    if !out.status.success() {
-        return Vec::new();
-    }
-    let text = String::from_utf8_lossy(&out.stdout);
-    parse_conf(&text)
-}
-
-#[cfg(not(windows))]
-fn load_process_env_filtered() -> Vec<EnvVar> {
-    let mut vars: Vec<EnvVar> = std::env::vars()
-        .filter(|(name, _)| validate_var_name(name) && !is_ephemeral_env_name(name))
-        .map(|(name, value)| EnvVar { name, value })
-        .collect();
-    vars.sort_by(|a, b| a.name.to_ascii_uppercase().cmp(&b.name.to_ascii_uppercase()));
-    vars
 }
 
 fn is_ephemeral_env_name(name: &str) -> bool {

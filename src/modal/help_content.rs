@@ -62,7 +62,7 @@ menus pull-down, modais e proteção contra perda de trabalho.
   • Zoom 1–3; consumo de memória opcional (~2s)
   • Menus Alt+A/E/X/F/S/T/H; toggles com √; opções exclusivas estilo radio
   • Split: rodapé mostra Editor 1 / Editor 2 conforme painel em foco
-  • Ferramentas → Variáveis de ambiente (Ctrl+Shift+V): Usuário/Sistema
+  • Ferramentas → Variáveis de ambiente (Ctrl+Alt+V): Usuário/Sistema
   • Valores de env em claro na v1; persistência fora do processo (environment.d / registry)
 
 
@@ -71,7 +71,7 @@ menus pull-down, modais e proteção contra perda de trabalho.
   • edit.json (Linux: ~/.config/edit/; Windows: ao lado do exe)
   • Sessão: Linux ~/.local/state/edit/.edit-session/; Windows ao lado do exe
   • --workspace: ./.edit/ no diretório atual
-  • Env usuário Linux: environment.d + systemctl --user show-environment
+  • Env usuário Linux: só ~/.config/environment.d/*.conf (não a sessão live)
   • Env sistema Linux: /etc/environment + /etc/environment.d/*.conf
   • Gravação: 99-edit.conf (usuário/sistema); sistema via pkexec
   • Doc: docs/ENV_EDITOR.md
@@ -119,7 +119,7 @@ quando indicado (ex.: Ctrl+Q, Alt+F4).
   Ctrl+A              Selecionar tudo
   Ctrl+F / Ctrl+R     Buscar / Substituir
   Ctrl+G              Ir para linha...
-  Ctrl+Shift+V        Variáveis de ambiente (painel direito)
+  Ctrl+Alt+V          Variáveis de ambiente (painel direito)
   F3 / Shift+F3       Próxima / anterior ocorrência de busca
   Esc                 Limpa busca ativa no editor (sem modal aberto)
 
@@ -165,7 +165,7 @@ quando indicado (ex.: Ctrl+Q, Alt+F4).
 
 ─── VARIÁVEIS DE AMBIENTE (painel) ───
 
-  Ctrl+Shift+V        Abre o painel Usuário/Sistema
+  Ctrl+Alt+V          Abre o painel Usuário/Sistema
   Alt+O / Tab         Alterna escopo (Origem)
   Alt+N               Nova
   Alt+M / Enter       Mudar (editar)
@@ -177,7 +177,7 @@ quando indicado (ex.: Ctrl+Q, Alt+F4).
   Roda do mouse       Rola a lista
 
   Botões: Alt+letra (como no Windows). Menus: Alt+A/E/X/F/S/T/H.
-  Linux: environment.d + systemctl --user show-environment
+  Linux: ~/.config/environment.d/*.conf (usuário); /etc/environment.d (sistema)
   Doc: docs/ENV_EDITOR.md
 
 

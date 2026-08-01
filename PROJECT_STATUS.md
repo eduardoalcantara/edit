@@ -207,8 +207,12 @@
   - Removidos menu, `Ctrl+Shift+Alt+E`, `ui_suspended`, `platform.rs` e `TerminalGuard::suspend`.
   - Elevação env (`leave_ui_briefly` / `pkexec`) permanece.
   - Suite: **213** testes (`cargo test -- --test-threads=1`).
+- **Fix env Usuário / atalho (2026-08-01):**
+  - Bug do código: a lista Usuário misturava `systemctl --user show-environment` (sessão live) e gravava isso em `99-edit.conf`.
+  - Descodifica quoting `$''`; atalho **`Ctrl+Alt+V`** — `Ctrl+Shift+V` é Paste nos emuladores Linux e não chega ao `edit`.
+  - Suite: **215** testes.
 - **Editor de variáveis de ambiente (2026-07-31):**
-  - Menu Ferramentas (`Alt+T`) + `Ctrl+Shift+V`; painel direito Usuário/Sistema.
+  - Menu Ferramentas (`Alt+T`) + `Ctrl+Alt+V`; painel direito Usuário/Sistema.
   - Linux: `environment.d/99-edit.conf`; sistema com modal de privilégio + `pkexec`.
   - Windows: HKCU/HKLM + `WM_SETTINGCHANGE` (`winreg`).
   - Spec: `specs/done/SPEC-ENV-EDITOR.md`; RULES **v3.4**; README **v2.9**; **211** testes.

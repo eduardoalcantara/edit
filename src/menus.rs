@@ -760,7 +760,7 @@ fn view_menu(view: &ViewState, split_editor: bool) -> Vec<MenuNode> {
 fn tools_menu() -> Vec<MenuNode> {
     vec![item(
         "Variáveis de ambiente...",
-        Some("Ctrl+Shift+V"),
+        Some("Ctrl+Alt+V"),
         ActionId::EnvVariables,
         true,
         None,

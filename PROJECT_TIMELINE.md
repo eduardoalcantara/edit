@@ -180,3 +180,4 @@
 - 2026-07-31 — **Editor de variáveis de ambiente** — painel Usuário/Sistema; Linux `environment.d` + `pkexec`; Windows registry; menu Ferramentas; spec `SPEC-ENV-EDITOR.md`; **211** testes; README **v2.9**; STATUS/TIMELINE **v4.4**.
 - 2026-07-31 — **Terminal UX + PATH** — atalho **Ctrl+`**; fundo padrão `classico`; `docs/ENV_EDITOR.md` + help; `install-user.sh` → `~/.local/bin/edit`; RULES **v3.5**, README **v2.10**, STATUS/TIMELINE **v4.5**.
 - 2026-08-01 — **Remoção Sair da tela** — incompatibilidade TTY (shell usável vs retomada por chord); remove menu/atalho/`platform.rs`/`suspend`; README **v2.11**, STATUS/TIMELINE **v4.6**.
+- 2026-08-01 — **Fix env Usuário** — deixa de misturar sessão systemd/`show-environment` na lista; descodifica `$''`; evita poluir `99-edit.conf`; atalho **Ctrl+Alt+V**.

@@ -25,7 +25,7 @@ Formato Linux: linhas `NOME=valor` (sem `export`). Apenas o ficheiro `99-edit.co
 
 ## UX
 
-- Menu **Ferramentas → Variáveis de ambiente…**; atalho **`Ctrl+Shift+V`**.
+- Menu **Ferramentas → Variáveis de ambiente…**; atalho **`Ctrl+Alt+V`** (evita `Ctrl+Shift+V`, Paste nos emuladores Linux).
 - Split direito; lista `NOME | valor`; escopos Usuário / Sistema.
 - Ações: Novo, Editar, Excluir, Salvar, Recarregar, Fechar.
 - Confirmação em Excluir e ao trocar escopo com dirty.

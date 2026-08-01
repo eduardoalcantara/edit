@@ -42,7 +42,7 @@ impl App {
         self.editor_split.right_tab = None;
         self.editor_split.focused_pane = SplitPane::Right;
         self.input_focus = InputFocus::Editor;
-        self.set_status("Variáveis de ambiente — Usuário (Ctrl+Shift+V)");
+        self.set_status("Variáveis de ambiente — Usuário (Ctrl+Alt+V)");
     }
 
     pub fn close_env_pane(&mut self) {

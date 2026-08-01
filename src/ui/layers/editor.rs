@@ -577,6 +577,12 @@ fn handle_ctrl_key(app: &mut crate::app::App, key: KeyEvent) -> InputResult {
             }
         }
         KeyCode::Char('v' | 'V') => {
+            // Só Ctrl+V = colar. Ctrl+Shift+V / Ctrl+Alt+V não devem cair aqui.
+            if key.modifiers.contains(crossterm::event::KeyModifiers::SHIFT)
+                || key.modifiers.contains(crossterm::event::KeyModifiers::ALT)
+            {
+                return InputResult::Unhandled;
+            }
             if let Some(text) = app.clipboard.paste_text() {
                 app.editor.execute(EditorCommand::Paste(text));
                 app.set_status("Colado");

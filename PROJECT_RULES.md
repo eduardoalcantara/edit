@@ -40,7 +40,7 @@ Regras estáveis do projeto. Para estado de implementação, ver `PROJECT_STATUS
 
 ### Variáveis de ambiente persistentes
 
-- Painel **Ferramentas → Variáveis de ambiente…** (`Ctrl+Shift+V`): lista estruturada Usuário / Sistema no split direito.
+- Painel **Ferramentas → Variáveis de ambiente…** (`Ctrl+Alt+V`): lista estruturada Usuário / Sistema no split direito.
 - Linux usuário: `~/.config/environment.d/99-edit.conf`; sistema: `/etc/environment.d/99-edit.conf` (gravação com modal de privilégio + `pkexec`).
 - Windows usuário: `HKCU\Environment`; sistema: `HKLM\...\Environment` (requer admin).
 - Spec: `specs/done/SPEC-ENV-EDITOR.md`; doc: `docs/ENV_EDITOR.md`.
@@ -99,7 +99,7 @@ Regras estáveis do projeto. Para estado de implementação, ver `PROJECT_STATUS
 | `Ctrl+Tab` / `Ctrl+Shift+Tab` | Próxima / anterior aba (quando o host repassar ao app) |
 | `Ctrl+F` / `Ctrl+H` | Buscar / Substituir |
 | **`Ctrl+G`** | Ir para linha... |
-| **`Ctrl+Shift+V`** | Variáveis de ambiente (painel direito) |
+| **`Ctrl+Alt+V`** | Variáveis de ambiente (painel direito) |
 | `Ctrl+←/→` | Navegação inteligente por palavra |
 | `Ctrl+Shift+←/→` | Seleção por palavra |
 | `Alt` + arraste | Seleção retangular (bloco) |
