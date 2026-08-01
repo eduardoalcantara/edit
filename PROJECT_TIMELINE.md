@@ -178,3 +178,4 @@
 - 2026-07-31 — **Host Linux nativo** — verificação de toolchain (Rust 1.97 / 1.85+, `cc`, X11); `cargo build --release` e testes OK; docs Linux-first (README **v2.6**, MASTER/spec v1 supersessão, STATUS/TIMELINE **v4.2**). Sem mudança de código de runtime.
 - 2026-07-31 — **XDG + freedesktop + pacotes Linux** — `src/paths.rs` (config/sessão XDG no Linux); migração legada; `packaging/linux/` + `scripts/linux/`; spec `SPEC-LINUX-XDG-PACKAGING.md`; RULES **v3.3**, README **v2.7**, STATUS/TIMELINE **v4.3**; **206** testes.
 - 2026-07-31 — **Fix Sair da tela** — remove `SIGTSTP`; retomada via `ui_suspended` + `Ctrl+Shift+Alt+E` (Linux).
+- 2026-07-31 — **Editor de variáveis de ambiente** — painel Usuário/Sistema; Linux `environment.d` + `pkexec`; Windows registry; menu Ferramentas; spec `SPEC-ENV-EDITOR.md`; **210** testes; README **v2.9**; STATUS/TIMELINE **v4.4**.

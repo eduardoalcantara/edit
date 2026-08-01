@@ -2,7 +2,7 @@
 
 **Autor:** Perplexity AI  
 **Data:** 2026-07-31  
-**Versão:** 2.8
+**Versão:** 2.9
 
 Editor TUI para **Linux** (alvo principal; alternativa ao Vim) com suporte a Windows. Menus estilo **Turbo Vision**, núcleo **ropey**, UX previsível e proteção contra perda de trabalho.
 
@@ -101,7 +101,7 @@ Isso instala `/usr/bin/edit`, o lançador `.desktop` e os ícones.
 - **`edit.json` v2** — seção `arquivo.abas` (toggles, ordem, metadados, cursor, encoding/tabulacao por aba).
 - Split persistido por **caminho** (`exibir.split_left_caminho`, `split_right_caminho`, `split_foco`).
 
-### Menus (Alt+A / E / X / F / S / H)
+### Menus (Alt+A / E / X / F / S / T / H)
 
 | Menu | Destaques |
 |------|-------------|
@@ -109,8 +109,16 @@ Isso instala `/usr/bin/edit`, o lançador `.desktop` e os ícones.
 | **Editar** | Recortar/Copiar/Colar, clipboard 5 itens, Buscar/Substituir (modal), Selecionar tudo |
 | **Exibir** | Temas, word wrap, símbolos/espaços/tabs/EOL, colunas, margem, borda, **Dividir editor**, terminal, rodapé, **memória** |
 | **Formatar** | Codificação (UTF-8, ANSI, UTF-16…), tabulação, converter tabulação |
-| **Abas** | Lista dinâmica (até 10, radio na ativa), Fechar Todos, toggles sessão, Ordenar por |
+| **Abas** | Lista dinâmica (até 10, check na ativa), Fechar Todos, toggles sessão, Ordenar por |
+| **Ferramentas** | **Variáveis de ambiente…** (`Ctrl+Shift+V`) — Usuário/Sistema persistentes |
 | **Ajuda** | **Funcionalidades** e **Atalhos** no painel direito (split); **Tabela ASCII**; **Sobre** (modal) |
+
+### Variáveis de ambiente
+
+- Painel direito estruturado (lista `NOME | valor`); escopos Usuário / Sistema.
+- Linux: `~/.config/environment.d/99-edit.conf` e `/etc/environment.d/99-edit.conf` (sistema via modal + `pkexec`).
+- Windows: `HKCU\Environment` / `HKLM\...\Environment` (sistema requer admin).
+- Ações: Novo, Editar, Excluir, Salvar (`Ctrl+S` no painel), Recarregar, Fechar.
 
 ### Referência no split (estilo SideKick)
 

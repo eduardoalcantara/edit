@@ -390,4 +390,24 @@ mod tests {
         std::env::remove_var("EDIT_ENV_USER_CONF");
         let _ = fs::remove_dir_all(&dir);
     }
+
+    #[test]
+    fn system_roundtrip_via_override() {
+        let dir = std::env::temp_dir().join(format!("edit-env-sys-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("99-edit.conf");
+        std::env::set_var("EDIT_ENV_SYSTEM_CONF", &path);
+
+        let vars = vec![EnvVar {
+            name: "EDIT_SYS_TEST".into(),
+            value: "world".into(),
+        }];
+        save_scope(EnvScope::System, &vars).unwrap();
+        let loaded = load_scope(EnvScope::System).unwrap();
+        assert_eq!(loaded, vars);
+
+        std::env::remove_var("EDIT_ENV_SYSTEM_CONF");
+        let _ = fs::remove_dir_all(&dir);
+    }
 }
