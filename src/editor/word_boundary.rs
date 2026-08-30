@@ -85,7 +85,9 @@ fn prev_word_boundary(text: &str, pos: usize) -> usize {
         while p > 0 && is_separator(chars[p - 1]) {
             p -= 1;
         }
-        return prev_word_boundary(text, p);
+        // `p` aponta para o primeiro separador da sequência; recursão com o mesmo
+        // índice causava stack overflow quando o caractere anterior não é separador.
+        return prev_word_start_before(&chars, p);
     }
 
     let cur_start = word_start_at_or_before(&chars, pos);
@@ -362,6 +364,14 @@ mod tests {
     #[test]
     fn ctrl_left_user_profile_id() {
         assert_eq!(left_steps("user_profile_id", 15, 3), vec![15, 13, 5, 0]);
+    }
+
+    #[test]
+    fn ctrl_left_from_separator_does_not_overflow() {
+        assert_eq!(prev_word_boundary("user_profile_id", 4), 0);
+        assert_eq!(prev_word_boundary("user_profile_id", 12), 5);
+        assert_eq!(prev_word_boundary("easy-edit-turbo", 4), 0);
+        assert_eq!(left_steps("user_profile_id", 4, 1), vec![4, 0]);
     }
 
     #[test]
